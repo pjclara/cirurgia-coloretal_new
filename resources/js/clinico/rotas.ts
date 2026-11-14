@@ -15,6 +15,7 @@ export const rotas = {
     },
     internamentos: {
         lista: '/internamentos',
+        seguimentos: '/internamentos/seguimentos',
         novo: (utenteId?: number) => (utenteId ? `/internamentos/novo?utente=${utenteId}` : '/internamentos/novo'),
         registo: (id: number) => `/internamentos/${id}`,
     },

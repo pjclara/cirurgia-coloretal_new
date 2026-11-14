@@ -67,6 +67,55 @@ class InternamentoController extends Controller
         ]);
     }
 
+    /** Altas cujo seguimento aos 30 dias (morbilidade) ainda não foi registado. */
+    public function seguimentos(Request $request): Response
+    {
+        $periodos = ['90' => 90, '365' => 365, 'todos' => null];
+        $periodo = array_key_exists($request->query('periodo'), $periodos) ? $request->query('periodo') : '90';
+        $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
+        $hoje = now()->startOfDay();
+        $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
+
+        $base = Internamento::query()
+            ->comAlta()
+            ->where(fn ($q) => $q->whereNull('destino_id')->orWhere('destino_id', '<>', Internamento::DESTINO_FALECIDO))
+            ->whereDoesntHave('morbilidades', fn ($q) => $q->where('momento', Morbilidade::AOS_30_DIAS))
+            ->when($periodos[$periodo], fn ($q, $dias) => $q->whereDate('data_de_alta', '>=', $hoje->copy()->subDays($dias)));
+
+        $emAtraso = (clone $base)->whereDate('data_de_alta', '<', $limiteAtraso)->count();
+        $aDecorrer = (clone $base)->whereDate('data_de_alta', '>=', $limiteAtraso)->count();
+
+        $lista = (clone $base)
+            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
+            ->when($estado === 'em_atraso', fn ($q) => $q->whereDate('data_de_alta', '<', $limiteAtraso))
+            ->when($estado === 'a_decorrer', fn ($q) => $q->whereDate('data_de_alta', '>=', $limiteAtraso))
+            ->orderBy('data_de_alta')
+            ->orderBy('id')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(function (Internamento $i) use ($hoje) {
+                $prevista = $i->data_de_alta->copy()->addDays(30);
+
+                return [
+                    'id' => $i->id,
+                    'utente' => ['id' => $i->utente?->id, 'nome' => $i->utente?->nome, 'numero_processo' => $i->utente?->numero_processo],
+                    'motivo' => $i->motivo_internamento,
+                    'data_de_alta' => $i->data_de_alta->format('Y-m-d'),
+                    'prevista' => $prevista->format('Y-m-d'),
+                    // positivo = dias de atraso; negativo = dias que faltam
+                    'dias_de_atraso' => (int) $prevista->startOfDay()->diffInDays($hoje, false),
+                    'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
+                    'clavien' => Dominios::nome('clavien_dindos', $i->claviemMaisGrave()),
+                ];
+            });
+
+        return Inertia::render('internamentos/seguimentos', [
+            'seguimentos' => $lista,
+            'filtros' => ['estado' => $estado, 'periodo' => $periodo],
+            'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer],
+        ]);
+    }
+
     public function create(Request $request): Response
     {
         $utente = ctype_digit((string) $request->query('utente'))

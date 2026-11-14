@@ -27,6 +27,7 @@ Route::middleware('can:show internamento')->group(function () {
     Route::get('utentes/pesquisa', [UtenteController::class, 'pesquisa'])->name('utentes.pesquisa');
 
     Route::get('internamentos', [InternamentoController::class, 'index'])->name('internamentos.index');
+    Route::get('internamentos/seguimentos', [InternamentoController::class, 'seguimentos'])->name('internamentos.seguimentos');
 });
 
 Route::middleware('can:create internamento')->group(function () {

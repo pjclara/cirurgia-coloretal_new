@@ -71,7 +71,16 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
         <ClinicoLayout
             titulo="Internamentos"
             largura="larga"
-            acoes={permissoes.includes('create internamento') && <BotaoLigacao href={rotas.internamentos.novo()}>Registar internamento</BotaoLigacao>}
+            acoes={
+                <>
+                    <BotaoLigacao href={rotas.internamentos.seguimentos} variante="secundario">
+                        Seguimentos aos 30 dias
+                    </BotaoLigacao>
+                    {permissoes.includes('create internamento') && (
+                        <BotaoLigacao href={rotas.internamentos.novo()}>Registar internamento</BotaoLigacao>
+                    )}
+                </>
+            }
         >
             <div className="mb-4 flex flex-wrap items-end gap-3">
                 <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5" role="group" aria-label="Estado">
@@ -146,14 +155,30 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                 <table className="w-full text-left text-sm">
                     <thead className="border-b border-slate-200 bg-slate-50 text-slate-700">
                         <tr>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Utente</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Motivo</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Entrada</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Alta</th>
-                            <th scope="col" className="px-4 py-2.5 text-right font-semibold">Dias</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Local</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Resp.</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Destino</th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Utente
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Motivo
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Entrada
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Alta
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-semibold">
+                                Dias
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Local
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Resp.
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Destino
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -176,14 +201,14 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                                         {formatarData(i.data_de_entrada)}
                                         {!diasValidos && <span className="block text-xs">Data a corrigir</span>}
                                     </td>
-                                    <td className="px-4 py-2.5 tabular-nums text-slate-700">
+                                    <td className="px-4 py-2.5 text-slate-700 tabular-nums">
                                         {i.data_de_alta ? (
                                             formatarData(i.data_de_alta)
                                         ) : (
                                             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">Internado</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{diasValidos ? dias : '—'}</td>
+                                    <td className="px-4 py-2.5 text-right text-slate-700 tabular-nums">{diasValidos ? dias : '—'}</td>
                                     <td className="px-4 py-2.5 text-slate-700">
                                         {i.localizacao ?? '—'}
                                         <span className="block text-xs text-slate-600 tabular-nums">Cama {i.cama}</span>
