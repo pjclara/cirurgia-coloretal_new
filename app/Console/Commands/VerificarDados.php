@@ -92,6 +92,21 @@ class VerificarDados extends Command
             DB::table('internamentos')->whereNull('deleted_at')->whereNotNull('data_de_alta')->where('estado_da_alta_id', 1)
                 ->get(['id', 'data_de_alta']), 'data_de_alta');
 
+        $registar('Alta sem destino', 'internamentos',
+            DB::table('internamentos')->whereNull('deleted_at')->whereNotNull('data_de_alta')->whereNull('destino_id')
+                ->get(['id', 'data_de_alta']), 'data_de_alta');
+
+        $registar('Alta sem morbilidade registada na alta', 'internamentos',
+            DB::table('internamentos as i')->whereNull('i.deleted_at')->whereNotNull('i.data_de_alta')
+                ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('morbilidades as m')
+                    ->whereColumn('m.internamento_id', 'i.id')->where('m.momento', 'alta'))
+                ->get(['i.id', 'i.data_de_alta']), 'data_de_alta');
+
+        $registar('Alta sem diagnóstico', 'internamentos',
+            DB::table('internamentos as i')->whereNull('i.deleted_at')->whereNotNull('i.data_de_alta')
+                ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('diagnostico_internamento as d')->whereColumn('d.internamento_id', 'i.id'))
+                ->get(['i.id', 'i.data_de_alta']), 'data_de_alta');
+
         // Resumo no ecrã.
         $resumo = collect($achados)->groupBy(0)->map(fn ($grupo, $problema) => [$problema, $grupo->first()[1], $grupo->count()])->values();
         $this->table(['Problema', 'Tabela', 'Registos'], $resumo->all());

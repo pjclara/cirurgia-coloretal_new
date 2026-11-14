@@ -196,6 +196,7 @@ export function FormularioInternamento({
     const erros = form.errors as Record<string, string | undefined>;
 
     const [separador, setSeparador] = useState<Separador>('dados');
+    const [tentouAlta, setTentouAlta] = useState(false);
     const [momento, setMomento] = useState<Momento>(internamento?.data_de_alta ? 'alta' : 'internamento');
     const obito = data.destino_id === DESTINO_FALECIDO;
     const temComplicacaoReal = (m: Momento) => data.morbilidade[m].complicacoes.some((c) => c.id !== SEM_COMPLICACOES);
@@ -224,8 +225,28 @@ export function FormularioInternamento({
         }));
     };
 
+    /** Requisitos para dar alta: o que tem de estar preenchido, e onde se preenche. */
+    const requisitosDeAlta: { texto: string; feito: boolean; separador: Separador }[] = [
+        { texto: 'Destino do doente escolhido', feito: data.destino_id !== '', separador: 'alta' },
+        { texto: 'Pelo menos um diagnóstico', feito: data.diagnosticos.length > 0, separador: 'dados' },
+        { texto: 'Motivo de internamento preenchido', feito: data.motivo_internamento.trim() !== '', separador: 'dados' },
+        { texto: 'Morbilidade da alta registada (ou "Sem complicações")', feito: registado('alta'), separador: 'morbilidade' },
+        {
+            texto: 'Grau de Clavien-Dindo da alta, se houve complicações',
+            feito: !temComplicacaoReal('alta') || obito || data.morbilidade.alta.clavien_dindo_id !== '',
+            separador: 'morbilidade',
+        },
+    ];
+    const pendenciasDeAlta = requisitosDeAlta.filter((r) => !r.feito);
+
     const guardar = (evento: FormEvent) => {
         evento.preventDefault();
+        // Não se dá alta com campos obrigatórios por preencher: abre o separador do primeiro em falta.
+        if (data.data_de_alta && pendenciasDeAlta.length > 0) {
+            setTentouAlta(true);
+            setSeparador(pendenciasDeAlta[0].separador);
+            return;
+        }
         form.transform((atual) => (origem ? { ...atual, origem } : atual));
         const opcoes = {
             preserveScroll: true,
@@ -241,6 +262,46 @@ export function FormularioInternamento({
     const apagar = () => {
         if (internamento) router.delete(rotas.internamentos.registo(internamento.id) + (origem ? `?origem=${origem}` : ''));
     };
+
+    const painelDeAlta = (
+        <div
+            role={tentouAlta && pendenciasDeAlta.length > 0 ? 'alert' : 'status'}
+            className={`mb-5 rounded-md border px-4 py-3 text-sm ${
+                !data.data_de_alta
+                    ? 'border-slate-200 bg-slate-50 text-slate-800'
+                    : pendenciasDeAlta.length === 0
+                      ? 'border-teal-300 bg-teal-50 text-teal-950'
+                      : tentouAlta
+                        ? 'border-rose-300 bg-rose-50 text-rose-950'
+                        : 'border-amber-300 bg-amber-50 text-amber-950'
+            }`}
+        >
+            <p className="font-semibold">
+                {!data.data_de_alta
+                    ? 'Antes de dar alta, confirme que está preenchido:'
+                    : pendenciasDeAlta.length === 0
+                      ? 'Tudo preenchido: pode dar alta.'
+                      : `Faltam ${plural(pendenciasDeAlta.length, 'campo obrigatório', 'campos obrigatórios')} para dar alta:`}
+            </p>
+            <ul className="mt-2 space-y-1">
+                {requisitosDeAlta.map((r) => (
+                    <li key={r.texto} className="flex items-start gap-2">
+                        <span aria-hidden className={r.feito ? 'text-teal-700' : 'text-rose-700'}>
+                            {r.feito ? '✓' : '✗'}
+                        </span>
+                        <span className="sr-only">{r.feito ? 'Preenchido: ' : 'Em falta: '}</span>
+                        {r.feito || r.separador === 'alta' ? (
+                            <span>{r.texto}</span>
+                        ) : (
+                            <button type="button" onClick={() => setSeparador(r.separador)} className="text-left underline underline-offset-2">
+                                {r.texto}
+                            </button>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 
     const numeroDeErros = Object.keys(erros).length;
 
@@ -586,6 +647,7 @@ export function FormularioInternamento({
                             titulo="Alta"
                             descricao="Deixe a data de alta vazia enquanto o doente estiver internado. As complicações da alta registam-se em Morbilidade."
                         >
+                            {painelDeAlta}
                             <div className="grid gap-4 sm:grid-cols-6">
                                 <Campo rotulo="Data de alta" para="data_de_alta" erro={erros.data_de_alta} className="sm:col-span-2">
                                     <input
