@@ -175,7 +175,8 @@ class InternamentoRequest extends FormRequest
             }
 
             // Óbito com complicação na alta fica automaticamente em grau 5.
-            $grauAutomatico = $momento === Morbilidade::NA_ALTA && $destinoFalecido;
+            $grauAutomatico = ($momento === Morbilidade::NA_ALTA && $destinoFalecido)
+                || Morbilidade::grauPelasResolucoes($bloco['complicacoes'] ?? []) !== null; // calculado pelas resoluções
             if ($temReal && empty($bloco['clavien_dindo_id']) && ! $grauAutomatico) {
                 $validator->errors()->add("morbilidade.$momento.clavien_dindo_id", 'Indique o grau de Clavien-Dindo das complicações registadas.');
             }

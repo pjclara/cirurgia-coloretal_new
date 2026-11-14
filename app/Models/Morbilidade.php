@@ -7,6 +7,7 @@ use App\Models\Concerns\RegistaAutor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\DB;
 
 /** Morbilidade de um internamento num dos três momentos de registo. */
 class Morbilidade extends Model
@@ -31,6 +32,28 @@ class Morbilidade extends Model
     protected function casts(): array
     {
         return ['data_registo' => 'date'];
+    }
+
+    /**
+     * Grau de Clavien-Dindo calculado pelas resoluções escolhidas: o mais alto entre os graus
+     * associados a cada resolução. `null` se nenhuma resolução tem grau associado.
+     *
+     * @param  array<int, array{id:int|string, resolucoes?:array}>  $complicacoes
+     */
+    public static function grauPelasResolucoes(array $complicacoes): ?int
+    {
+        $resolucoes = collect($complicacoes)
+            ->reject(fn ($c) => (int) ($c['id'] ?? 0) === Complicacao::SEM_COMPLICACOES)
+            ->flatMap(fn ($c) => $c['resolucoes'] ?? [])
+            ->map(fn ($r) => (int) $r)->unique()->values();
+
+        if ($resolucoes->isEmpty()) {
+            return null;
+        }
+
+        $grau = DB::table('resolucao_complicacaos')->whereIn('id', $resolucoes)->whereNotNull('clavien_dindo_id')->max('clavien_dindo_id');
+
+        return $grau === null ? null : (int) $grau;
     }
 
     public function internamento(): BelongsTo

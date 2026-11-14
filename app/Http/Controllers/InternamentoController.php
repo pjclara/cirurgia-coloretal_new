@@ -279,7 +279,10 @@ class InternamentoController extends Controller
             'destinos' => Dominios::lista('destinos'),
             'casos_sociais' => Dominios::lista('caso_socials'),
             'clavien' => Dominios::lista('clavien_dindos'),
-            'resolucoes' => Dominios::lista('resolucao_complicacaos'),
+            // Cada resolução traz o grau de Clavien-Dindo associado (calculado automaticamente no formulário).
+            'resolucoes' => DB::table('resolucao_complicacaos')->orderBy('id')->get(['id', 'nome', 'clavien_dindo_id'])
+                ->map(fn ($r) => ['id' => (int) $r->id, 'nome' => trim($r->nome), 'clavien_dindo_id' => $r->clavien_dindo_id ? (int) $r->clavien_dindo_id : null])
+                ->all(),
             'diagnosticos' => Dominios::diagnosticos(),
             'complicacoes' => Dominios::complicacoes(),
             'responsaveis' => Dominios::responsaveis($responsavelAtual),

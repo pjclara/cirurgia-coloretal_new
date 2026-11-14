@@ -6,10 +6,13 @@ export type ComplicacaoEscolhida = { id: number; resolucoes: number[] };
 export type BlocoMorbilidade = { complicacoes: ComplicacaoEscolhida[]; clavien_dindo_id: number | ''; data_registo: string };
 export type Momento = 'internamento' | 'alta' | '30_dias';
 
+/** Resolução com o grau de Clavien-Dindo associado (null = sem grau automático). */
+export type ResolucaoComGrau = Opcao & { clavien_dindo_id?: number | null };
+
 type Props = {
     bloco: BlocoMorbilidade;
     aoMudar: (bloco: BlocoMorbilidade) => void;
-    dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: Opcao[]; clavien: Opcao[] };
+    dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
     desativado: boolean;
     /** Óbito com complicação na alta: o grau fica fixo em 5. */
     clavienFixo?: boolean;
@@ -26,29 +29,39 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
     const temReal = ids.some((i) => i !== SEM_COMPLICACOES);
     const nome = (i: number) => dominios.complicacoes.find((c) => c.id === i)?.nome ?? `Complicação ${i}`;
 
+    /** Grau mais alto entre as resoluções escolhidas (null se nenhuma tem grau associado). */
+    const grauAutomatico = (complicacoes: ComplicacaoEscolhida[]): number | null => {
+        const graus = complicacoes
+            .filter((c) => c.id !== SEM_COMPLICACOES)
+            .flatMap((c) => c.resolucoes)
+            .map((r) => dominios.resolucoes.find((x) => x.id === r)?.clavien_dindo_id ?? null)
+            .filter((g): g is number => g !== null);
+        return graus.length > 0 ? Math.max(...graus) : null;
+    };
+    const nomeGrau = (id: number | '' | null) => dominios.clavien.find((g) => g.id === id)?.nome;
+    const sugerido = grauAutomatico(bloco.complicacoes);
+
     /** "Sem complicações" substitui tudo; escolher outra complicação retira-a. */
     const mudarComplicacoes = (novosIds: number[]) => {
         const acabouDeEscolherSem = novosIds.includes(SEM_COMPLICACOES) && !semComplicacoes;
         const finais = acabouDeEscolherSem ? [SEM_COMPLICACOES] : novosIds.filter((i) => i !== SEM_COMPLICACOES || novosIds.length === 1);
         const complicacoes = finais.map((i) => bloco.complicacoes.find((c) => c.id === i) ?? { id: i, resolucoes: [] });
         const continuaReal = finais.some((i) => i !== SEM_COMPLICACOES);
-        aoMudar({ ...bloco, complicacoes, clavien_dindo_id: continuaReal ? bloco.clavien_dindo_id : '' });
+        aoMudar({ ...bloco, complicacoes, clavien_dindo_id: !continuaReal ? '' : (grauAutomatico(complicacoes) ?? bloco.clavien_dindo_id) });
     };
 
-    const alternarResolucao = (complicacaoId: number, resolucaoId: number) =>
-        aoMudar({
-            ...bloco,
-            complicacoes: bloco.complicacoes.map((c) =>
-                c.id !== complicacaoId
-                    ? c
-                    : {
-                          ...c,
-                          resolucoes: c.resolucoes.includes(resolucaoId)
-                              ? c.resolucoes.filter((r) => r !== resolucaoId)
-                              : [...c.resolucoes, resolucaoId],
-                      },
-            ),
-        });
+    /** Escolher ou retirar uma resolução recalcula o grau de Clavien-Dindo (pode ser ajustado à mão a seguir). */
+    const alternarResolucao = (complicacaoId: number, resolucaoId: number) => {
+        const complicacoes = bloco.complicacoes.map((c) =>
+            c.id !== complicacaoId
+                ? c
+                : {
+                      ...c,
+                      resolucoes: c.resolucoes.includes(resolucaoId) ? c.resolucoes.filter((r) => r !== resolucaoId) : [...c.resolucoes, resolucaoId],
+                  },
+        );
+        aoMudar({ ...bloco, complicacoes, clavien_dindo_id: grauAutomatico(complicacoes) ?? bloco.clavien_dindo_id });
+    };
 
     return (
         <div>
@@ -99,6 +112,7 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
                                                 disabled={desativado}
                                             />
                                             {r.nome}
+                                            {r.clavien_dindo_id && <span className="text-xs text-slate-500">({nomeGrau(r.clavien_dindo_id)})</span>}
                                         </label>
                                     ))}
                                 </div>
@@ -109,7 +123,13 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
                         rotulo="Grau de Clavien-Dindo"
                         para={`${id}-clavien`}
                         erro={erros.clavien}
-                        ajuda={clavienFixo ? 'Óbito com complicação: fica registado como grau 5.' : 'O grau mais alto entre as complicações.'}
+                        ajuda={
+                            clavienFixo
+                                ? 'Óbito com complicação: fica registado como grau 5.'
+                                : sugerido !== null
+                                  ? `Calculado pelas resoluções (${nomeGrau(sugerido)}, o mais alto). Pode ajustar.`
+                                  : 'Sem resolução com grau associado: escolha o grau mais alto entre as complicações.'
+                        }
                         className="max-w-xs"
                     >
                         <Selecao

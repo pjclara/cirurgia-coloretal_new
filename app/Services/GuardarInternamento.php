@@ -62,10 +62,11 @@ class GuardarInternamento
             }
 
             $temReal = $complicacoes->keys()->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
-            // Clavien-Dindo só existe quando há complicação; óbito com complicação na alta é grau 5.
+            // Clavien-Dindo só existe quando há complicação. Óbito com complicação na alta é grau 5;
+            // o grau escolhido à mão prevalece; sem ele, calcula-se pelas resoluções.
             $clavien = ! $temReal ? null : ($momento === Morbilidade::NA_ALTA && $obito
                 ? Internamento::CLAVIEN_GRAU_5
-                : ($blocos[$momento]['clavien_dindo_id'] ?? null));
+                : ($blocos[$momento]['clavien_dindo_id'] ?? Morbilidade::grauPelasResolucoes($blocos[$momento]['complicacoes'] ?? [])));
 
             $morbilidade = $internamento->morbilidades()->firstOrNew(['momento' => $momento]);
             $morbilidade->fill([
