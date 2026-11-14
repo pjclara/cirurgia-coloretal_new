@@ -39,7 +39,29 @@ function Dado({ rotulo, children }: { rotulo: string; children: ReactNode }) {
     );
 }
 
-export default function FichaUtente({ utente, internamentos }: { utente: Utente; internamentos: Internamento[] }) {
+type Referenciacao = {
+    id: number;
+    data_de_referenciacao: string | null;
+    origem: string | null;
+    data_de_entrada: string | null;
+    data_de_saida: string | null;
+    destino: string | null;
+    responsavel: string | null;
+    situacao: 'referenciado' | 'no_centro' | 'saida';
+    diagnosticos: string[];
+};
+
+const SITUACAO = { referenciado: 'Referenciado', no_centro: 'No centro', saida: 'Saída registada' } as const;
+
+export default function FichaUtente({
+    utente,
+    internamentos,
+    referenciacoes = [],
+}: {
+    utente: Utente;
+    internamentos: Internamento[];
+    referenciacoes?: Referenciacao[];
+}) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const anos = idade(utente.data_nascimento);
     const aberto = internamentos.find((i) => !i.data_de_alta);
@@ -56,6 +78,11 @@ export default function FichaUtente({ utente, internamentos }: { utente: Utente;
                     {permissoes.includes('create agendamento') && (
                         <BotaoLigacao href={`/agendamento/utentes/${utente.id}/inscrever`} variante="secundario">
                             Inscrever em lista de espera
+                        </BotaoLigacao>
+                    )}
+                    {permissoes.includes('create referenciacao') && (
+                        <BotaoLigacao href={`/referenciacao/utentes/${utente.id}/nova`} variante="secundario">
+                            Referenciar ao centro
                         </BotaoLigacao>
                     )}
                     {permissoes.includes('update internamento') && (
@@ -81,6 +108,44 @@ export default function FichaUtente({ utente, internamentos }: { utente: Utente;
                     </dl>
                 </Seccao>
 
+                {permissoes.includes('show referenciacao') && (
+                    <Seccao
+                        titulo="Centro de referência"
+                        descricao={referenciacoes.length > 0 ? plural(referenciacoes.length, 'referenciação', 'referenciações') : undefined}
+                    >
+                        {referenciacoes.length === 0 ? (
+                            <p className="text-sm text-slate-600">Este utente não está referenciado ao centro de referência.</p>
+                        ) : (
+                            <ol className="divide-y divide-slate-100">
+                                {referenciacoes.map((r) => (
+                                    <li key={r.id} className="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-3 first:pt-0 last:pb-0">
+                                        <p className="w-52 shrink-0 text-sm text-slate-700 tabular-nums">
+                                            Referenciado a {formatarData(r.data_de_referenciacao)}
+                                            {r.data_de_entrada && (
+                                                <span className="block text-xs text-slate-500">
+                                                    Entrada {formatarData(r.data_de_entrada)}
+                                                    {r.data_de_saida ? `, saída ${formatarData(r.data_de_saida)}` : ''}
+                                                </span>
+                                            )}
+                                        </p>
+                                        <div className="min-w-0 flex-1">
+                                            <Link href={`/referenciacao/${r.id}`} className="text-sm font-medium text-teal-800 hover:underline">
+                                                {r.diagnosticos.length > 0 ? r.diagnosticos.join(', ') : 'Sem diagnóstico registado'}
+                                            </Link>
+                                            <p className="text-xs text-slate-600">
+                                                {[r.origem, r.destino ? `Destino: ${r.destino}` : null, r.responsavel].filter(Boolean).join(' · ')}
+                                            </p>
+                                        </div>
+                                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-800">
+                                            {SITUACAO[r.situacao]}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
+                    </Seccao>
+                )}
+
                 <Seccao titulo="Internamentos" descricao={internamentos.length > 0 ? plural(internamentos.length, 'registo', 'registos') : undefined}>
                     {internamentos.length === 0 ? (
                         <p className="text-sm text-slate-600">Este utente ainda não tem internamentos registados.</p>
@@ -92,10 +157,15 @@ export default function FichaUtente({ utente, internamentos }: { utente: Utente;
                                     <li key={i.id} className="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-3 first:pt-0 last:pb-0">
                                         <p className="w-52 shrink-0 text-sm text-slate-700 tabular-nums">
                                             {formatarData(i.data_de_entrada)} a {i.data_de_alta ? formatarData(i.data_de_alta) : 'hoje'}
-                                            {dias !== null && dias >= 0 && dias < 3650 && <span className="text-slate-500"> ({plural(dias, 'dia', 'dias')})</span>}
+                                            {dias !== null && dias >= 0 && dias < 3650 && (
+                                                <span className="text-slate-500"> ({plural(dias, 'dia', 'dias')})</span>
+                                            )}
                                         </p>
                                         <div className="min-w-0 flex-1">
-                                            <Link href={rotas.internamentos.registo(i.id)} className="text-sm font-medium text-teal-800 hover:underline">
+                                            <Link
+                                                href={rotas.internamentos.registo(i.id)}
+                                                className="text-sm font-medium text-teal-800 hover:underline"
+                                            >
                                                 {i.motivo}
                                             </Link>
                                             {i.diagnosticos.length > 0 && <p className="text-sm text-slate-600">{i.diagnosticos.join(', ')}</p>}

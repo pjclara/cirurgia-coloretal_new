@@ -42,6 +42,11 @@ class Utente extends Model
         });
     }
 
+    public function referenciacoes(): HasMany
+    {
+        return $this->hasMany(Referenciacao::class)->orderByDesc('data_de_referenciacao');
+    }
+
     public function internamentos(): HasMany
     {
         return $this->hasMany(Internamento::class)->orderByDesc('data_de_entrada');

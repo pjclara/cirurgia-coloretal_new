@@ -1,0 +1,116 @@
+<?php
+
+use App\Models\Referenciacao;
+use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function () {
+    $this->gestor = utilizadorClinico(['show referenciacao', 'create referenciacao', 'update referenciacao']);
+    $this->utente = novoUtente();
+    $this->hoje = now()->format('Y-m-d');
+});
+
+/** Corpo válido de uma referenciação; `$extra` sobrepõe campos. */
+function corpoReferenciacao(object $t, array $extra = []): array
+{
+    return $extra + [
+        'data_de_referenciacao' => now()->subDays(20)->format('Y-m-d'),
+        'origem_id' => DB::table('origem_da_referenciacaos')->value('id'),
+        'responsavel_id' => $t->gestor->id,
+        'diagnosticos' => [[
+            'diagnostico_id' => DB::table('diagnosticos')->value('id'),
+            'modo_id' => DB::table('diagnostico_referenciacao_modos')->value('id'),
+            'histologia_id' => DB::table('histologias')->value('id'),
+            'data_diagnostico' => now()->subDays(25)->format('Y-m-d'),
+        ]],
+    ];
+}
+
+function referenciar(object $t, array $extra = [])
+{
+    return $t->actingAs($t->gestor)->post("/referenciacao/utentes/{$t->utente->id}", corpoReferenciacao($t, $extra));
+}
+
+test('referenciar um utente grava a referenciação com os diagnósticos', function () {
+    referenciar($this)->assertSessionHasNoErrors()->assertRedirect('/referenciacao');
+
+    $r = Referenciacao::where('utente_id', $this->utente->id)->first();
+    expect($r)->not->toBeNull()
+        ->and($r->uuid)->toHaveLength(36)
+        ->and($r->diagnosticos)->toHaveCount(1)
+        ->and($r->situacao())->toBe('referenciado');
+});
+
+test('as datas têm de ser coerentes', function () {
+    referenciar($this, ['data_de_diagnostico' => now()->subDays(5)->format('Y-m-d')])->assertSessionHasErrors('data_de_diagnostico');
+    referenciar($this, ['data_de_entrada' => now()->subDays(30)->format('Y-m-d')])->assertSessionHasErrors('data_de_entrada');
+    referenciar($this, ['data_de_saida' => $this->hoje, 'destino_id' => 1])->assertSessionHasErrors('data_de_entrada');
+    referenciar($this, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d'), 'data_de_saida' => now()->subDays(12)->format('Y-m-d'), 'destino_id' => 1])->assertSessionHasErrors('data_de_saida');
+    referenciar($this, ['data_de_referenciacao' => now()->addDay()->format('Y-m-d')])->assertSessionHasErrors('data_de_referenciacao');
+
+    expect(Referenciacao::count())->toBe(0);
+});
+
+test('a saída exige o destino e a entrada', function () {
+    $entrada = now()->subDays(10)->format('Y-m-d');
+
+    referenciar($this, ['data_de_entrada' => $entrada, 'data_de_saida' => $this->hoje])->assertSessionHasErrors('destino_id');
+    referenciar($this, ['data_de_entrada' => $entrada, 'destino_id' => 1])->assertSessionHasErrors('data_de_saida');
+    referenciar($this, ['data_de_entrada' => $entrada, 'data_de_saida' => $this->hoje, 'destino_id' => 1])->assertSessionHasNoErrors();
+
+    expect(Referenciacao::first()->situacao())->toBe('saida');
+});
+
+test('cada diagnóstico exige o modo e não se repete', function () {
+    $linha = corpoReferenciacao($this)['diagnosticos'][0];
+
+    referenciar($this, ['diagnosticos' => [array_merge($linha, ['modo_id' => null])]])->assertSessionHasErrors('diagnosticos.0.modo_id');
+    referenciar($this, ['diagnosticos' => [$linha, $linha]])->assertSessionHasErrors('diagnosticos.0.diagnostico_id');
+});
+
+test('editar substitui os diagnósticos', function () {
+    referenciar($this);
+    $r = Referenciacao::first();
+
+    $this->actingAs($this->gestor)->put("/referenciacao/{$r->id}", corpoReferenciacao($this, ['diagnosticos' => [], 'data_de_entrada' => $this->hoje]))->assertSessionHasNoErrors();
+
+    $r->refresh();
+    expect($r->diagnosticos()->count())->toBe(0)->and($r->situacao())->toBe('no_centro');
+});
+
+test('quem só pode consultar não consegue referenciar nem alterar', function () {
+    $leitor = utilizadorClinico(['show referenciacao']);
+    referenciar($this);
+    $r = Referenciacao::first();
+
+    $this->actingAs($leitor)->post("/referenciacao/utentes/{$this->utente->id}", corpoReferenciacao($this))->assertForbidden();
+    $this->actingAs($leitor)->put("/referenciacao/{$r->id}", corpoReferenciacao($this))->assertForbidden();
+    $this->actingAs($leitor)->get('/referenciacao')->assertOk();
+});
+
+test('a lista filtra por situação e a ficha do utente mostra a referenciação', function () {
+    referenciar($this);
+    $outro = novoUtente();
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$outro->id}", corpoReferenciacao($this, ['data_de_entrada' => now()->subDays(5)->format('Y-m-d')]));
+
+    $this->actingAs($this->gestor)->get('/referenciacao?situacao=no_centro')->assertInertia(fn (Assert $p) => $p
+        ->component('referenciacao/index')
+        ->where('lista.total', 1)
+        ->where('lista.data.0.utente.id', $outro->id));
+
+    // A ficha exige também ver internamentos; sem ver referenciações, a secção vem vazia.
+    $completo = utilizadorClinico(['show internamento', 'show referenciacao']);
+    $semReferenciacao = utilizadorClinico(['show internamento']);
+    $this->actingAs($completo)->get("/utentes/{$this->utente->id}")->assertInertia(fn (Assert $p) => $p->has('referenciacoes', 1));
+    $this->actingAs($semReferenciacao)->get("/utentes/{$this->utente->id}")->assertInertia(fn (Assert $p) => $p->has('referenciacoes', 0));
+});
+
+test('apagar faz soft delete e a modal de edição abre sobre a lista', function () {
+    referenciar($this);
+    $r = Referenciacao::first();
+
+    $this->actingAs($this->gestor)->get("/referenciacao/{$r->id}")->assertInertia(fn (Assert $p) => $p
+        ->component('referenciacao/index')->where('modal.referenciacao.id', $r->id)->where('modal.utente.id', $this->utente->id));
+
+    $this->actingAs($this->gestor)->delete("/referenciacao/{$r->id}")->assertRedirect('/referenciacao');
+    expect(Referenciacao::count())->toBe(0)->and(Referenciacao::withTrashed()->count())->toBe(1);
+});

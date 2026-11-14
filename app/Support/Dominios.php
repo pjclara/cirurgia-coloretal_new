@@ -26,6 +26,9 @@ class Dominios
         'resolucao_complicacaos',
         'grupo_diagnosticos',
         'grupo_complicacaos',
+        'origem_da_referenciacaos',
+        'diagnostico_referenciacao_modos',
+        'histologias',
     ];
 
     /** @var array<string, array<int, array{id:int, nome:string}>> */

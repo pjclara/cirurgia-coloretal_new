@@ -7,6 +7,7 @@ use App\Http\Controllers\CirurgiaController;
 use App\Http\Controllers\ContaController;
 use App\Http\Controllers\InternamentoController;
 use App\Http\Controllers\QuadroController;
+use App\Http\Controllers\ReferenciacaoController;
 use App\Http\Controllers\UtenteController;
 use Illuminate\Support\Facades\Route;
 
@@ -103,4 +104,20 @@ Route::prefix('agendamento')->name('agendamento.')->group(function () {
         Route::put('{agendamento}', [AgendamentoController::class, 'atualizarAgendamento'])->whereNumber('agendamento')->name('update');
     });
     Route::delete('{agendamento}', [AgendamentoController::class, 'apagarAgendamento'])->whereNumber('agendamento')->middleware('can:delete agendamento')->name('destroy');
+});
+
+// Referenciação ao centro de referência
+Route::prefix('referenciacao')->name('referenciacao.')->group(function () {
+    Route::middleware('can:show referenciacao')->group(function () {
+        Route::get('/', [ReferenciacaoController::class, 'index'])->name('index');
+        Route::get('{referenciacao}', [ReferenciacaoController::class, 'editar'])->whereNumber('referenciacao')->name('edit');
+    });
+    Route::middleware('can:create referenciacao')->group(function () {
+        Route::get('utentes/{utente}/nova', [ReferenciacaoController::class, 'criar'])->whereNumber('utente')->name('create');
+        Route::post('utentes/{utente}', [ReferenciacaoController::class, 'guardar'])->whereNumber('utente')->name('store');
+    });
+    Route::middleware('can:update referenciacao')->group(function () {
+        Route::put('{referenciacao}', [ReferenciacaoController::class, 'atualizar'])->whereNumber('referenciacao')->name('update');
+        Route::delete('{referenciacao}', [ReferenciacaoController::class, 'apagar'])->whereNumber('referenciacao')->name('destroy');
+    });
 });

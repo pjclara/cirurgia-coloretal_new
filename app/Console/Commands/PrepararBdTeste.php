@@ -26,6 +26,7 @@ class PrepararBdTeste extends Command
         'grupo_diagnosticos', 'diagnosticos', 'grupo_intervencaos', 'intervencaos',
         'periodo_de_agendamentos', 'local_de_agendamentos', 'sala_de_agendamentos',
         'tipo_de_agendamentos', 'estado_de_agendamentos', 'tipo_de_cirurgias',
+        'origem_da_referenciacaos', 'diagnostico_referenciacao_modos', 'histologias',
     ];
 
     public function handle(): int
