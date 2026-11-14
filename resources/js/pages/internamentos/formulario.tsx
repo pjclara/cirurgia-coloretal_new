@@ -5,7 +5,6 @@ import { rotas } from '../../clinico/rotas';
 import {
     ALTA_CONCLUIDA,
     ALTA_PENDENTE,
-    CLAVIEN_GRAU_5,
     DESTINO_FALECIDO,
     SEM_COMPLICACOES,
     type Opcao,
@@ -13,12 +12,28 @@ import {
     type Responsavel,
     type ResumoUtente,
 } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../../components/clinico/campos';
+import { BlocoMorbilidadeCampos, type BlocoMorbilidade, type Momento } from '../../components/clinico/bloco-morbilidade';
 import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
+import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../../components/clinico/campos';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
-type ComplicacaoEscolhida = { id: number; resolucoes: number[] };
+type RegistoMorbilidade = Record<
+    Momento,
+    { complicacoes: { id: number; resolucoes: number[] }[]; clavien_dindo_id: number | null; data_registo: string | null }
+>;
+
+const MOMENTOS: { id: Momento; rotulo: string; ajuda: string }[] = [
+    { id: 'internamento', rotulo: 'Durante o internamento', ajuda: 'Complicações que surgiram enquanto o doente esteve internado.' },
+    { id: 'alta', rotulo: 'Na alta', ajuda: 'Obrigatório para dar alta. Se não houve nenhuma, escolha "Sem complicações".' },
+    { id: '30_dias', rotulo: 'Aos 30 dias', ajuda: 'Seguimento 30 dias depois da alta.' },
+];
+
+const somarDias = (data: string, dias: number) => {
+    const d = new Date(data + 'T00:00:00');
+    d.setDate(d.getDate() + dias);
+    return d.toISOString().slice(0, 10);
+};
 
 type Dados = {
     utente_id: number | '';
@@ -32,8 +47,7 @@ type Dados = {
     comentarios: string;
     bloquear_tabela: boolean;
     diagnosticos: number[];
-    complicacoes: ComplicacaoEscolhida[];
-    clavien_dindo_id: number | '';
+    morbilidade: Record<Momento, BlocoMorbilidade>;
     data_de_alta: string;
     data_de_saida: string;
     estado_da_alta_id: number;
@@ -53,8 +67,7 @@ type Registo = {
     comentarios: string;
     bloquear_tabela: boolean;
     diagnosticos: number[];
-    complicacoes: ComplicacaoEscolhida[];
-    clavien_dindo_id: number | null;
+    morbilidade: RegistoMorbilidade;
     data_de_alta: string | null;
     data_de_saida: string | null;
     estado_da_alta_id: number;
@@ -112,8 +125,15 @@ export default function FormularioInternamento({
         comentarios: internamento?.comentarios ?? '',
         bloquear_tabela: internamento?.bloquear_tabela ?? false,
         diagnosticos: internamento?.diagnosticos ?? [],
-        complicacoes: internamento?.complicacoes ?? [],
-        clavien_dindo_id: internamento?.clavien_dindo_id ?? '',
+        morbilidade: Object.fromEntries(
+            MOMENTOS.map(({ id }) => {
+                const m = internamento?.morbilidade?.[id];
+                return [
+                    id,
+                    { complicacoes: m?.complicacoes ?? [], clavien_dindo_id: m?.clavien_dindo_id ?? '', data_registo: m?.data_registo ?? '' },
+                ];
+            }),
+        ) as Record<Momento, BlocoMorbilidade>,
         data_de_alta: internamento?.data_de_alta ?? '',
         data_de_saida: internamento?.data_de_saida ?? '',
         estado_da_alta_id: internamento?.estado_da_alta_id ?? ALTA_PENDENTE,
@@ -123,45 +143,14 @@ export default function FormularioInternamento({
     const { data, setData, processing } = form;
     const erros = form.errors as Record<string, string | undefined>;
 
-    const idsComplicacoes = data.complicacoes.map((c) => c.id);
-    const semComplicacoes = idsComplicacoes.includes(SEM_COMPLICACOES);
-    const temComplicacaoReal = idsComplicacoes.some((id) => id !== SEM_COMPLICACOES);
+    const [momento, setMomento] = useState<Momento>(internamento?.data_de_alta ? 'alta' : 'internamento');
     const obito = data.destino_id === DESTINO_FALECIDO;
-    const clavienFixo = temComplicacaoReal && obito;
+    const temComplicacaoReal = (m: Momento) => data.morbilidade[m].complicacoes.some((c) => c.id !== SEM_COMPLICACOES);
+    const registado = (m: Momento) => data.morbilidade[m].complicacoes.length > 0;
     const bloqueadoAntes = internamento?.bloquear_tabela ?? false;
 
     const dias = data.data_de_entrada ? diasEntre(data.data_de_entrada, data.data_de_alta || limites.hoje) : null;
     const anos = utente ? idade(utente.data_nascimento, data.data_de_entrada || limites.hoje) : null;
-
-    /** "Sem complicações" substitui tudo; escolher outra complicação retira-a. */
-    const mudarComplicacoes = (ids: number[]) => {
-        const acabouDeEscolherSem = ids.includes(SEM_COMPLICACOES) && !semComplicacoes;
-        const finais = acabouDeEscolherSem ? [SEM_COMPLICACOES] : ids.filter((id) => id !== SEM_COMPLICACOES || ids.length === 1);
-        const novas = finais.map((id) => data.complicacoes.find((c) => c.id === id) ?? { id, resolucoes: [] });
-        const continuaComReal = finais.some((id) => id !== SEM_COMPLICACOES);
-
-        setData((atual) => ({
-            ...atual,
-            complicacoes: novas,
-            clavien_dindo_id: continuaComReal ? atual.clavien_dindo_id : '',
-        }));
-    };
-
-    const alternarResolucao = (complicacaoId: number, resolucaoId: number) => {
-        setData(
-            'complicacoes',
-            data.complicacoes.map((c) =>
-                c.id !== complicacaoId
-                    ? c
-                    : {
-                          ...c,
-                          resolucoes: c.resolucoes.includes(resolucaoId)
-                              ? c.resolucoes.filter((r) => r !== resolucaoId)
-                              : [...c.resolucoes, resolucaoId],
-                      },
-            ),
-        );
-    };
 
     /** Preencher a data de alta propõe "Concluída"; apagá-la volta a "Pendente". */
     const mudarDataDeAlta = (valor: string) => {
@@ -184,10 +173,6 @@ export default function FormularioInternamento({
 
     const guardar = (evento: FormEvent) => {
         evento.preventDefault();
-        form.transform((atual) => ({
-            ...atual,
-            clavien_dindo_id: clavienFixo ? CLAVIEN_GRAU_5 : atual.clavien_dindo_id,
-        }));
         const opcoes = { preserveScroll: true };
         if (internamento) form.put(rotas.internamentos.registo(internamento.id), opcoes);
         else form.post(rotas.internamentos.lista, opcoes);
@@ -197,7 +182,6 @@ export default function FormularioInternamento({
         if (internamento) router.delete(rotas.internamentos.registo(internamento.id));
     };
 
-    const nomeComplicacao = (id: number) => dominios.complicacoes.find((c) => c.id === id)?.nome ?? `Complicação ${id}`;
     const numeroDeErros = Object.keys(erros).length;
 
     return (
@@ -236,7 +220,10 @@ export default function FormularioInternamento({
 
             {internamento && (
                 <div className="mb-5 max-w-4xl">
-                    <Seccao titulo="Cirurgias" descricao={listaCirurgias.length > 0 ? plural(listaCirurgias.length, 'registo', 'registos') : undefined}>
+                    <Seccao
+                        titulo="Cirurgias"
+                        descricao={listaCirurgias.length > 0 ? plural(listaCirurgias.length, 'registo', 'registos') : undefined}
+                    >
                         {listaCirurgias.length === 0 && <p className="text-sm text-slate-600">Sem cirurgias registadas neste internamento.</p>}
                         <ul className="space-y-1.5">
                             {listaCirurgias.map((c, n) => (
@@ -388,62 +375,63 @@ export default function FormularioInternamento({
                         </Campo>
                     </Seccao>
 
-                    <Seccao titulo="Complicações" descricao='Obrigatório para dar alta. Se não houve nenhuma, escolha "Sem complicações".'>
-                        <EscolhaMultipla
-                            opcoes={dominios.complicacoes}
-                            valor={idsComplicacoes}
-                            aoMudar={mudarComplicacoes}
-                            procurar="Procurar complicação"
-                            desativado={!podeEditar}
-                            vazio="Nenhuma complicação registada."
-                        />
-                        {erros.complicacoes && (
-                            <p className="mt-2 text-sm text-rose-700" role="alert">
-                                {erros.complicacoes}
-                            </p>
-                        )}
-
-                        {temComplicacaoReal && (
-                            <div className="mt-5 space-y-4 border-t border-slate-200 pt-4">
-                                {data.complicacoes
-                                    .filter((c) => c.id !== SEM_COMPLICACOES)
-                                    .map((c) => (
-                                        <fieldset key={c.id}>
-                                            <legend className="text-sm font-medium text-slate-800">Como foi resolvida: {nomeComplicacao(c.id)}</legend>
-                                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
-                                                {dominios.resolucoes.map((r) => (
-                                                    <label key={r.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="size-4 accent-teal-800"
-                                                            checked={c.resolucoes.includes(r.id)}
-                                                            onChange={() => alternarResolucao(c.id, r.id)}
-                                                        />
-                                                        {r.nome}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </fieldset>
-                                    ))}
-
-                                <Campo
-                                    rotulo="Grau de Clavien-Dindo"
-                                    para="clavien"
-                                    erro={erros.clavien_dindo_id}
-                                    ajuda={clavienFixo ? 'Óbito com complicação: fica registado como grau 5.' : 'O grau mais alto entre as complicações.'}
-                                    className="max-w-xs"
-                                >
-                                    <Selecao
-                                        id="clavien"
-                                        opcoes={dominios.clavien}
-                                        valor={clavienFixo ? CLAVIEN_GRAU_5 : data.clavien_dindo_id}
-                                        aoMudar={(v) => setData('clavien_dindo_id', v)}
-                                        disabled={clavienFixo}
-                                        invalido={!!erros.clavien_dindo_id}
-                                    />
-                                </Campo>
+                    <Seccao titulo="Morbilidade" descricao="Complicações registadas em três momentos: durante o internamento, na alta e aos 30 dias.">
+                        <div role="tablist" aria-label="Momento do registo" className="mb-4 flex flex-wrap gap-2 border-b border-slate-200">
+                            {MOMENTOS.map((m) => {
+                                const desligado = m.id === '30_dias' && !data.data_de_alta;
+                                return (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={momento === m.id}
+                                        disabled={desligado}
+                                        onClick={() => setMomento(m.id)}
+                                        className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm ${
+                                            momento === m.id
+                                                ? 'border-[#a3213e] font-semibold text-slate-900'
+                                                : 'border-transparent text-slate-600 hover:text-slate-900'
+                                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                                    >
+                                        {m.rotulo}
+                                        <span
+                                            className={`size-2 rounded-full ${registado(m.id) ? 'bg-teal-700' : 'bg-slate-300'}`}
+                                            title={registado(m.id) ? 'Registado' : 'Por registar'}
+                                        />
+                                        {Object.keys(erros).some((k) => k.startsWith(`morbilidade.${m.id}.`)) && (
+                                            <span className="text-rose-700">!</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {MOMENTOS.filter((m) => m.id === momento).map((m) => (
+                            <div key={m.id} role="tabpanel">
+                                <p className="mb-3 text-sm text-slate-600">
+                                    {m.ajuda}
+                                    {m.id === '30_dias' && data.data_de_alta && ` Previsto para ${formatarData(somarDias(data.data_de_alta, 30))}.`}
+                                    {m.id === '30_dias' && !data.data_de_alta && ' Disponível depois de preenchida a data de alta.'}
+                                </p>
+                                <BlocoMorbilidadeCampos
+                                    id={`morbilidade-${m.id}`}
+                                    bloco={data.morbilidade[m.id]}
+                                    aoMudar={(bloco) => setData('morbilidade', { ...data.morbilidade, [m.id]: bloco })}
+                                    dominios={dominios}
+                                    desativado={!podeEditar}
+                                    clavienFixo={m.id === 'alta' && obito && temComplicacaoReal('alta')}
+                                    dataDoRegisto={
+                                        m.id === '30_dias' && data.data_de_alta
+                                            ? { rotulo: 'Data do seguimento', min: data.data_de_alta, max: limites.hoje }
+                                            : undefined
+                                    }
+                                    erros={{
+                                        complicacoes: erros[`morbilidade.${m.id}.complicacoes`],
+                                        clavien: erros[`morbilidade.${m.id}.clavien_dindo_id`],
+                                        data: erros[`morbilidade.${m.id}.data_registo`],
+                                    }}
+                                />
                             </div>
-                        )}
+                        ))}
                     </Seccao>
 
                     <Seccao titulo="Alta" descricao="Deixe a data de alta vazia enquanto o doente estiver internado.">

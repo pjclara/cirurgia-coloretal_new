@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Complicacao;
 use App\Models\Internamento;
+use App\Models\Morbilidade;
 use App\Models\Utente;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,12 @@ class InternamentoRequest extends FormRequest
         $this->merge([
             'data_de_alta' => $vazioParaNulo($this->data_de_alta),
             'data_de_saida' => $vazioParaNulo($this->data_de_saida),
-            'clavien_dindo_id' => $vazioParaNulo($this->clavien_dindo_id),
+            'morbilidade' => collect($this->input('morbilidade', []))
+                ->map(fn ($bloco) => is_array($bloco) ? array_merge($bloco, [
+                    'clavien_dindo_id' => $vazioParaNulo($bloco['clavien_dindo_id'] ?? null),
+                    'data_registo' => $vazioParaNulo($bloco['data_registo'] ?? null),
+                ]) : $bloco)
+                ->all(),
             'destino_id' => $vazioParaNulo($this->destino_id),
             'caso_social_id' => $vazioParaNulo($this->caso_social_id),
             'cama' => is_string($this->cama) ? trim($this->cama) : $this->cama,
@@ -52,11 +58,15 @@ class InternamentoRequest extends FormRequest
             'diagnosticos' => ['required', 'array', 'min:1'],
             'diagnosticos.*' => ['integer', 'distinct', Rule::exists('diagnosticos', 'id')],
 
-            'complicacoes' => ['present', 'array'],
-            'complicacoes.*.id' => ['required', 'integer', 'distinct', Rule::exists('complicacaos', 'id')],
-            'complicacoes.*.resolucoes' => ['nullable', 'array'],
-            'complicacoes.*.resolucoes.*' => ['integer', Rule::exists('resolucao_complicacaos', 'id')],
-            'clavien_dindo_id' => ['nullable', 'integer', Rule::exists('clavien_dindos', 'id')],
+            // Morbilidade por momento: durante o internamento, na alta e aos 30 dias.
+            'morbilidade' => ['present', 'array'],
+            'morbilidade.*' => ['array'],
+            'morbilidade.*.complicacoes' => ['nullable', 'array'],
+            'morbilidade.*.complicacoes.*.id' => ['required', 'integer', Rule::exists('complicacaos', 'id')],
+            'morbilidade.*.complicacoes.*.resolucoes' => ['nullable', 'array'],
+            'morbilidade.*.complicacoes.*.resolucoes.*' => ['integer', Rule::exists('resolucao_complicacaos', 'id')],
+            'morbilidade.*.clavien_dindo_id' => ['nullable', 'integer', Rule::exists('clavien_dindos', 'id')],
+            'morbilidade.*.data_registo' => ['nullable', 'date_format:Y-m-d', "after_or_equal:$minima", 'before_or_equal:today'],
 
             'data_de_alta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:data_de_entrada', 'before_or_equal:today'],
             'data_de_saida' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:data_de_alta', 'before_or_equal:today'],
@@ -95,23 +105,9 @@ class InternamentoRequest extends FormRequest
                     }
                 }
 
-                $ids = collect($this->input('complicacoes', []))->pluck('id')->map(fn ($id) => (int) $id);
-                $temSem = $ids->contains(Complicacao::SEM_COMPLICACOES);
-                $temReal = $ids->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
+                $this->validarMorbilidade($validator);
 
-                if ($temSem && $temReal) {
-                    $validator->errors()->add('complicacoes', '"Sem complicações" não pode ser escolhida em conjunto com outras complicações.');
-                }
-
-                if ($temReal && ! $this->clavien_dindo_id && (int) $this->destino_id !== Internamento::DESTINO_FALECIDO) {
-                    $validator->errors()->add('clavien_dindo_id', 'Indique o grau de Clavien-Dindo das complicações registadas.');
-                }
-
-                if ($this->data_de_alta) {
-                    if ($ids->isEmpty()) {
-                        $validator->errors()->add('complicacoes', 'Para dar alta, registe as complicações ou escolha "Sem complicações".');
-                    }
-                } else {
+                if (! $this->data_de_alta) {
                     if ($this->data_de_saida) {
                         $validator->errors()->add('data_de_saida', 'Preencha a data de alta antes da data de saída.');
                     }
@@ -150,6 +146,54 @@ class InternamentoRequest extends FormRequest
         ];
     }
 
+    /** Cada momento é validado à parte; um momento sem complicações escolhidas conta como não registado. */
+    private function validarMorbilidade(Validator $validator): void
+    {
+        $destinoFalecido = (int) $this->destino_id === Internamento::DESTINO_FALECIDO;
+
+        foreach ($this->input('morbilidade', []) as $momento => $bloco) {
+            if (! in_array($momento, Morbilidade::MOMENTOS, true)) {
+                $validator->errors()->add('morbilidade', 'Momento de morbilidade desconhecido.');
+
+                continue;
+            }
+
+            $ids = collect($bloco['complicacoes'] ?? [])->pluck('id')->map(fn ($id) => (int) $id);
+            if ($ids->isEmpty()) {
+                continue;
+            }
+
+            if ($ids->count() !== $ids->unique()->count()) {
+                $validator->errors()->add("morbilidade.$momento.complicacoes", 'Há complicações repetidas.');
+            }
+
+            $temSem = $ids->contains(Complicacao::SEM_COMPLICACOES);
+            $temReal = $ids->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
+
+            if ($temSem && $temReal) {
+                $validator->errors()->add("morbilidade.$momento.complicacoes", '"Sem complicações" não pode ser escolhida em conjunto com outras complicações.');
+            }
+
+            // Óbito com complicação na alta fica automaticamente em grau 5.
+            $grauAutomatico = $momento === Morbilidade::NA_ALTA && $destinoFalecido;
+            if ($temReal && empty($bloco['clavien_dindo_id']) && ! $grauAutomatico) {
+                $validator->errors()->add("morbilidade.$momento.clavien_dindo_id", 'Indique o grau de Clavien-Dindo das complicações registadas.');
+            }
+
+            if ($momento === Morbilidade::AOS_30_DIAS && ! $this->data_de_alta) {
+                $validator->errors()->add("morbilidade.$momento.complicacoes", 'A morbilidade aos 30 dias só pode ser registada depois da alta.');
+            }
+
+            if ($momento === Morbilidade::AOS_30_DIAS && $this->data_de_alta && ! empty($bloco['data_registo']) && $bloco['data_registo'] < $this->data_de_alta) {
+                $validator->errors()->add("morbilidade.$momento.data_registo", 'A data do seguimento não pode ser anterior à alta.');
+            }
+        }
+
+        if ($this->data_de_alta && collect($this->input('morbilidade.'.Morbilidade::NA_ALTA.'.complicacoes', []))->isEmpty()) {
+            $validator->errors()->add('morbilidade.alta.complicacoes', 'Para dar alta, registe as complicações da alta ou escolha "Sem complicações".');
+        }
+    }
+
     public function messages(): array
     {
         $minima = date('d/m/Y', strtotime(config('clinico.data_minima')));
@@ -186,9 +230,10 @@ class InternamentoRequest extends FormRequest
             'caso_social_id' => 'o caso social',
             'comentarios' => 'os comentários',
             'diagnosticos' => 'os diagnósticos',
-            'complicacoes' => 'as complicações',
-            'complicacoes.*.id' => 'a complicação',
-            'clavien_dindo_id' => 'o grau de Clavien-Dindo',
+            'morbilidade' => 'a morbilidade',
+            'morbilidade.*.complicacoes.*.id' => 'a complicação',
+            'morbilidade.*.clavien_dindo_id' => 'o grau de Clavien-Dindo',
+            'morbilidade.*.data_registo' => 'a data do registo',
             'data_de_alta' => 'a data de alta',
             'data_de_saida' => 'a data de saída',
             'estado_da_alta_id' => 'o estado da alta',

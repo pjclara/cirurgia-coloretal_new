@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\InternamentoRequest;
 use App\Models\Internamento;
+use App\Models\Morbilidade;
 use App\Models\Utente;
 use App\Services\GuardarInternamento;
 use App\Support\Dominios;
@@ -26,7 +27,7 @@ class InternamentoController extends Controller
         ];
 
         $internamentos = Internamento::query()
-            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev'])
+            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
             ->when($filtros['estado'] === 'internados', fn ($q) => $q->internados())
             ->when($filtros['estado'] === 'alta', fn ($q) => $q->comAlta())
             ->when($filtros['ano'], fn ($q, $ano) => $q->whereYear('data_de_entrada', $ano))
@@ -53,7 +54,7 @@ class InternamentoController extends Controller
                 'motivo' => $i->motivo_internamento,
                 'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
                 'destino' => Dominios::nome('destinos', $i->destino_id),
-                'clavien' => Dominios::nome('clavien_dindos', $i->clavien_dindo_id),
+                'clavien' => Dominios::nome('clavien_dindos', $i->claviemMaisGrave()),
                 'bloqueado' => $i->bloquear_tabela,
             ]);
 
@@ -95,7 +96,7 @@ class InternamentoController extends Controller
 
     public function edit(Request $request, Internamento $internamento): Response
     {
-        $internamento->load(['utente', 'diagnosticos:id', 'complicacoes:id']);
+        $internamento->load(['utente', 'diagnosticos:id', 'morbilidades.complicacoes:id']);
         $utilizador = $request->user();
 
         $bloqueadoParaMim = $internamento->bloquear_tabela && ! $utilizador->eAdministrador();
@@ -114,12 +115,18 @@ class InternamentoController extends Controller
                 'comentarios' => $internamento->comentarios ?? '',
                 'bloquear_tabela' => $internamento->bloquear_tabela,
                 'diagnosticos' => $internamento->diagnosticos->pluck('id')->values(),
-                'complicacoes' => $internamento->complicacoes->map(fn ($c) => [
-                    'id' => $c->id,
-                    'resolucoes' => collect(json_decode($c->pivot->resolucao ?? '[]', true) ?: [])
-                        ->map(fn ($r) => (int) $r)->values(),
-                ])->values(),
-                'clavien_dindo_id' => $internamento->clavien_dindo_id,
+                'morbilidade' => collect(Morbilidade::MOMENTOS)->mapWithKeys(function ($momento) use ($internamento) {
+                    $m = $internamento->morbilidades->firstWhere('momento', $momento);
+
+                    return [$momento => [
+                        'complicacoes' => $m ? $m->complicacoes->map(fn ($c) => [
+                            'id' => $c->id,
+                            'resolucoes' => collect(json_decode($c->pivot->resolucao ?? '[]', true) ?: [])->map(fn ($r) => (int) $r)->values(),
+                        ])->values() : [],
+                        'clavien_dindo_id' => $m?->clavien_dindo_id,
+                        'data_registo' => $m?->data_registo?->format('Y-m-d'),
+                    ]];
+                }),
                 'data_de_alta' => $internamento->data_de_alta?->format('Y-m-d'),
                 'data_de_saida' => $internamento->data_de_saida?->format('Y-m-d'),
                 'estado_da_alta_id' => $internamento->estado_da_alta_id ?? Internamento::ALTA_PENDENTE,

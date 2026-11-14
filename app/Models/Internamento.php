@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Internamento extends Model
@@ -35,7 +36,6 @@ class Internamento extends Model
         'estado_da_alta_id',
         'responsavel_id',
         'motivo_internamento',
-        'clavien_dindo_id',
         'destino_id',
         'caso_social_id',
         'bloquear_tabela',
@@ -67,10 +67,17 @@ class Internamento extends Model
         return $this->belongsToMany(Diagnostico::class, 'diagnostico_internamento', 'internamento_id', 'diagnostico_id');
     }
 
-    public function complicacoes(): BelongsToMany
+    public function morbilidades(): HasMany
     {
-        return $this->belongsToMany(Complicacao::class, 'complicacao_internamento', 'internamento_id', 'complicacao_id')
-            ->withPivot('resolucao');
+        return $this->hasMany(Morbilidade::class);
+    }
+
+    /** Grau de Clavien-Dindo mais grave entre os três momentos de registo (null se não houver). */
+    public function claviemMaisGrave(): ?int
+    {
+        $graus = $this->morbilidades->pluck('clavien_dindo_id')->filter(fn ($g) => $g && $g !== Morbilidade::CLAVIEN_A_AGUARDAR);
+
+        return $graus->isEmpty() ? null : (int) $graus->max();
     }
 
     public function scopeInternados(Builder $query): Builder
