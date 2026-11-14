@@ -19,8 +19,14 @@ class AgendamentoController extends Controller
 {
     public function agenda(Request $request): Response
     {
+        return $this->montarAgenda($request, null);
+    }
+
+    private function montarAgenda(Request $request, ?array $modal, ?string $dataBase = null): Response
+    {
         try {
-            $base = $request->query('semana') ? Carbon::createFromFormat('Y-m-d', (string) $request->query('semana')) : now();
+            $data = $dataBase ?? $request->query('semana');
+            $base = $data ? Carbon::createFromFormat('Y-m-d', (string) $data) : now();
         } catch (\Throwable) {
             $base = now();
         }
@@ -63,10 +69,16 @@ class AgendamentoController extends Controller
             'hoje' => now()->format('Y-m-d'),
             'cancelados' => $mostrarCancelados,
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
+            'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
     }
 
     public function listaDeEspera(Request $request): Response
+    {
+        return $this->montarLista($request, null);
+    }
+
+    private function montarLista(Request $request, ?array $modal): Response
     {
         $estados = ['abertas' => [1, 2], 'agendadas' => [3], 'canceladas' => [4], 'todas' => null];
         $estado = array_key_exists($request->query('estado'), $estados) ? $request->query('estado') : 'abertas';
@@ -102,6 +114,7 @@ class AgendamentoController extends Controller
             'lista' => $lista,
             'filtros' => ['estado' => $estado, 'prioridade' => $prioridade, 'q' => $q],
             'dataAlvo' => $this->dataAlvo($request),
+            'modal' => $modal ? $modal + ['fechar_url' => '/agendamento/lista-de-espera'] : null,
             'prioridades' => $this->opcoesPrioridade(),
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
         ]);
@@ -111,12 +124,12 @@ class AgendamentoController extends Controller
 
     public function criarInscricao(Request $request, Utente $utente): Response
     {
-        return $this->formularioInscricao($utente, null);
+        return $this->montarLista($request, ['tipo' => 'inscricao'] + $this->formularioInscricao($utente, null));
     }
 
-    public function editarInscricao(ListaDeEspera $espera): Response
+    public function editarInscricao(Request $request, ListaDeEspera $espera): Response
     {
-        return $this->formularioInscricao($espera->utente, $espera);
+        return $this->montarLista($request, ['tipo' => 'inscricao'] + $this->formularioInscricao($espera->utente, $espera));
     }
 
     public function guardarInscricao(Request $request, Utente $utente): RedirectResponse
@@ -159,12 +172,14 @@ class AgendamentoController extends Controller
 
     public function criarAgendamento(Request $request, ListaDeEspera $espera): Response
     {
-        return $this->formularioAgendamento($espera, null, $this->dataAlvo($request));
+        $data = $this->dataAlvo($request);
+
+        return $this->montarAgenda($request, ['tipo' => 'agendar'] + $this->formularioAgendamento($espera, null, $data), $data);
     }
 
-    public function editarAgendamento(Agendamento $agendamento): Response
+    public function editarAgendamento(Request $request, Agendamento $agendamento): Response
     {
-        return $this->formularioAgendamento($agendamento->espera, $agendamento);
+        return $this->montarAgenda($request, ['tipo' => 'agendar'] + $this->formularioAgendamento($agendamento->espera, $agendamento), $agendamento->start?->format('Y-m-d'));
     }
 
     public function guardarAgendamento(Request $request, ListaDeEspera $espera): RedirectResponse
@@ -243,9 +258,9 @@ class AgendamentoController extends Controller
         return collect(ListaDeEspera::PRIORIDADES)->map(fn ($nome, $id) => ['id' => $id, 'nome' => $nome])->values()->all();
     }
 
-    private function formularioInscricao(Utente $utente, ?ListaDeEspera $espera): Response
+    private function formularioInscricao(Utente $utente, ?ListaDeEspera $espera): array
     {
-        return Inertia::render('agendamento/inscricao', [
+        return [
             'espera' => $espera ? [
                 'id' => $espera->id,
                 'prioridade_id' => (int) $espera->prioridade_id,
@@ -270,14 +285,14 @@ class AgendamentoController extends Controller
             ],
             'hoje' => now()->format('Y-m-d'),
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
-        ]);
+        ];
     }
 
-    private function formularioAgendamento(ListaDeEspera $espera, ?Agendamento $agendamento, ?string $dataSugerida = null): Response
+    private function formularioAgendamento(ListaDeEspera $espera, ?Agendamento $agendamento, ?string $dataSugerida = null): array
     {
         $espera->load(['utente:id,nome,numero_processo', 'intervencoes:id,nome,abrev']);
 
-        return Inertia::render('agendamento/agendar', [
+        return [
             'agendamento' => $agendamento ? [
                 'id' => $agendamento->id,
                 'data' => $agendamento->start?->format('Y-m-d'),
@@ -306,7 +321,7 @@ class AgendamentoController extends Controller
             ],
             'hoje' => now()->format('Y-m-d'),
             'dataSugerida' => $dataSugerida,
-        ]);
+        ];
     }
 
     private function intervencoes(): array

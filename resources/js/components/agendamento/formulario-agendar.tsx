@@ -1,10 +1,10 @@
+import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import type { Opcao, Responsavel } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../../components/clinico/campos';
-import ClinicoLayout from '../../layouts/clinico-layout';
+import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../clinico/campos';
 
-type Props = {
+export type PropsAgendar = {
     agendamento: {
         id: number;
         data: string | null;
@@ -28,7 +28,9 @@ type Props = {
     dataSugerida: string | null;
 };
 
-export default function Agendar({ agendamento, espera, dominios, hoje, dataSugerida }: Props) {
+type Props = PropsAgendar & { fechar: () => void };
+
+export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSugerida, fechar }: Props) {
     const form = useForm({
         data: agendamento?.data ?? dataSugerida ?? '',
         periodo_id: (agendamento?.periodo_id ?? 1) as number | '',
@@ -54,15 +56,14 @@ export default function Agendar({ agendamento, espera, dominios, hoje, dataSuger
     };
 
     return (
-        <ClinicoLayout
-            titulo={agendamento ? 'Agendamento' : 'Agendar cirurgia'}
-            subtitulo={
-                <span>
+        <>
+            <DialogHeader>
+                <DialogTitle>{agendamento ? 'Agendamento' : 'Agendar cirurgia'}</DialogTitle>
+                <DialogDescription>
                     {espera.utente.nome} · Processo {espera.utente.numero_processo} · {espera.intervencoes.join(', ') || 'sem intervenção indicada'}
-                </span>
-            }
-        >
-            <form onSubmit={guardar} noValidate className="max-w-4xl space-y-5">
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={guardar} noValidate className="space-y-5">
                 <Seccao titulo="Data e local">
                     <div className="grid gap-4 sm:grid-cols-3">
                         <Campo rotulo="Data" para="data" erro={erros.data}>
@@ -126,9 +127,9 @@ export default function Agendar({ agendamento, espera, dominios, hoje, dataSuger
                     <Botao type="submit" disabled={processing}>
                         {agendamento ? 'Guardar alterações' : 'Agendar'}
                     </Botao>
-                    <BotaoLigacao href="/agendamento" variante="secundario">
+                    <Botao variante="secundario" onClick={fechar}>
                         Cancelar
-                    </BotaoLigacao>
+                    </Botao>
                     <BotaoLigacao href={`/agendamento/lista-de-espera/${espera.id}`} variante="secundario">
                         Ver inscrição
                     </BotaoLigacao>
@@ -139,8 +140,6 @@ export default function Agendar({ agendamento, espera, dominios, hoje, dataSuger
                     )}
                 </div>
             </form>
-        </ClinicoLayout>
+        </>
     );
 }
-
-Agendar.layout = (pagina: React.ReactNode) => pagina;

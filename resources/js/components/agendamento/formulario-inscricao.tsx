@@ -1,13 +1,13 @@
+import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { COR_ESTADO, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../../components/clinico/campos';
-import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
-import ClinicoLayout from '../../layouts/clinico-layout';
+import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../clinico/campos';
+import { EscolhaMultipla } from '../clinico/escolha-multipla';
 
-type Props = {
+export type PropsInscricao = {
     espera: {
         id: number;
         prioridade_id: number;
@@ -25,7 +25,9 @@ type Props = {
     estados: Opcao[];
 };
 
-export default function Inscricao({ espera, utente, dominios, hoje, estados }: Props) {
+type Props = PropsInscricao & { fechar: () => void };
+
+export function FormularioInscricao({ espera, utente, dominios, hoje, estados, fechar }: Props) {
     const form = useForm({
         prioridade_id: (espera?.prioridade_id ?? 1) as number | '',
         data_de_lista: espera?.data_de_lista ?? hoje,
@@ -49,20 +51,14 @@ export default function Inscricao({ espera, utente, dominios, hoje, estados }: P
     };
 
     return (
-        <ClinicoLayout
-            titulo={espera ? 'Inscrição em lista de espera' : 'Inscrever em lista de espera'}
-            subtitulo={
-                <span className="tabular-nums">
+        <>
+            <DialogHeader>
+                <DialogTitle>{espera ? 'Inscrição em lista de espera' : 'Inscrever em lista de espera'}</DialogTitle>
+                <DialogDescription className="tabular-nums">
                     {utente.nome} · Processo {utente.numero_processo}
-                </span>
-            }
-            acoes={
-                espera && espera.estado !== 4 ? (
-                    <BotaoLigacao href={`/agendamento/lista-de-espera/${espera.id}/agendar`}>Agendar cirurgia</BotaoLigacao>
-                ) : undefined
-            }
-        >
-            <form onSubmit={guardar} noValidate className="max-w-4xl space-y-5">
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={guardar} noValidate className="space-y-5">
                 <Seccao titulo="Inscrição">
                     <div className="grid gap-4 sm:grid-cols-3">
                         <Campo rotulo="Data de inscrição" para="data" erro={erros.data_de_lista}>
@@ -155,9 +151,14 @@ export default function Inscricao({ espera, utente, dominios, hoje, estados }: P
                     <Botao type="submit" disabled={processing}>
                         {espera ? 'Guardar alterações' : 'Inscrever'}
                     </Botao>
-                    <BotaoLigacao href="/agendamento/lista-de-espera" variante="secundario">
+                    {espera && espera.estado !== 4 && (
+                        <BotaoLigacao href={`/agendamento/lista-de-espera/${espera.id}/agendar`} variante="secundario">
+                            Agendar cirurgia
+                        </BotaoLigacao>
+                    )}
+                    <Botao variante="secundario" onClick={fechar}>
                         Cancelar
-                    </BotaoLigacao>
+                    </Botao>
                     {espera && espera.estado !== 4 && (
                         <Botao variante="perigo" className="ml-auto" onClick={cancelar}>
                             Cancelar inscrição
@@ -165,8 +166,6 @@ export default function Inscricao({ espera, utente, dominios, hoje, estados }: P
                     )}
                 </div>
             </form>
-        </ClinicoLayout>
+        </>
     );
 }
-
-Inscricao.layout = (pagina: React.ReactNode) => pagina;

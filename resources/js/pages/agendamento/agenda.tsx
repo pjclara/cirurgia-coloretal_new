@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { COR_ESTADO, NOMES_DIA, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
+import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
 import { Botao, BotaoLigacao } from '../../components/clinico/campos';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -30,9 +31,10 @@ type Props = {
     hoje: string;
     cancelados: boolean;
     estados: Opcao[];
+    modal: Modal | null;
 };
 
-export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, hoje, cancelados, estados }: Props) {
+export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, hoje, cancelados, estados, modal }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const ir = (parametros: Record<string, string | boolean>) => router.get('/agendamento', parametros, { preserveScroll: true });
     const [arrastado, setArrastado] = useState<number | null>(null);
@@ -219,6 +221,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                     })}
                 </div>
             )}
+            <ModalAgendamento modal={modal} />
         </ClinicoLayout>
     );
 }

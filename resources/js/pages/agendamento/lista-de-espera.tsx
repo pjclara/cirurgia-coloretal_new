@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { COR_ESTADO, PRIORIDADE, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
+import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -24,6 +25,7 @@ type Props = {
     prioridades: Opcao[];
     estados: Opcao[];
     dataAlvo: string | null;
+    modal: Modal | null;
 };
 
 const ESTADOS = [
@@ -33,7 +35,7 @@ const ESTADOS = [
     ['todas', 'Todas'],
 ];
 
-export default function ListaDeEspera({ lista, filtros, prioridades, estados, dataAlvo }: Props) {
+export default function ListaDeEspera({ lista, filtros, prioridades, estados, dataAlvo, modal }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [q, setQ] = useState(filtros.q);
     const filtrar = (novos: Record<string, unknown>) =>
@@ -188,6 +190,7 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                     ))}
                 </nav>
             )}
+            <ModalAgendamento modal={modal} />
         </ClinicoLayout>
     );
 }
