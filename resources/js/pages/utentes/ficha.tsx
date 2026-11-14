@@ -53,6 +53,11 @@ export default function FichaUtente({ utente, internamentos }: { utente: Utente;
                     <BotaoLigacao href={`/utentes/${utente.id}/cirurgias`} variante="secundario">
                         Cirurgias
                     </BotaoLigacao>
+                    {permissoes.includes('create agendamento') && (
+                        <BotaoLigacao href={`/agendamento/utentes/${utente.id}/inscrever`} variante="secundario">
+                            Inscrever em lista de espera
+                        </BotaoLigacao>
+                    )}
                     {permissoes.includes('update internamento') && (
                         <BotaoLigacao href={rotas.utentes.editar(utente.id)} variante="secundario">
                             Editar dados

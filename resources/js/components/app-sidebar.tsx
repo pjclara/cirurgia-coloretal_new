@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BedDouble, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
+import { BedDouble, CalendarDays, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -16,8 +16,12 @@ const mainNavItems: NavItem[] = [
 const footerNavItems: NavItem[] = [];
 
 export function AppSidebar() {
-    const administrador = usePage<{ clinico?: { administrador?: boolean } }>().props.clinico?.administrador;
-    const itens = administrador ? [...mainNavItems, { title: 'Administração', url: '/admin/utilizadores', icon: ShieldCheck }] : mainNavItems;
+    const clinico = usePage<{ clinico?: { administrador?: boolean; permissoes?: string[] } }>().props.clinico;
+    const itens: NavItem[] = [
+        ...mainNavItems,
+        ...(clinico?.permissoes?.includes('show agendamento') ? [{ title: 'Agendamento', url: '/agendamento', icon: CalendarDays }] : []),
+        ...(clinico?.administrador ? [{ title: 'Administração', url: '/admin/utilizadores', icon: ShieldCheck }] : []),
+    ];
 
     return (
         <Sidebar collapsible="icon" variant="inset">

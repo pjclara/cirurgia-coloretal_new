@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UtilizadorController;
+use App\Http\Controllers\AgendamentoController;
 use App\Http\Controllers\CirurgiaController;
 use App\Http\Controllers\ContaController;
 use App\Http\Controllers\InternamentoController;
@@ -73,4 +74,27 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
     Route::post('utilizadores', [UtilizadorController::class, 'store'])->name('utilizadores.store');
     Route::get('utilizadores/{utilizador}', [UtilizadorController::class, 'edit'])->whereNumber('utilizador')->name('utilizadores.edit');
     Route::put('utilizadores/{utilizador}', [UtilizadorController::class, 'update'])->whereNumber('utilizador')->name('utilizadores.update');
+});
+
+// Agendamento cirúrgico
+Route::prefix('agendamento')->name('agendamento.')->group(function () {
+    Route::middleware('can:show agendamento')->group(function () {
+        Route::get('/', [AgendamentoController::class, 'agenda'])->name('agenda');
+        Route::get('lista-de-espera', [AgendamentoController::class, 'listaDeEspera'])->name('espera');
+        Route::get('lista-de-espera/{espera}', [AgendamentoController::class, 'editarInscricao'])->whereNumber('espera')->name('espera.edit');
+        Route::get('{agendamento}', [AgendamentoController::class, 'editarAgendamento'])->whereNumber('agendamento')->name('edit');
+    });
+    Route::middleware('can:create agendamento')->group(function () {
+        Route::get('utentes/{utente}/inscrever', [AgendamentoController::class, 'criarInscricao'])->whereNumber('utente')->name('espera.create');
+        Route::post('utentes/{utente}/inscrever', [AgendamentoController::class, 'guardarInscricao'])->whereNumber('utente')->name('espera.store');
+        Route::get('lista-de-espera/{espera}/agendar', [AgendamentoController::class, 'criarAgendamento'])->whereNumber('espera')->name('create');
+        Route::post('lista-de-espera/{espera}/agendar', [AgendamentoController::class, 'guardarAgendamento'])->whereNumber('espera')->name('store');
+    });
+    Route::middleware('can:update agendamento')->group(function () {
+        Route::put('lista-de-espera/{espera}', [AgendamentoController::class, 'atualizarInscricao'])->whereNumber('espera')->name('espera.update');
+        Route::post('lista-de-espera/{espera}/cancelar', [AgendamentoController::class, 'cancelarInscricao'])->whereNumber('espera')->name('espera.cancel');
+        Route::patch('{agendamento}/mover', [AgendamentoController::class, 'moverAgendamento'])->whereNumber('agendamento')->name('move');
+        Route::put('{agendamento}', [AgendamentoController::class, 'atualizarAgendamento'])->whereNumber('agendamento')->name('update');
+    });
+    Route::delete('{agendamento}', [AgendamentoController::class, 'apagarAgendamento'])->whereNumber('agendamento')->middleware('can:delete agendamento')->name('destroy');
 });
