@@ -73,6 +73,50 @@ class AgendamentoController extends Controller
         ]);
     }
 
+    /** Mapa operatório do dia ou da semana, em formato próprio para imprimir. */
+    public function mapa(Request $request): Response
+    {
+        $vista = $request->query('vista') === 'dia' ? 'dia' : 'semana';
+        try {
+            $base = $request->query('data') ? Carbon::createFromFormat('Y-m-d', (string) $request->query('data')) : now();
+        } catch (\Throwable) {
+            $base = now();
+        }
+        $inicio = $vista === 'dia' ? $base->copy()->startOfDay() : $base->copy()->startOfWeek();
+        $nDias = $vista === 'dia' ? 1 : 7;
+        $fim = $inicio->copy()->addDays($nDias - 1)->endOfDay();
+
+        $agendamentos = Agendamento::query()
+            ->with(['espera.utente:id,nome,numero_processo,data_nascimento', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
+            ->whereBetween('start', [$inicio, $fim])
+            ->orderBy('periodo_de_agendamento_id')
+            ->orderBy('sala_de_agendamento_id')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Agendamento $a) => $a->estado() !== ListaDeEspera::ESTADO_CANCELADO)
+            ->map(fn (Agendamento $a) => $this->resumo($a) + [
+                'idade' => ($nasc = $a->espera?->utente?->data_nascimento) ? (int) $nasc->diffInYears($a->start) : null,
+            ])
+            ->groupBy('data');
+
+        // Numa semana mostram-se os dias úteis e ainda os dias de fim de semana com cirurgias.
+        $dias = collect(range(0, $nDias - 1))
+            ->map(fn ($n) => $inicio->copy()->addDays($n))
+            ->map(fn ($d) => ['data' => $d->format('Y-m-d'), 'util' => $d->isWeekday(), 'agendamentos' => $agendamentos->get($d->format('Y-m-d'), collect())->values()])
+            ->filter(fn ($d) => $vista === 'dia' || $d['util'] || $d['agendamentos']->isNotEmpty())
+            ->values();
+
+        return Inertia::render('agendamento/mapa', [
+            'dias' => $dias,
+            'vista' => $vista,
+            'inicio' => $inicio->format('Y-m-d'),
+            'anterior' => $inicio->copy()->subDays($nDias)->format('Y-m-d'),
+            'seguinte' => $inicio->copy()->addDays($nDias)->format('Y-m-d'),
+            'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
+            'geradoEm' => now()->format('d/m/Y H:i'),
+        ]);
+    }
+
     public function listaDeEspera(Request $request): Response
     {
         return $this->montarLista($request, null);
@@ -186,6 +230,10 @@ class AgendamentoController extends Controller
     {
         $dados = $this->validarAgendamento($request);
 
+        if ($aviso = $this->avisoDeConflito($request, $dados['data'], $dados['periodo_id'], $dados['local_id'], $dados['sala_id'] ?? null, (int) $dados['estado'], null)) {
+            return back()->withInput()->withErrors(['conflito' => $aviso]);
+        }
+
         DB::transaction(function () use ($dados, $espera) {
             $agendamento = new Agendamento($this->paraGravar($dados));
             $agendamento->lista_de_espera_id = $espera->id;
@@ -199,6 +247,10 @@ class AgendamentoController extends Controller
     public function atualizarAgendamento(Request $request, Agendamento $agendamento): RedirectResponse
     {
         $dados = $this->validarAgendamento($request);
+
+        if ($aviso = $this->avisoDeConflito($request, $dados['data'], $dados['periodo_id'], $dados['local_id'], $dados['sala_id'] ?? null, (int) $dados['estado'], $agendamento->id)) {
+            return back()->withInput()->withErrors(['conflito' => $aviso]);
+        }
 
         DB::transaction(function () use ($dados, $agendamento) {
             $agendamento->update($this->paraGravar($dados));
@@ -221,7 +273,12 @@ class AgendamentoController extends Controller
     {
         $dados = $request->validate([
             'data' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:'.now()->addYears(3)->format('Y-m-d')],
+            'forcar' => ['sometimes', 'boolean'],
         ]);
+        if ($aviso = $this->avisoDeConflito($request, $dados['data'], $agendamento->periodo_de_agendamento_id, $agendamento->local_de_agendamento_id, $agendamento->sala_de_agendamento_id, (int) $agendamento->estado(), $agendamento->id)) {
+            return back()->withErrors(['conflito' => $aviso]);
+        }
+
         $agendamento->update(['start' => $dados['data'].' 00:00:00', 'end' => $dados['data'].' 00:00:00']);
 
         return back()->with('sucesso', 'Agendamento movido para '.Carbon::parse($dados['data'])->format('d/m/Y').'.');
@@ -250,6 +307,7 @@ class AgendamentoController extends Controller
             'estado' => $a->estado(),
             'responsavel' => $a->responsavel?->abrev ?: $a->responsavel?->name,
             'reserva_sangue' => (string) $a->reserva_sangue === '1',
+            'comentarios' => $a->comentarios,
         ];
     }
 
@@ -365,7 +423,39 @@ class AgendamentoController extends Controller
             'estado' => ['required', 'integer', Rule::exists('estado_de_agendamentos', 'id')],
             'reserva_sangue' => ['required', 'boolean'],
             'comentarios' => ['nullable', 'string', 'max:2000'],
+            'forcar' => ['sometimes', 'boolean'],
         ], ['required' => 'Preencha este campo.']);
+    }
+
+    /**
+     * Mensagem de aviso se a sala já estiver ocupada no mesmo dia e período por outra cirurgia ativa.
+     * Só avisa uma vez: com `forcar` o utilizador confirma que quer marcar na mesma.
+     */
+    private function avisoDeConflito(Request $request, string $data, ?int $periodo, ?int $local, ?int $sala, int $estado, ?int $excluirId): ?string
+    {
+        if ($request->boolean('forcar') || ! $sala || $estado === ListaDeEspera::ESTADO_CANCELADO) {
+            return null;
+        }
+
+        $ocupantes = Agendamento::query()
+            ->with('espera.utente:id,nome')
+            ->whereDate('start', $data)
+            ->where('periodo_de_agendamento_id', $periodo)
+            ->where('local_de_agendamento_id', $local)
+            ->where('sala_de_agendamento_id', $sala)
+            ->when($excluirId, fn ($q) => $q->whereKeyNot($excluirId))
+            ->get()
+            ->filter(fn (Agendamento $a) => $a->estado() !== ListaDeEspera::ESTADO_CANCELADO);
+
+        if ($ocupantes->isEmpty()) {
+            return null;
+        }
+
+        $nomes = $ocupantes->map(fn (Agendamento $a) => $a->espera?->utente?->nome ?? 'utente sem ficha')->implode(', ');
+        $nomeSala = Dominios::tabela('sala_de_agendamentos', $sala) ?? $sala;
+        $nomePeriodo = mb_strtolower((string) Dominios::tabela('periodo_de_agendamentos', $periodo));
+
+        return "A sala $nomeSala já tem cirurgia marcada nesse dia, de $nomePeriodo: $nomes.";
     }
 
     private function paraGravar(array $d): array

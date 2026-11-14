@@ -46,7 +46,18 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
         setSobre(null);
         const origem = dias.flatMap((d) => d.agendamentos.map((a) => ({ ...a }))).find((a) => a.id === id);
         if (!origem || origem.data === data) return;
-        router.patch(`/agendamento/${id}/mover`, { data }, { preserveScroll: true });
+        router.patch(
+            `/agendamento/${id}/mover`,
+            { data },
+            {
+                preserveScroll: true,
+                onError: (erros) => {
+                    if (erros.conflito && window.confirm(`${erros.conflito}\n\nMover mesmo assim?`)) {
+                        router.patch(`/agendamento/${id}/mover`, { data, forcar: true }, { preserveScroll: true });
+                    }
+                },
+            },
+        );
     };
     const eMes = vista === 'mes';
     const visiveis = dias.filter((d, n) => n < 5 || d.agendamentos.length > 0);
@@ -61,9 +72,17 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
             subtitulo={`${eMes ? nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) : `Semana de ${formatarData(semana)}`} · ${total} ${total === 1 ? 'cirurgia' : 'cirurgias'}`}
             largura="larga"
             acoes={
-                <BotaoLigacao href="/agendamento/lista-de-espera" variante="secundario">
-                    Lista de espera
-                </BotaoLigacao>
+                <>
+                    <BotaoLigacao
+                        href={`/agendamento/mapa?vista=semana&data=${eMes ? (mes.slice(0, 7) === hoje.slice(0, 7) ? hoje : mes) : semana}`}
+                        variante="secundario"
+                    >
+                        Mapa para imprimir
+                    </BotaoLigacao>
+                    <BotaoLigacao href="/agendamento/lista-de-espera" variante="secundario">
+                        Lista de espera
+                    </BotaoLigacao>
+                </>
             }
         >
             <div className="mb-4 flex flex-wrap items-center gap-2">

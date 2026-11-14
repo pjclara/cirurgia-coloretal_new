@@ -81,6 +81,7 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
 Route::prefix('agendamento')->name('agendamento.')->group(function () {
     Route::middleware('can:show agendamento')->group(function () {
         Route::get('/', [AgendamentoController::class, 'agenda'])->name('agenda');
+        Route::get('mapa', [AgendamentoController::class, 'mapa'])->name('mapa');
         Route::get('lista-de-espera', [AgendamentoController::class, 'listaDeEspera'])->name('espera');
         Route::get('lista-de-espera/{espera}', [AgendamentoController::class, 'editarInscricao'])->whereNumber('espera')->name('espera.edit');
         Route::get('{agendamento}', [AgendamentoController::class, 'editarAgendamento'])->whereNumber('agendamento')->name('edit');

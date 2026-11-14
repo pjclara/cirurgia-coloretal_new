@@ -45,10 +45,15 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
     const { data, setData, processing } = form;
     const erros = form.errors as Record<string, string | undefined>;
 
-    const guardar = (e: FormEvent) => {
-        e.preventDefault();
+    const enviar = (forcar: boolean) => {
+        form.transform((atual) => ({ ...atual, forcar }));
         if (agendamento) form.put(`/agendamento/${agendamento.id}`, { preserveScroll: true });
         else form.post(`/agendamento/lista-de-espera/${espera.id}/agendar`, { preserveScroll: true });
+    };
+
+    const guardar = (e: FormEvent) => {
+        e.preventDefault();
+        enviar(false);
     };
 
     const apagar = () => {
@@ -64,6 +69,17 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
                 </DialogDescription>
             </DialogHeader>
             <form onSubmit={guardar} noValidate className="space-y-5">
+                {erros.conflito && (
+                    <div
+                        role="alert"
+                        className="flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                    >
+                        <p className="min-w-0 flex-1">{erros.conflito}</p>
+                        <Botao variante="secundario" onClick={() => enviar(true)} disabled={processing}>
+                            Agendar mesmo assim
+                        </Botao>
+                    </div>
+                )}
                 <Seccao titulo="Data e local">
                     <div className="grid gap-4 sm:grid-cols-3">
                         <Campo rotulo="Data" para="data" erro={erros.data}>
