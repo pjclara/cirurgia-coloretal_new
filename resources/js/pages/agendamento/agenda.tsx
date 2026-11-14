@@ -157,11 +157,11 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                         setSobre(null);
                                                     }}
                                                     href={permissoes.includes('show agendamento') ? `/agendamento/${a.id}` : '#'}
-                                                    title={`${a.utente.nome ?? 'Utente sem ficha'} — ${a.intervencoes.join(', ')}`}
+                                                    title={`Processo ${a.utente.numero_processo ?? '—'} — ${a.intervencoes.join(', ')}`}
                                                     className={`block truncate rounded px-1.5 py-0.5 text-xs ${COR_ESTADO[a.estado ?? 6]}`}
                                                 >
                                                     {a.periodo ? `${a.periodo.charAt(0)} · ` : ''}
-                                                    {a.utente.nome ?? 'Utente sem ficha'}
+                                                    {a.utente.numero_processo ?? 'Sem processo'}
                                                 </Link>
                                             </li>
                                         ))}

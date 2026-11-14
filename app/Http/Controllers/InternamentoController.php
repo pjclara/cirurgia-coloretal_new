@@ -18,6 +18,12 @@ class InternamentoController extends Controller
 {
     public function index(Request $request): Response
     {
+        return $this->montarIndex($request, null);
+    }
+
+    /** A lista de internamentos, opcionalmente com o formulário de registo numa modal por cima. */
+    private function montarIndex(Request $request, ?array $modal): Response
+    {
         $filtros = [
             'estado' => in_array($request->query('estado'), ['internados', 'alta', 'todos'], true) ? $request->query('estado') : 'todos',
             'q' => trim((string) $request->query('q', '')),
@@ -64,6 +70,7 @@ class InternamentoController extends Controller
             'localizacoes' => Dominios::lista('localizacaos'),
             'responsaveis' => Dominios::responsaveis(),
             'anos' => range((int) now()->format('Y'), (int) substr(config('clinico.data_minima'), 0, 4)),
+            'modal' => $modal,
         ]);
     }
 
@@ -122,11 +129,13 @@ class InternamentoController extends Controller
             ? Utente::find((int) $request->query('utente'))
             : null;
 
-        return Inertia::render('internamentos/formulario', [
+        return $this->montarIndex($request, [
             'internamento' => null,
             'utente' => $utente ? $this->resumoUtente($utente) : null,
             'dominios' => $this->dominios(),
             'cirurgias' => 0,
+            'listaCirurgias' => [],
+            'podeNovaCirurgia' => false,
             'podeEditar' => true,
             'podeDesbloquear' => $request->user()->eAdministrador(),
             'podeApagar' => false,

@@ -1,3 +1,4 @@
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { diasEntre, formatarData, hojeIso } from '../../clinico/formato';
@@ -6,6 +7,7 @@ import type { Opcao, Paginado, PropsPartilhadas, Responsavel } from '../../clini
 import { Botao, BotaoLigacao, Selecao, estiloEntrada } from '../../components/clinico/campos';
 import { Paginacao } from '../../components/clinico/paginacao';
 import ClinicoLayout from '../../layouts/clinico-layout';
+import { FormularioInternamento, type PropsFormulario } from './formulario';
 
 type Linha = {
     id: number;
@@ -37,6 +39,7 @@ type Props = {
     localizacoes: Opcao[];
     responsaveis: Responsavel[];
     anos: number[];
+    modal: PropsFormulario | null;
 };
 
 const estados: { valor: Estado; rotulo: string }[] = [
@@ -45,7 +48,7 @@ const estados: { valor: Estado; rotulo: string }[] = [
     { valor: 'alta', rotulo: 'Com alta' },
 ];
 
-export default function Internamentos({ internamentos, filtros, localizacoes, responsaveis, anos }: Props) {
+export default function Internamentos({ internamentos, filtros, localizacoes, responsaveis, anos, modal }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(filtros.q);
 
@@ -233,6 +236,21 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
             </div>
 
             <Paginacao pagina={internamentos} nome="internamentos" />
+            <Dialog open={modal !== null} onOpenChange={(aberto) => !aberto && router.visit(rotas.internamentos.lista, { preserveScroll: true })}>
+                <DialogContent
+                    className="max-h-[90vh] max-w-4xl overflow-y-auto bg-white text-slate-900"
+                    onInteractOutside={(e) => e.preventDefault()}
+                    aria-describedby={undefined}
+                >
+                    {modal && (
+                        <FormularioInternamento
+                            key={modal.utente?.id ?? 'novo'}
+                            {...modal}
+                            aoFechar={() => router.visit(rotas.internamentos.lista, { preserveScroll: true })}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </ClinicoLayout>
     );
 }
