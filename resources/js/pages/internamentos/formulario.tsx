@@ -30,15 +30,17 @@ const MOMENTOS: { id: Momento; rotulo: string; ajuda: string }[] = [
     { id: '30_dias', rotulo: 'Aos 30 dias', ajuda: 'Seguimento 30 dias depois da alta.' },
 ];
 
-type Separador = 'dados' | 'cirurgias' | 'morbilidade' | 'alta';
+type Separador = 'dados' | 'notas' | 'cirurgias' | 'morbilidade' | 'alta';
 
 /** Separador onde está o campo com erro (para o abrir quando a gravação falha). */
 const separadorDoErro = (campo: string): Separador =>
     campo.startsWith('morbilidade')
         ? 'morbilidade'
-        : ['data_de_alta', 'data_de_saida', 'estado_da_alta_id', 'destino_id'].includes(campo)
-          ? 'alta'
-          : 'dados';
+        : ['caso_social_id', 'comentarios', 'bloquear_tabela'].includes(campo)
+          ? 'notas'
+          : ['data_de_alta', 'data_de_saida', 'estado_da_alta_id', 'destino_id'].includes(campo)
+            ? 'alta'
+            : 'dados';
 
 const somarDias = (data: string, dias: number) => {
     const d = new Date(data + 'T00:00:00');
@@ -277,16 +279,18 @@ export function FormularioInternamento({
                 </p>
             )}
 
-            {internamento && (
-                <div role="tablist" aria-label="Secções do internamento" className="mb-5 flex max-w-4xl flex-wrap gap-1 border-b border-slate-200">
-                    {(
-                        [
-                            ['dados', 'Dados do internamento'],
-                            ['cirurgias', `Cirurgias${listaCirurgias.length > 0 ? ` (${listaCirurgias.length})` : ''}`],
-                            ['morbilidade', 'Morbilidade'],
-                            ['alta', 'Alta'],
-                        ] as [Separador, string][]
-                    ).map(([id, rotulo]) => (
+            <div role="tablist" aria-label="Secções do internamento" className="mb-5 flex max-w-4xl flex-wrap gap-1 border-b border-slate-200">
+                {(
+                    [
+                        ['dados', internamento ? 'Dados do internamento' : 'Dados'],
+                        ['notas', 'Notas'],
+                        ['cirurgias', `Cirurgias${listaCirurgias.length > 0 ? ` (${listaCirurgias.length})` : ''}`],
+                        ['morbilidade', 'Morbilidade'],
+                        ['alta', 'Alta'],
+                    ] as [Separador, string][]
+                )
+                    .filter(([id]) => internamento || id === 'dados' || id === 'notas')
+                    .map(([id, rotulo]) => (
                         <button
                             key={id}
                             type="button"
@@ -303,8 +307,7 @@ export function FormularioInternamento({
                             {Object.keys(erros).some((k) => separadorDoErro(k) === id) && <span className="text-rose-700">!</span>}
                         </button>
                     ))}
-                </div>
-            )}
+            </div>
 
             {internamento && separador === 'cirurgias' && (
                 <div className="mb-5 max-w-4xl">
@@ -469,47 +472,47 @@ export function FormularioInternamento({
                                     />
                                 </Campo>
                             </Seccao>
-
-                            <Seccao titulo="Notas">
-                                <div className="grid gap-4 sm:grid-cols-6">
-                                    <Campo rotulo="Caso social" para="caso_social" erro={erros.caso_social_id} className="sm:col-span-3">
-                                        <Selecao
-                                            id="caso_social"
-                                            opcoes={dominios.casos_sociais}
-                                            valor={data.caso_social_id}
-                                            aoMudar={(v) => setData('caso_social_id', v)}
-                                            vazio="Sem informação"
-                                        />
-                                    </Campo>
-                                    <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} className="sm:col-span-6" opcional>
-                                        <textarea
-                                            id="comentarios"
-                                            rows={3}
-                                            value={data.comentarios}
-                                            onChange={(e) => setData('comentarios', e.target.value)}
-                                            className={estiloEntrada}
-                                        />
-                                    </Campo>
-                                </div>
-                                {internamento && (
-                                    <label className="mt-4 flex items-start gap-2 text-sm text-slate-800">
-                                        <input
-                                            type="checkbox"
-                                            className="mt-0.5 size-4 accent-teal-800"
-                                            checked={data.bloquear_tabela}
-                                            disabled={bloqueadoAntes && !podeDesbloquear}
-                                            onChange={(e) => setData('bloquear_tabela', e.target.checked)}
-                                        />
-                                        <span>
-                                            Bloquear este registo
-                                            <span className="block text-xs text-slate-500">
-                                                Depois de bloqueado, só um administrador o pode alterar.
-                                            </span>
-                                        </span>
-                                    </label>
-                                )}
-                            </Seccao>
                         </>
+                    )}
+
+                    {separador === 'notas' && (
+                        <Seccao titulo="Notas">
+                            <div className="grid gap-4 sm:grid-cols-6">
+                                <Campo rotulo="Caso social" para="caso_social" erro={erros.caso_social_id} className="sm:col-span-3">
+                                    <Selecao
+                                        id="caso_social"
+                                        opcoes={dominios.casos_sociais}
+                                        valor={data.caso_social_id}
+                                        aoMudar={(v) => setData('caso_social_id', v)}
+                                        vazio="Sem informação"
+                                    />
+                                </Campo>
+                                <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} className="sm:col-span-6" opcional>
+                                    <textarea
+                                        id="comentarios"
+                                        rows={3}
+                                        value={data.comentarios}
+                                        onChange={(e) => setData('comentarios', e.target.value)}
+                                        className={estiloEntrada}
+                                    />
+                                </Campo>
+                            </div>
+                            {internamento && (
+                                <label className="mt-4 flex items-start gap-2 text-sm text-slate-800">
+                                    <input
+                                        type="checkbox"
+                                        className="mt-0.5 size-4 accent-teal-800"
+                                        checked={data.bloquear_tabela}
+                                        disabled={bloqueadoAntes && !podeDesbloquear}
+                                        onChange={(e) => setData('bloquear_tabela', e.target.checked)}
+                                    />
+                                    <span>
+                                        Bloquear este registo
+                                        <span className="block text-xs text-slate-500">Depois de bloqueado, só um administrador o pode alterar.</span>
+                                    </span>
+                                </label>
+                            )}
+                        </Seccao>
                     )}
 
                     {internamento && separador === 'morbilidade' && (
