@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Internamento;
+use App\Support\Cirurgias;
+use App\Support\Dominios;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * Quadro do serviço: todos os doentes internados neste momento, por localização e cama.
+ */
+class QuadroController extends Controller
+{
+    public function __invoke(Request $request): Response
+    {
+        $equipa = in_array($request->query('equipa'), ['A', 'B'], true) ? $request->query('equipa') : null;
+
+        $cirurgias = Cirurgias::porInternamento(Internamento::query()->internados()->select('id'));
+
+        $internados = Internamento::query()
+            ->internados()
+            ->with(['utente:id,nome,data_nascimento,sexo_id,numero_processo', 'responsavel:id,name,abrev,equipa', 'diagnosticos:id,nome,abrev'])
+            ->when($equipa, fn ($q) => $q->whereHas('responsavel', fn ($r) => $r->where('equipa', $equipa)))
+            ->orderBy('localizacao_id')
+            ->orderBy('cama')
+            ->get()
+            ->map(fn (Internamento $i) => [
+                'id' => $i->id,
+                'cirurgias' => $cirurgias[$i->id] ?? [],
+                'cama' => $i->cama,
+                'localizacao_id' => $i->localizacao_id,
+                'localizacao' => Dominios::nome('localizacaos', $i->localizacao_id) ?? 'Sem localização',
+                'data_de_entrada' => $i->data_de_entrada?->format('Y-m-d'),
+                'motivo' => $i->motivo_internamento,
+                'caso_social' => $i->caso_social_id !== null && $i->caso_social_id !== 1
+                    ? Dominios::nome('caso_socials', $i->caso_social_id)
+                    : null,
+                'utente' => [
+                    'id' => $i->utente?->id,
+                    'nome' => $i->utente?->nome,
+                    'data_nascimento' => $i->utente?->data_nascimento?->format('Y-m-d'),
+                    'sexo' => Dominios::nome('sexos', $i->utente?->sexo_id),
+                    'numero_processo' => $i->utente?->numero_processo,
+                ],
+                'responsavel' => $i->responsavel ? [
+                    'nome' => $i->responsavel->name,
+                    'abrev' => $i->responsavel->abrev,
+                    'equipa' => $i->responsavel->equipa,
+                ] : null,
+                'diagnosticos' => $i->diagnosticos->map(fn ($d) => trim($d->abrev ?: $d->nome))->values(),
+            ]);
+
+        return Inertia::render('quadro/index', [
+            'internados' => $internados,
+            'equipa' => $equipa,
+            'hoje' => now()->format('Y-m-d'),
+        ]);
+    }
+}

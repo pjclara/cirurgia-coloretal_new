@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\RegistaAuditoria;
+use App\Models\Concerns\RegistaAutor;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Internamento extends Model
+{
+    use RegistaAuditoria, RegistaAutor, SoftDeletes;
+
+    public const ALTA_PENDENTE = 1;
+
+    public const ALTA_CONCLUIDA = 2;
+
+    public const DESTINO_FALECIDO = 6;
+
+    public const CLAVIEN_GRAU_5 = 7;
+
+    protected $table = 'internamentos';
+
+    protected $fillable = [
+        'utente_id',
+        'cama',
+        'localizacao_id',
+        'data_de_entrada',
+        'origem_do_internamento_id',
+        'data_de_alta',
+        'data_de_saida',
+        'estado_da_alta_id',
+        'responsavel_id',
+        'motivo_internamento',
+        'clavien_dindo_id',
+        'destino_id',
+        'caso_social_id',
+        'bloquear_tabela',
+        'comentarios',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'data_de_entrada' => 'date',
+            'data_de_alta' => 'date',
+            'data_de_saida' => 'date',
+            'bloquear_tabela' => 'boolean',
+        ];
+    }
+
+    public function utente(): BelongsTo
+    {
+        return $this->belongsTo(Utente::class)->withTrashed();
+    }
+
+    public function responsavel(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsavel_id');
+    }
+
+    public function diagnosticos(): BelongsToMany
+    {
+        return $this->belongsToMany(Diagnostico::class, 'diagnostico_internamento', 'internamento_id', 'diagnostico_id');
+    }
+
+    public function complicacoes(): BelongsToMany
+    {
+        return $this->belongsToMany(Complicacao::class, 'complicacao_internamento', 'internamento_id', 'complicacao_id')
+            ->withPivot('resolucao');
+    }
+
+    public function scopeInternados(Builder $query): Builder
+    {
+        return $query->whereNull('data_de_alta');
+    }
+
+    public function scopeComAlta(Builder $query): Builder
+    {
+        return $query->whereNotNull('data_de_alta');
+    }
+}
