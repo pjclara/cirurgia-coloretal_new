@@ -4,13 +4,14 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BedDouble, CalendarDays, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
+import { BarChart3, BedDouble, CalendarDays, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
     { title: 'Quadro', url: '/quadro', icon: LayoutGrid },
     { title: 'Internamentos', url: '/internamentos', icon: BedDouble },
     { title: 'Utentes', url: '/utentes', icon: Users },
+    { title: 'Análise', url: '/dashboard', icon: BarChart3 },
 ];
 
 const footerNavItems: NavItem[] = [];

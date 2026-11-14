@@ -57,6 +57,17 @@ npm install && composer run dev
 
 Entrar com o email e a password que cada pessoa já usava. A página inicial passa a ser `/quadro`.
 
+## Testes
+
+Os testes correm numa base MySQL própria (`<base>_teste`), porque as migrações dependem de tabelas legadas que só existem na base importada. A base de testes só leva estrutura e tabelas de referência (domínios e permissões), nunca dados de utentes.
+
+```bash
+php artisan testes:preparar   # cria/recria cr_base_teste a partir da base atual (repetir quando a estrutura mudar)
+php artisan test
+```
+
+Cada teste corre dentro de uma transação que é desfeita no fim. O `TestCase` recusa-se a correr se a base ativa não terminar em `_teste`, para nunca tocar na base de trabalho.
+
 ## O que as migrações fazem
 
 | Migração | Efeito | Reversível |

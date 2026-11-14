@@ -6,6 +6,7 @@ use App\Models\Internamento;
 use App\Support\Cirurgias;
 use App\Support\Dominios;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,9 +35,22 @@ class QuadroController extends Controller
     {
         $equipa = in_array($request->query('equipa'), ['A', 'B'], true) ? $request->query('equipa') : null;
 
+        $internados = $this->internados($equipa);
+
+        return Inertia::render('quadro/index', [
+            'internados' => $internados,
+            'equipa' => $equipa,
+            'hoje' => now()->format('Y-m-d'),
+            'modal' => $modal,
+        ]);
+    }
+
+    /** Doentes internados neste momento, por localização e cama (opcionalmente de uma equipa). */
+    private function internados(?string $equipa): Collection
+    {
         $cirurgias = Cirurgias::porInternamento(Internamento::query()->internados()->select('id'));
 
-        $internados = Internamento::query()
+        return Internamento::query()
             ->internados()
             ->with(['utente:id,nome,data_nascimento,sexo_id,numero_processo', 'responsavel:id,name,abrev,equipa', 'diagnosticos:id,nome,abrev'])
             ->when($equipa, fn ($q) => $q->whereHas('responsavel', fn ($r) => $r->where('equipa', $equipa)))
@@ -68,12 +82,18 @@ class QuadroController extends Controller
                 ] : null,
                 'diagnosticos' => $i->diagnosticos->map(fn ($d) => trim($d->abrev ?: $d->nome))->values(),
             ]);
+    }
 
-        return Inertia::render('quadro/index', [
-            'internados' => $internados,
+    /** Lista do quadro para imprimir: passar a visita e recolher registos à cabeceira. */
+    public function imprimir(Request $request): Response
+    {
+        $equipa = in_array($request->query('equipa'), ['A', 'B'], true) ? $request->query('equipa') : null;
+
+        return Inertia::render('quadro/imprimir', [
+            'internados' => $this->internados($equipa),
             'equipa' => $equipa,
             'hoje' => now()->format('Y-m-d'),
-            'modal' => $modal,
+            'geradoEm' => now()->format('d/m/Y H:i'),
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\UtilizadorController;
 use App\Http\Controllers\AgendamentoController;
+use App\Http\Controllers\AnaliseController;
 use App\Http\Controllers\CirurgiaController;
 use App\Http\Controllers\ContaController;
 use App\Http\Controllers\InternamentoController;
@@ -22,6 +23,8 @@ Route::put('conta/password', [ContaController::class, 'atualizarPassword'])->nam
 
 Route::middleware('can:show internamento')->group(function () {
     Route::get('quadro', QuadroController::class)->name('quadro');
+    Route::get('dashboard', AnaliseController::class)->name('dashboard');
+    Route::get('quadro/imprimir', [QuadroController::class, 'imprimir'])->name('quadro.imprimir');
     Route::get('quadro/{internamento}', [QuadroController::class, 'editar'])->whereNumber('internamento')->name('quadro.editar');
 
     Route::get('utentes', [UtenteController::class, 'index'])->name('utentes.index');
