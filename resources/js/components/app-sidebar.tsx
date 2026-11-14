@@ -3,8 +3,8 @@ import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { BedDouble, LayoutGrid, Users } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { BedDouble, LayoutGrid, ShieldCheck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -16,6 +16,9 @@ const mainNavItems: NavItem[] = [
 const footerNavItems: NavItem[] = [];
 
 export function AppSidebar() {
+    const administrador = usePage<{ clinico?: { administrador?: boolean } }>().props.clinico?.administrador;
+    const itens = administrador ? [...mainNavItems, { title: 'Administração', url: '/admin/utilizadores', icon: ShieldCheck }] : mainNavItems;
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -31,7 +34,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={itens} />
             </SidebarContent>
 
             <SidebarFooter>

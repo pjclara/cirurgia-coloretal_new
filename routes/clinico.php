@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\UtilizadorController;
 use App\Http\Controllers\CirurgiaController;
 use App\Http\Controllers\ContaController;
 use App\Http\Controllers\InternamentoController;
@@ -64,3 +65,12 @@ Route::middleware('can:update internamento')->group(function () {
     Route::put('cirurgias/{bloco}', [CirurgiaController::class, 'update'])->whereNumber('bloco')->name('cirurgias.update');
 });
 Route::delete('cirurgias/{bloco}', [CirurgiaController::class, 'destroy'])->whereNumber('bloco')->middleware('can:delete internamento')->name('cirurgias.destroy');
+
+// Administração
+Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(function () {
+    Route::get('utilizadores', [UtilizadorController::class, 'index'])->name('utilizadores.index');
+    Route::get('utilizadores/novo', [UtilizadorController::class, 'create'])->name('utilizadores.create');
+    Route::post('utilizadores', [UtilizadorController::class, 'store'])->name('utilizadores.store');
+    Route::get('utilizadores/{utilizador}', [UtilizadorController::class, 'edit'])->whereNumber('utilizador')->name('utilizadores.edit');
+    Route::put('utilizadores/{utilizador}', [UtilizadorController::class, 'update'])->whereNumber('utilizador')->name('utilizadores.update');
+});

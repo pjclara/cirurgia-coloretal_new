@@ -28,6 +28,7 @@ class ClinicoServiceProvider extends ServiceProvider
     public function boot(Router $router): void
     {
         $router->aliasMiddleware('clinico.ativo', UtilizadorAtivo::class);
+        $router->aliasMiddleware('clinico.admin', \App\Http\Middleware\ApenasAdministrador::class);
         $router->aliasMiddleware('clinico.password', PasswordAlterada::class);
         $router->pushMiddlewareToGroup('web', BloquearRegistoPublico::class);
 
