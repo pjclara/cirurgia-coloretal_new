@@ -4,6 +4,7 @@ import { diasEntre, idade, plural } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { PropsPartilhadas } from '../../clinico/tipos';
 import { BotaoLigacao } from '../../components/clinico/campos';
+import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Internado = {
@@ -20,7 +21,7 @@ type Internado = {
     cirurgias: { data: string; tipo: string | null; intervencoes: string[] }[];
 };
 
-type Props = { internados: Internado[]; equipa: 'A' | 'B' | null; hoje: string };
+type Props = { internados: Internado[]; equipa: 'A' | 'B' | null; hoje: string; modal: ModalInternamentoDados | null };
 
 /** Cor e comprimento da barra de demora: até 7 dias, 8 a 14, mais de 14. */
 function demora(dias: number) {
@@ -30,7 +31,7 @@ function demora(dias: number) {
     return { largura, barra: 'bg-teal-600', texto: 'text-slate-700' };
 }
 
-function Cama({ internado, hoje }: { internado: Internado; hoje: string }) {
+function Cama({ internado, hoje, equipa }: { internado: Internado; hoje: string; equipa: 'A' | 'B' | null }) {
     const dias = Math.max(0, diasEntre(internado.data_de_entrada, hoje));
     const estilo = demora(dias);
     const anos = idade(internado.utente.data_nascimento, hoje);
@@ -39,7 +40,8 @@ function Cama({ internado, hoje }: { internado: Internado; hoje: string }) {
     return (
         <li>
             <Link
-                href={rotas.internamentos.registo(internado.id)}
+                href={`/quadro/${internado.id}${equipa ? `?equipa=${equipa}` : ''}`}
+                preserveScroll
                 className="flex h-full flex-col rounded-lg border border-slate-200 bg-white hover:border-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
             >
                 <div className="flex items-start gap-3 px-3 pt-3">
@@ -88,7 +90,7 @@ function Cama({ internado, hoje }: { internado: Internado; hoje: string }) {
     );
 }
 
-export default function Quadro({ internados, equipa, hoje }: Props) {
+export default function Quadro({ internados, equipa, hoje, modal }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const podeCriar = permissoes.includes('create internamento');
 
@@ -158,13 +160,14 @@ export default function Quadro({ internados, equipa, hoje }: Props) {
                             </h2>
                             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                                 {lista.map((internado) => (
-                                    <Cama key={internado.id} internado={internado} hoje={hoje} />
+                                    <Cama key={internado.id} internado={internado} hoje={hoje} equipa={equipa} />
                                 ))}
                             </ul>
                         </section>
                     ))}
                 </div>
             )}
+            <ModalInternamento modal={modal} />
         </ClinicoLayout>
     );
 }

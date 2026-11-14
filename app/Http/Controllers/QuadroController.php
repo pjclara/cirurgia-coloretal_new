@@ -16,6 +16,22 @@ class QuadroController extends Controller
 {
     public function __invoke(Request $request): Response
     {
+        return $this->montar($request, null);
+    }
+
+    /** O quadro com o formulário do internamento, editável, numa modal por cima. */
+    public function editar(Request $request, Internamento $internamento, InternamentoController $formulario): Response
+    {
+        $equipa = $request->query('equipa');
+
+        return $this->montar($request, $formulario->propsEdicao($request, $internamento) + [
+            'fechar_url' => $equipa ? '/quadro?equipa='.urlencode((string) $equipa) : '/quadro',
+            'origem' => 'quadro',
+        ]);
+    }
+
+    private function montar(Request $request, ?array $modal): Response
+    {
         $equipa = in_array($request->query('equipa'), ['A', 'B'], true) ? $request->query('equipa') : null;
 
         $cirurgias = Cirurgias::porInternamento(Internamento::query()->internados()->select('id'));
@@ -57,6 +73,7 @@ class QuadroController extends Controller
             'internados' => $internados,
             'equipa' => $equipa,
             'hoje' => now()->format('Y-m-d'),
+            'modal' => $modal,
         ]);
     }
 }

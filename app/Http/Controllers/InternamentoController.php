@@ -140,6 +140,7 @@ class InternamentoController extends Controller
             'podeDesbloquear' => $request->user()->eAdministrador(),
             'podeApagar' => false,
             'limites' => $this->limites(),
+            'fechar_url' => '/internamentos',
         ]);
     }
 
@@ -154,12 +155,18 @@ class InternamentoController extends Controller
 
     public function edit(Request $request, Internamento $internamento): Response
     {
+        return Inertia::render('internamentos/formulario', $this->propsEdicao($request, $internamento));
+    }
+
+    /** Dados do formulário de edição; usados na página do internamento e na modal do quadro. */
+    public function propsEdicao(Request $request, Internamento $internamento): array
+    {
         $internamento->load(['utente', 'diagnosticos:id', 'morbilidades.complicacoes:id']);
         $utilizador = $request->user();
 
         $bloqueadoParaMim = $internamento->bloquear_tabela && ! $utilizador->eAdministrador();
 
-        return Inertia::render('internamentos/formulario', [
+        return [
             'internamento' => [
                 'id' => $internamento->id,
                 'utente_id' => $internamento->utente_id,
@@ -202,7 +209,7 @@ class InternamentoController extends Controller
             'podeDesbloquear' => $utilizador->eAdministrador(),
             'podeApagar' => $utilizador->can('delete internamento') && ! $bloqueadoParaMim,
             'limites' => $this->limites(),
-        ]);
+        ];
     }
 
     public function update(InternamentoRequest $request, Internamento $internamento, GuardarInternamento $guardar): RedirectResponse
@@ -210,6 +217,11 @@ class InternamentoController extends Controller
         $this->impedirSeBloqueado($request, $internamento);
 
         $guardar->executar($internamento, $request->validated());
+
+        // Gravado a partir da modal do quadro: volta ao quadro.
+        if ($request->input('origem') === 'quadro') {
+            return redirect()->route('quadro')->with('sucesso', 'Alterações guardadas.');
+        }
 
         return redirect()
             ->route('internamentos.edit', $internamento)
@@ -234,7 +246,7 @@ class InternamentoController extends Controller
         $internamento->delete();
 
         return redirect()
-            ->route('internamentos.index')
+            ->route($request->query('origem') === 'quadro' ? 'quadro' : 'internamentos.index')
             ->with('sucesso', 'Internamento apagado.');
     }
 

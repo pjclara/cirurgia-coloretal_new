@@ -109,7 +109,7 @@ export type PropsFormulario = {
     limites: { data_minima: string; hoje: string };
 };
 
-type Props = PropsFormulario & { aoFechar?: () => void };
+type Props = PropsFormulario & { aoFechar?: () => void; origem?: 'quadro' };
 
 /** Página completa ou, com `modal`, apenas o cabeçalho e o conteúdo para uma janela modal. */
 function Quadro({
@@ -136,9 +136,10 @@ function Quadro({
         <>
             <DialogHeader>
                 <DialogTitle>{titulo}</DialogTitle>
-                <DialogDescription>
-                    Registe a entrada. Morbilidade, alta e cirurgias preenchem-se depois, na página do internamento.
+                <DialogDescription asChild>
+                    <div>{subtitulo ?? 'Registe a entrada. Morbilidade, alta e cirurgias preenchem-se depois, na página do internamento.'}</div>
                 </DialogDescription>
+                {acoes && <div className="flex flex-wrap gap-2 pt-1">{acoes}</div>}
             </DialogHeader>
             {children}
         </>
@@ -147,6 +148,7 @@ function Quadro({
 
 export function FormularioInternamento({
     aoFechar,
+    origem,
     internamento,
     utente: utenteInicial,
     dominios,
@@ -222,6 +224,7 @@ export function FormularioInternamento({
 
     const guardar = (evento: FormEvent) => {
         evento.preventDefault();
+        form.transform((atual) => (origem ? { ...atual, origem } : atual));
         const opcoes = {
             preserveScroll: true,
             onError: (e: Record<string, string>) => {
@@ -234,7 +237,7 @@ export function FormularioInternamento({
     };
 
     const apagar = () => {
-        if (internamento) router.delete(rotas.internamentos.registo(internamento.id));
+        if (internamento) router.delete(rotas.internamentos.registo(internamento.id) + (origem ? `?origem=${origem}` : ''));
     };
 
     const numeroDeErros = Object.keys(erros).length;

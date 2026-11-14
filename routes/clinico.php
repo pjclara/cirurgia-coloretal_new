@@ -22,6 +22,7 @@ Route::put('conta/password', [ContaController::class, 'atualizarPassword'])->nam
 
 Route::middleware('can:show internamento')->group(function () {
     Route::get('quadro', QuadroController::class)->name('quadro');
+    Route::get('quadro/{internamento}', [QuadroController::class, 'editar'])->whereNumber('internamento')->name('quadro.editar');
 
     Route::get('utentes', [UtenteController::class, 'index'])->name('utentes.index');
     Route::get('utentes/pesquisa', [UtenteController::class, 'pesquisa'])->name('utentes.pesquisa');
