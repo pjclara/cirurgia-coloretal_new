@@ -29,3 +29,12 @@ docker compose down              # parar (os dados ficam no volume db_data)
 6. Actualizar: `git pull && docker compose up -d --build`; se houver migrações novas, fazer backup e
    `docker compose exec app php artisan migrate --force`.
 7. Backup diário: `docker compose exec -T db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" cr_base' | gzip > backup_$(date +%F).sql.gz`.
+
+## phpMyAdmin (gestão da base de dados)
+
+Serviço `phpmyadmin`, só acessível no próprio servidor (`127.0.0.1:8083`) porque dá acesso total aos dados clínicos.
+Para o usar a partir do PC, abrir um túnel SSH e depois `http://localhost:8083` (utilizador `root`, password = `MYSQL_ROOT_PASSWORD` do `.env.docker`):
+
+    ssh -L 8083:127.0.0.1:8083 UTILIZADOR@SERVIDOR
+
+Para mudar a porta ou expor à rede (não recomendado sem firewall/HTTPS), definir `PMA_PORT` e `PMA_BIND` no `.env`.

@@ -35,6 +35,23 @@ services:
       timeout: 5s
       retries: 30
 
+  # Gestão da base de dados. Por omissão só responde no próprio servidor (acesso por túnel SSH):
+  # tem acesso total aos dados clínicos, por isso não se expõe à rede sem proteção.
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 0
+      UPLOAD_LIMIT: 128M
+      TZ: Europe/Lisbon
+    ports:
+      - "${PMA_BIND:-127.0.0.1}:${PMA_PORT:-8083}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db_data:
   app_storage:
