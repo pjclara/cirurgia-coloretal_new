@@ -17,6 +17,7 @@ type Linha = {
     data_de_alta: string | null;
     motivo: string;
     responsavel: string | null;
+    centro_referencia: boolean;
     destino: string | null;
     clavien: string | null;
     bloqueado: boolean;
@@ -194,6 +195,16 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                                             {i.utente.nome ?? 'Utente sem ficha'}
                                         </Link>
                                         <span className="block text-xs text-slate-600 tabular-nums">Processo {i.utente.numero_processo ?? '—'}</span>
+                                        {i.centro_referencia && (
+                                            <span className="mt-1 inline-block">
+                                                <span
+                                                    className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900"
+                                                    title="Sinalizado para o centro de referência"
+                                                >
+                                                    Centro de referência
+                                                </span>
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="max-w-xs px-4 py-2.5 text-slate-800">
                                         <span className="line-clamp-2">{i.motivo}</span>

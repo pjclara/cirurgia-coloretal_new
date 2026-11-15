@@ -13,6 +13,15 @@ class Agendamento extends Model
 {
     use RegistaAuditoria, RegistaAutor, SoftDeletes;
 
+    /** ids de tipo_de_agendamentos e local_de_agendamentos usados para classificar o agendamento. */
+    public const TIPO_PROGRAMADA = 1;
+
+    public const TIPO_URGENCIA = 3;
+
+    public const TIPO_ADICIONAL = 4;
+
+    public const LOCAL_AMBULATORIO = 2;
+
     protected $table = 'agendamentos';
 
     protected $fillable = [
@@ -43,6 +52,20 @@ class Agendamento extends Model
     public function responsavel(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsavel_id');
+    }
+
+    /**
+     * Categoria para o calendário: adicional (tipo) tem prioridade, depois ambulatório (local),
+     * depois programada; urgência e outros ficam em "outra".
+     */
+    public function categoria(): string
+    {
+        return match (true) {
+            (int) $this->tipo_de_agendamento_id === self::TIPO_ADICIONAL => 'adicional',
+            (int) $this->local_de_agendamento_id === self::LOCAL_AMBULATORIO => 'ambulatorio',
+            (int) $this->tipo_de_agendamento_id === self::TIPO_PROGRAMADA => 'programada',
+            default => 'outra',
+        };
     }
 
     /** Os registos antigos guardam o estado em `estado_de_agendamento`, os novos em `estado_de_agendamento_id`. */

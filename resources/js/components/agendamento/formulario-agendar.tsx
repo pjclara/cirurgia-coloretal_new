@@ -102,8 +102,14 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
                         <Campo rotulo="Local" para="local" erro={erros.local_id}>
                             <Selecao id="local" opcoes={dominios.locais} valor={data.local_id} aoMudar={(v) => setData('local_id', v)} />
                         </Campo>
-                        <Campo rotulo="Sala" para="sala" erro={erros.sala_id} opcional>
-                            <Selecao id="sala" opcoes={dominios.salas} valor={data.sala_id} aoMudar={(v) => setData('sala_id', v)} vazio="Sem sala" />
+                        <Campo rotulo="Sala" para="sala" erro={erros.sala_id}>
+                            <Selecao
+                                id="sala"
+                                opcoes={dominios.salas}
+                                valor={data.sala_id}
+                                aoMudar={(v) => setData('sala_id', v)}
+                                invalido={!!erros.sala_id}
+                            />
                         </Campo>
                         <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
                             <Selecao

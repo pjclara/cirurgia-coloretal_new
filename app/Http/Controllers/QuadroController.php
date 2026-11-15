@@ -52,7 +52,7 @@ class QuadroController extends Controller
 
         return Internamento::query()
             ->internados()
-            ->with(['utente:id,nome,data_nascimento,sexo_id,numero_processo', 'responsavel:id,name,abrev,equipa', 'diagnosticos:id,nome,abrev'])
+            ->with(['utente:id,nome,data_nascimento,sexo_id,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev,equipa', 'diagnosticos:id,nome,abrev'])
             ->when($equipa, fn ($q) => $q->whereHas('responsavel', fn ($r) => $r->where('equipa', $equipa)))
             ->orderBy('localizacao_id')
             ->orderBy('cama')
@@ -65,6 +65,7 @@ class QuadroController extends Controller
                 'localizacao' => Dominios::nome('localizacaos', $i->localizacao_id) ?? 'Sem localização',
                 'data_de_entrada' => $i->data_de_entrada?->format('Y-m-d'),
                 'motivo' => $i->motivo_internamento,
+                'centro_referencia' => (bool) $i->utente?->referenciacoesAtivas->isNotEmpty(),
                 'caso_social' => $i->caso_social_id !== null && $i->caso_social_id !== 1
                     ? Dominios::nome('caso_socials', $i->caso_social_id)
                     : null,

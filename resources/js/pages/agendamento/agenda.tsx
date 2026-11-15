@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { COR_ESTADO, NOMES_DIA, nomeEstado } from '../../clinico/agendamento';
+import { CATEGORIAS, COR_ESTADO, NOMES_DIA, nomeEstado, type Categoria } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
@@ -16,6 +16,7 @@ type Item = {
     local: string | null;
     sala: string | null;
     tipo: string | null;
+    categoria: Categoria;
     estado: number | null;
     responsavel: string | null;
     reserva_sangue: boolean;
@@ -113,6 +114,23 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                 </label>
             </div>
 
+            <ul className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm" aria-label="Legenda das cores">
+                {(Object.keys(CATEGORIAS) as Categoria[]).map((c) => {
+                    const n = dias.reduce((soma, d) => soma + d.agendamentos.filter((a) => a.categoria === c).length, 0);
+                    return (
+                        <li key={c} className="flex items-center gap-2 text-slate-700">
+                            <span
+                                className={`inline-block size-3 rounded-sm ${CATEGORIAS[c].ponto} ${c === 'adicional' ? 'ring-1 ring-amber-700 ring-offset-1' : ''}`}
+                                aria-hidden="true"
+                            />
+                            {CATEGORIAS[c].rotulo}
+                            <span className="text-xs text-slate-500 tabular-nums">({n})</span>
+                        </li>
+                    );
+                })}
+                <li className="text-xs text-slate-500">✓ operado · riscado = cancelado</li>
+            </ul>
+
             {eMes && (
                 <div className="overflow-x-auto">
                     <div className="grid min-w-[56rem] grid-cols-7 overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -157,9 +175,10 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                         setSobre(null);
                                                     }}
                                                     href={permissoes.includes('show agendamento') ? `/agendamento/${a.id}` : '#'}
-                                                    title={`Processo ${a.utente.numero_processo ?? '—'} — ${a.intervencoes.join(', ')}`}
-                                                    className={`block truncate rounded px-1.5 py-0.5 text-xs ${COR_ESTADO[a.estado ?? 6]}`}
+                                                    title={`${CATEGORIAS[a.categoria].rotulo}${a.estado === 4 ? ' (cancelado)' : ''} · Processo ${a.utente.numero_processo ?? '—'} — ${a.intervencoes.join(', ')}`}
+                                                    className={`block truncate rounded px-1.5 py-0.5 text-xs ${CATEGORIAS[a.categoria].chip} ${a.estado === 4 ? 'line-through opacity-60' : ''}`}
                                                 >
+                                                    {a.estado === 5 ? '✓ ' : ''}
                                                     {a.periodo ? `${a.periodo.charAt(0)} · ` : ''}
                                                     {a.utente.numero_processo ?? 'Sem processo'}
                                                 </Link>
@@ -203,7 +222,10 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                 ) : (
                                     <ul className="divide-y divide-slate-100">
                                         {dia.agendamentos.map((a) => (
-                                            <li key={a.id} className="flex flex-wrap items-baseline gap-x-5 gap-y-1 px-4 py-2.5">
+                                            <li
+                                                key={a.id}
+                                                className={`flex flex-wrap items-baseline gap-x-5 gap-y-1 border-l-4 px-4 py-2.5 ${CATEGORIAS[a.categoria].faixa}`}
+                                            >
                                                 <p className="w-36 shrink-0 text-xs text-slate-600">
                                                     {[a.periodo, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
                                                 </p>

@@ -115,6 +115,7 @@ class UtenteController extends Controller
                 'estado_civil' => Dominios::nome('estado_civils', $utente->estado_civil_id),
             ],
             'internamentos' => $internamentos,
+            'origensReferenciacao' => request()->user()->can('create referenciacao') ? Dominios::lista('origem_da_referenciacaos') : [],
             'referenciacoes' => request()->user()->can('show referenciacao')
                 ? $utente->referenciacoes()->with(['responsavel:id,name,abrev', 'diagnosticos:id,nome,abrev'])->get()
                     ->each(fn ($r) => $r->setRelation('utente', $utente))

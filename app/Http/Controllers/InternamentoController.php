@@ -33,7 +33,7 @@ class InternamentoController extends Controller
         ];
 
         $internamentos = Internamento::query()
-            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
+            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
             ->when($filtros['estado'] === 'internados', fn ($q) => $q->internados())
             ->when($filtros['estado'] === 'alta', fn ($q) => $q->comAlta())
             ->when($filtros['ano'], fn ($q, $ano) => $q->whereYear('data_de_entrada', $ano))
@@ -62,6 +62,7 @@ class InternamentoController extends Controller
                 'destino' => Dominios::nome('destinos', $i->destino_id),
                 'clavien' => Dominios::nome('clavien_dindos', $i->claviemMaisGrave()),
                 'bloqueado' => $i->bloquear_tabela,
+                'centro_referencia' => (bool) $i->utente?->referenciacoesAtivas->isNotEmpty(),
             ]);
 
         return Inertia::render('internamentos/index', [

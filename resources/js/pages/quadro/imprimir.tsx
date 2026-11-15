@@ -8,6 +8,7 @@ type Internado = {
     data_de_entrada: string;
     motivo: string;
     caso_social: string | null;
+    centro_referencia: boolean;
     utente: { nome: string | null; data_nascimento: string | null; sexo: string | null; numero_processo: number | null };
     responsavel: { nome: string; abrev: string | null; equipa: string | null } | null;
     diagnosticos: string[];
@@ -112,6 +113,7 @@ export default function ImprimirQuadro({ internados, equipa, hoje, geradoEm }: P
                                                     </p>
                                                 )}
                                                 {i.caso_social && <p className="font-medium">Caso social: {i.caso_social}</p>}
+                                                {i.centro_referencia && <p className="font-medium">Centro de referência</p>}
                                             </td>
                                             <td className="py-1.5 pr-2">{i.responsavel?.abrev ?? '—'}</td>
                                             <td className="border-l border-dashed border-slate-300 py-1.5 pr-2" />

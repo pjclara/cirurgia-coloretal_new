@@ -15,3 +15,33 @@ export const COR_ESTADO: Record<number, string> = {
 export const nomeEstado = (estados: Opcao[], id: number | null) => estados.find((e) => e.id === id)?.nome ?? '—';
 
 export const NOMES_DIA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+export type Categoria = 'programada' | 'ambulatorio' | 'adicional' | 'outra';
+
+/** Cor do agendamento no calendário. O adicional leva também contorno tracejado, para não depender só da cor. */
+export const CATEGORIAS: Record<Categoria, { rotulo: string; chip: string; ponto: string; faixa: string }> = {
+    programada: {
+        rotulo: 'Programada',
+        chip: 'bg-sky-100 text-sky-950 border-l-[3px] border-sky-600',
+        ponto: 'bg-sky-600',
+        faixa: 'border-l-sky-600',
+    },
+    ambulatorio: {
+        rotulo: 'Ambulatório',
+        chip: 'bg-emerald-100 text-emerald-950 border-l-[3px] border-emerald-600',
+        ponto: 'bg-emerald-600',
+        faixa: 'border-l-emerald-600',
+    },
+    adicional: {
+        rotulo: 'Adicional',
+        chip: 'bg-amber-100 text-amber-950 border border-dashed border-amber-600 border-l-[3px] border-l-amber-600',
+        ponto: 'bg-amber-500',
+        faixa: 'border-l-amber-500',
+    },
+    outra: {
+        rotulo: 'Urgência / outro',
+        chip: 'bg-slate-100 text-slate-800 border-l-[3px] border-slate-400',
+        ponto: 'bg-slate-400',
+        faixa: 'border-l-slate-400',
+    },
+};

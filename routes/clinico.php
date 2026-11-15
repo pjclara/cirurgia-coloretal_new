@@ -115,6 +115,7 @@ Route::prefix('referenciacao')->name('referenciacao.')->group(function () {
     Route::middleware('can:create referenciacao')->group(function () {
         Route::get('utentes/{utente}/nova', [ReferenciacaoController::class, 'criar'])->whereNumber('utente')->name('create');
         Route::post('utentes/{utente}', [ReferenciacaoController::class, 'guardar'])->whereNumber('utente')->name('store');
+        Route::post('utentes/{utente}/sinalizar', [ReferenciacaoController::class, 'sinalizar'])->whereNumber('utente')->name('sinalizar');
     });
     Route::middleware('can:update referenciacao')->group(function () {
         Route::put('{referenciacao}', [ReferenciacaoController::class, 'atualizar'])->whereNumber('referenciacao')->name('update');

@@ -15,6 +15,7 @@ type Internado = {
     data_de_entrada: string;
     motivo: string;
     caso_social: string | null;
+    centro_referencia: boolean;
     utente: { id: number | null; nome: string | null; data_nascimento: string | null; sexo: string | null; numero_processo: number | null };
     responsavel: { nome: string; abrev: string | null; equipa: string | null } | null;
     diagnosticos: string[];
@@ -74,6 +75,17 @@ function Cama({ internado, hoje, equipa }: { internado: Internado; hoje: string;
                         {c.intervencoes.length > 0 ? `: ${c.intervencoes.join(', ')}` : ''}
                     </p>
                 ))}
+
+                {internado.centro_referencia && (
+                    <p className="mx-3 mt-2">
+                        <span
+                            className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900"
+                            title="Sinalizado para o centro de referência"
+                        >
+                            Centro de referência
+                        </span>
+                    </p>
+                )}
 
                 {internado.caso_social && (
                     <p className="mx-3 mt-2 rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">Caso social: {internado.caso_social}</p>

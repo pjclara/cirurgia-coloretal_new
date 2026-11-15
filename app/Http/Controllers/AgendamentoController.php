@@ -304,6 +304,7 @@ class AgendamentoController extends Controller
             'local' => Dominios::tabela('local_de_agendamentos', $a->local_de_agendamento_id),
             'sala' => Dominios::tabela('sala_de_agendamentos', $a->sala_de_agendamento_id),
             'tipo' => Dominios::tabela('tipo_de_agendamentos', $a->tipo_de_agendamento_id),
+            'categoria' => $a->categoria(),
             'estado' => $a->estado(),
             'responsavel' => $a->responsavel?->abrev ?: $a->responsavel?->name,
             'reserva_sangue' => (string) $a->reserva_sangue === '1',
@@ -417,7 +418,7 @@ class AgendamentoController extends Controller
             'data' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:'.now()->addYears(3)->format('Y-m-d')],
             'periodo_id' => ['required', 'integer', Rule::exists('periodo_de_agendamentos', 'id')],
             'local_id' => ['required', 'integer', Rule::exists('local_de_agendamentos', 'id')],
-            'sala_id' => ['nullable', 'integer', Rule::exists('sala_de_agendamentos', 'id')],
+            'sala_id' => ['required', 'integer', Rule::exists('sala_de_agendamentos', 'id')], // a coluna é obrigatória na base
             'tipo_id' => ['required', 'integer', Rule::exists('tipo_de_agendamentos', 'id')],
             'responsavel_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'estado' => ['required', 'integer', Rule::exists('estado_de_agendamentos', 'id')],

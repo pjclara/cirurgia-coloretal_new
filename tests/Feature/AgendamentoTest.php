@@ -75,3 +75,37 @@ test('sem permissão de alterar não se pode mover', function () {
 
     $this->actingAs($leitor)->patch("/agendamento/{$this->ocupante->id}/mover", ['data' => now()->addDays(12)->format('Y-m-d')])->assertForbidden();
 });
+
+test('a sala é obrigatória ao agendar', function () {
+    pedidoDeAgendar($this, ['sala_id' => null, 'data' => now()->addDays(30)->format('Y-m-d')])->assertSessionHasErrors('sala_id');
+
+    expect(Agendamento::where('lista_de_espera_id', $this->espera->id)->count())->toBe(0);
+});
+
+test('a categoria do calendário: adicional, ambulatório, programada ou outra', function () {
+    $ambulatorio = Agendamento::LOCAL_AMBULATORIO;
+    $bloco = DB::table('local_de_agendamentos')->where('id', '<>', $ambulatorio)->value('id');
+    $salas = DB::table('sala_de_agendamentos')->limit(5)->pluck('id')->values();
+    $dia = now()->addDays(20)->format('Y-m-d');
+    $novo = fn (int $sala, int $tipo, int $local) => novoAgendamento(novaEspera(novoUtente(), $this->utilizador), $this->utilizador, $dia, [
+        'sala_de_agendamento_id' => $sala, 'tipo_de_agendamento_id' => $tipo, 'local_de_agendamento_id' => $local,
+    ]);
+
+    $casos = [
+        'programada' => $novo($salas[0], Agendamento::TIPO_PROGRAMADA, $bloco),
+        'ambulatorio' => $novo($salas[1], Agendamento::TIPO_PROGRAMADA, $ambulatorio),
+        'adicional' => $novo($salas[2], Agendamento::TIPO_ADICIONAL, $ambulatorio), // o adicional prevalece sobre o ambulatório
+        'outra' => $novo($salas[3], Agendamento::TIPO_URGENCIA, $bloco),
+    ];
+
+    foreach ($casos as $esperada => $agendamento) {
+        expect($agendamento->categoria())->toBe($esperada);
+    }
+
+    $this->actingAs($this->utilizador)->get("/agendamento?semana=$dia")->assertInertia(fn ($p) => $p
+        ->where('dias', function ($dias) use ($casos) {
+            $porId = collect($dias)->flatMap(fn ($d) => $d['agendamentos'])->pluck('categoria', 'id');
+
+            return collect($casos)->every(fn ($agendamento, $categoria) => $porId[$agendamento->id] === $categoria);
+        }));
+});

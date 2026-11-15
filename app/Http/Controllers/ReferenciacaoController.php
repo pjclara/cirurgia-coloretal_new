@@ -44,6 +44,28 @@ class ReferenciacaoController extends Controller
         return redirect()->route('referenciacao.index')->with('sucesso', 'Utente referenciado ao centro de referência.');
     }
 
+    /** Sinalização rápida: o utente fica marcado como referenciado ao centro; o resto preenche-se depois. */
+    public function sinalizar(Request $request, Utente $utente): RedirectResponse
+    {
+        $minima = config('clinico.data_minima');
+        $dados = $request->validate([
+            'data_de_referenciacao' => ['required', 'date_format:Y-m-d', "after_or_equal:$minima", 'before_or_equal:today'],
+            'origem_id' => ['required', 'integer', Rule::exists('origem_da_referenciacaos', 'id')],
+            'comentarios' => ['nullable', 'string', 'max:2000'],
+        ], ['required' => 'Preencha este campo.', 'before_or_equal' => 'A data não pode ser futura.']);
+
+        if ($utente->referenciacoesAtivas()->exists()) {
+            return back()->with('erro', 'Este utente já está sinalizado para o centro de referência.');
+        }
+
+        $referenciacao = new Referenciacao($dados);
+        $referenciacao->utente_id = $utente->id;
+        $referenciacao->responsavel_id = $request->user()->id;
+        $referenciacao->save();
+
+        return back()->with('sucesso', 'Utente sinalizado para o centro de referência.');
+    }
+
     public function atualizar(Request $request, Referenciacao $referenciacao): RedirectResponse
     {
         $dados = $this->validar($request);

@@ -114,3 +114,51 @@ test('apagar faz soft delete e a modal de edição abre sobre a lista', function
     $this->actingAs($this->gestor)->delete("/referenciacao/{$r->id}")->assertRedirect('/referenciacao');
     expect(Referenciacao::count())->toBe(0)->and(Referenciacao::withTrashed()->count())->toBe(1);
 });
+
+test('sinalizar um utente só pede a origem e a data e fica em nome de quem sinalizou', function () {
+    $origem = DB::table('origem_da_referenciacaos')->value('id');
+
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$this->utente->id}/sinalizar", ['data_de_referenciacao' => $this->hoje, 'origem_id' => $origem])
+        ->assertSessionHasNoErrors();
+
+    $r = Referenciacao::where('utente_id', $this->utente->id)->first();
+    expect($r->responsavel_id)->toBe($this->gestor->id)->and($r->situacao())->toBe('referenciado');
+});
+
+test('a sinalização valida a origem e a data e não duplica', function () {
+    $origem = DB::table('origem_da_referenciacaos')->value('id');
+    $url = "/referenciacao/utentes/{$this->utente->id}/sinalizar";
+
+    $this->actingAs($this->gestor)->post($url, ['data_de_referenciacao' => $this->hoje])->assertSessionHasErrors('origem_id');
+    $this->actingAs($this->gestor)->post($url, ['data_de_referenciacao' => now()->addDay()->format('Y-m-d'), 'origem_id' => $origem])->assertSessionHasErrors('data_de_referenciacao');
+
+    $this->actingAs($this->gestor)->post($url, ['data_de_referenciacao' => $this->hoje, 'origem_id' => $origem]);
+    $this->actingAs($this->gestor)->post($url, ['data_de_referenciacao' => $this->hoje, 'origem_id' => $origem])->assertSessionHas('erro');
+
+    expect(Referenciacao::where('utente_id', $this->utente->id)->count())->toBe(1);
+});
+
+test('sem permissão de referenciar não se sinaliza', function () {
+    $leitor = utilizadorClinico(['show referenciacao']);
+
+    $this->actingAs($leitor)->post("/referenciacao/utentes/{$this->utente->id}/sinalizar", ['data_de_referenciacao' => $this->hoje, 'origem_id' => 1])->assertForbidden();
+});
+
+test('o utente sinalizado aparece marcado no quadro e nos internamentos, até ter saída', function () {
+    $internamento = novoInternamento($this->utente, $this->gestor);
+    $vizinho = novoInternamento(novoUtente(), $this->gestor, ['cama' => '2']);
+    $leitor = utilizadorClinico();
+    referenciar($this, ['data_de_entrada' => now()->subDays(5)->format('Y-m-d')]);
+
+    $this->actingAs($leitor)->get('/quadro')->assertInertia(fn (Assert $p) => $p
+        ->where('internados', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true
+            && collect($lista)->firstWhere('id', $vizinho->id)['centro_referencia'] === false));
+
+    $this->actingAs($leitor)->get('/internamentos')->assertInertia(fn (Assert $p) => $p
+        ->where('internamentos.data', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true));
+
+    // Com saída do centro deixa de estar sinalizado.
+    Referenciacao::first()->update(['data_de_saida' => $this->hoje, 'destino_id' => 1]);
+    $this->actingAs($leitor)->get('/quadro')->assertInertia(fn (Assert $p) => $p
+        ->where('internados', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === false));
+});

@@ -47,6 +47,12 @@ class Utente extends Model
         return $this->hasMany(Referenciacao::class)->orderByDesc('data_de_referenciacao');
     }
 
+    /** Referenciações ainda ativas (sem saída do centro): o utente está sinalizado. */
+    public function referenciacoesAtivas(): HasMany
+    {
+        return $this->hasMany(Referenciacao::class)->whereNull('data_de_saida');
+    }
+
     public function internamentos(): HasMany
     {
         return $this->hasMany(Internamento::class)->orderByDesc('data_de_entrada');
