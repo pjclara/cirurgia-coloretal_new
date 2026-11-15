@@ -112,3 +112,38 @@ test('a reintervenção é sim ou não', function () {
     $bloco = App\Models\BlocoOperatorio::where('internamento_id', $internamento->id)->firstOrFail();
     expect((int) $bloco->re_intervencao_nao_programada_id)->toBe(2);
 });
+
+test('o quadro abre com a equipa do utilizador e a escolha "todas" fica guardada na sessão', function () {
+    $a = utilizadorClinico();
+    $a->forceFill(['equipa' => 'A'])->save();
+    $b = utilizadorClinico();
+    $b->forceFill(['equipa' => 'B'])->save();
+    $daA = novoInternamento(novoUtente(), $a, ['cama' => '1']);
+    $daB = novoInternamento(novoUtente(), $b, ['cama' => '2']);
+    $ids = fn ($p) => collect($p)->pluck('id')->all();
+
+    // Por defeito: só os da equipa do utilizador.
+    $this->actingAs($a)->get('/quadro')->assertInertia(fn (Assert $p) => $p
+        ->where('equipa', 'A')
+        ->where('internados', fn ($l) => in_array($daA->id, $ids($l)) && ! in_array($daB->id, $ids($l))));
+
+    // "Todas" mostra tudo e continua assim nas visitas seguintes (ex.: depois de gravar).
+    $this->actingAs($a)->get('/quadro?equipa=todas')->assertInertia(fn (Assert $p) => $p
+        ->where('equipa', null)
+        ->where('internados', fn ($l) => in_array($daA->id, $ids($l)) && in_array($daB->id, $ids($l))));
+    $this->actingAs($a)->get('/quadro')->assertInertia(fn (Assert $p) => $p->where('equipa', null));
+
+    // Escolher outra equipa também fica.
+    $this->actingAs($a)->get('/quadro?equipa=B')->assertInertia(fn (Assert $p) => $p
+        ->where('internados', fn ($l) => ! in_array($daA->id, $ids($l)) && in_array($daB->id, $ids($l))));
+    $this->actingAs($a)->get('/quadro')->assertInertia(fn (Assert $p) => $p->where('equipa', 'B'));
+});
+
+test('um utilizador sem equipa vê todos os internados no quadro', function () {
+    $u = utilizadorClinico();
+    $i = novoInternamento(novoUtente(), $u);
+
+    $this->actingAs($u)->get('/quadro')->assertInertia(fn (Assert $p) => $p
+        ->where('equipa', null)
+        ->where('internados', fn ($l) => collect($l)->pluck('id')->contains($i->id)));
+});

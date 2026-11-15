@@ -314,7 +314,7 @@ export default function Quadro({ internados, equipa, hoje, modal, modalUtente, m
     const sociais = internados.filter((i) => i.caso_social).length;
 
     const filtrar = (valor: 'A' | 'B' | null) =>
-        router.get(rotas.quadro, valor ? { equipa: valor } : {}, { preserveState: true, preserveScroll: true });
+        router.get(rotas.quadro, { equipa: valor ?? 'todas' }, { preserveState: true, preserveScroll: true });
 
     const equipas: { rotulo: string; valor: 'A' | 'B' | null }[] = [
         { rotulo: 'Todas', valor: null },

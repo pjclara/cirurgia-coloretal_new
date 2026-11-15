@@ -24,10 +24,8 @@ class QuadroController extends Controller
     /** O quadro com o formulário do internamento, editável, numa modal por cima. */
     public function editar(Request $request, Internamento $internamento, InternamentoController $formulario): Response
     {
-        $equipa = $request->query('equipa');
-
         return $this->montar($request, $formulario->propsEdicao($request, $internamento) + [
-            'fechar_url' => $equipa ? '/quadro?equipa='.urlencode((string) $equipa) : '/quadro',
+            'fechar_url' => '/quadro',
             'origem' => 'quadro',
         ]);
     }
@@ -35,10 +33,8 @@ class QuadroController extends Controller
     /** O quadro com o formulário de novo internamento numa modal por cima. */
     public function novo(Request $request, InternamentoController $formulario): Response
     {
-        $equipa = $request->query('equipa');
-
         return $this->montar($request, $formulario->propsCriacao($request) + [
-            'fechar_url' => $equipa ? '/quadro?equipa='.urlencode((string) $equipa) : '/quadro',
+            'fechar_url' => '/quadro',
             'origem' => 'quadro',
         ]);
     }
@@ -74,7 +70,7 @@ class QuadroController extends Controller
 
     private function montar(Request $request, ?array $modal, ?array $modalUtente = null, ?array $modalCirurgia = null): Response
     {
-        $equipa = in_array($request->query('equipa'), ['A', 'B'], true) ? $request->query('equipa') : null;
+        $equipa = $this->equipaDoQuadro($request);
 
         $internados = $this->internados($equipa);
 
@@ -86,6 +82,22 @@ class QuadroController extends Controller
             'modalUtente' => $modalUtente,
             'modalCirurgia' => $modalCirurgia,
         ]);
+    }
+
+    /**
+     * Equipa mostrada no quadro: a escolhida agora (A, B ou "todas"), senão a última escolha desta sessão,
+     * senão a equipa do próprio utilizador. Sem equipa, mostra todos.
+     */
+    private function equipaDoQuadro(Request $request): ?string
+    {
+        $pedida = $request->query('equipa');
+        if (in_array($pedida, ['A', 'B', 'todas'], true)) {
+            $request->session()->put('quadro.equipa', $pedida);
+        }
+
+        $valor = $request->session()->get('quadro.equipa', $request->user()?->equipa);
+
+        return in_array($valor, ['A', 'B'], true) ? $valor : null;
     }
 
     /** Doentes internados neste momento, por localização e cama (opcionalmente de uma equipa). */
