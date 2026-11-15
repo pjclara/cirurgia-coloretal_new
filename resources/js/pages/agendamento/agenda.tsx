@@ -77,6 +77,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                     <BotaoLigacao
                         href={`/agendamento/mapa?vista=semana&data=${eMes ? (mes.slice(0, 7) === hoje.slice(0, 7) ? hoje : mes) : semana}`}
                         variante="secundario"
+                        novoSeparador
                     >
                         Mapa para imprimir
                     </BotaoLigacao>

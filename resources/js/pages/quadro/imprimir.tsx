@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { diasEntre, formatarData, idade, plural } from '../../clinico/formato';
 
 type Internado = {
@@ -39,9 +39,17 @@ export default function ImprimirQuadro({ internados, equipa, hoje, geradoEm }: P
             <style>{`@media print { @page { size: A4 landscape; margin: 10mm; } body { background: white !important; } thead { display: table-header-group; } tr { break-inside: avoid; } }`}</style>
 
             <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
-                <Link href={equipa ? `/quadro?equipa=${equipa}` : '/quadro'} className={ligacao}>
-                    ‹ Quadro
-                </Link>
+                <button
+                    type="button"
+                    onClick={() => {
+                        // Fecha o separador; se o browser não deixar (página aberta diretamente), volta à aplicação.
+                        window.close();
+                        setTimeout(() => router.visit('/quadro'), 200);
+                    }}
+                    className={ligacao}
+                >
+                    Fechar
+                </button>
                 {([null, 'A', 'B'] as const).map((e) => (
                     <Link
                         key={e ?? 'todas'}

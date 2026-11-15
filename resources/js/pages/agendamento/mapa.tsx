@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { NOMES_DIA, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao } from '../../clinico/tipos';
@@ -41,9 +41,17 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, estados,
             <style>{`@media print { @page { size: A4 landscape; margin: 12mm; } body { background: white !important; } }`}</style>
 
             <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
-                <Link href="/agendamento" className={ligacao}>
-                    ‹ Agenda
-                </Link>
+                <button
+                    type="button"
+                    onClick={() => {
+                        // Fecha o separador; se o browser não deixar (página aberta diretamente), volta à aplicação.
+                        window.close();
+                        setTimeout(() => router.visit('/agendamento'), 200);
+                    }}
+                    className={ligacao}
+                >
+                    Fechar
+                </button>
                 <Link href={`/agendamento/mapa?vista=${vista}&data=${anterior}`} className={ligacao}>
                     ‹ {vista === 'dia' ? 'Dia anterior' : 'Semana anterior'}
                 </Link>

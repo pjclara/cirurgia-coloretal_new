@@ -87,15 +87,26 @@ export function BotaoLigacao({
     href,
     variante = 'primario',
     className = '',
+    novoSeparador = false,
     children,
 }: {
     href: string;
     variante?: Variante;
     className?: string;
+    /** Abre a página noutro separador do browser (por exemplo, páginas para imprimir). */
+    novoSeparador?: boolean;
     children: ReactNode;
 }) {
+    const classes = `${estiloBotao} ${variantes[variante]} ${className}`;
+    if (novoSeparador) {
+        return (
+            <a href={href} target="_blank" rel="noopener noreferrer" className={classes}>
+                {children}
+            </a>
+        );
+    }
     return (
-        <Link href={href} className={`${estiloBotao} ${variantes[variante]} ${className}`}>
+        <Link href={href} className={classes}>
             {children}
         </Link>
     );

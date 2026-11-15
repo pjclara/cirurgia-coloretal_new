@@ -151,7 +151,7 @@ export default function Quadro({ internados, equipa, hoje, modal }: Props) {
                             </button>
                         ))}
                     </div>
-                    <BotaoLigacao href={equipa ? `/quadro/imprimir?equipa=${equipa}` : '/quadro/imprimir'} variante="secundario">
+                    <BotaoLigacao href={equipa ? `/quadro/imprimir?equipa=${equipa}` : '/quadro/imprimir'} variante="secundario" novoSeparador>
                         Imprimir lista
                     </BotaoLigacao>
                     {podeCriar && <BotaoLigacao href={rotas.internamentos.novo()}>Registar internamento</BotaoLigacao>}
