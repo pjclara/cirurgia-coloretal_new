@@ -28,6 +28,7 @@ class Cirurgias
             ->groupBy('bloco_operatorio_id');
 
         return $blocos->groupBy('internamento_id')->map(fn ($linhas) => $linhas->map(fn ($c) => [
+            'id' => $c->id,
             'data' => $c->data_de_inicio,
             'tipo' => $c->tipo,
             'intervencoes' => ($intervencoes[$c->id] ?? collect())->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),

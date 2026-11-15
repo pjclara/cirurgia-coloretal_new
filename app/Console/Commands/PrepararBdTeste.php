@@ -25,7 +25,7 @@ class PrepararBdTeste extends Command
         'clavien_dindos', 'resolucao_complicacaos', 'grupo_complicacaos', 'complicacaos',
         'grupo_diagnosticos', 'diagnosticos', 'grupo_intervencaos', 'intervencaos',
         'periodo_de_agendamentos', 'local_de_agendamentos', 'sala_de_agendamentos',
-        'tipo_de_agendamentos', 'estado_de_agendamentos', 'tipo_de_cirurgias',
+        'tipo_de_agendamentos', 'estado_de_agendamentos', 'tipo_de_cirurgias', 'tipo_de_abordagems', 're_intervencao_nao_programadas',
         'origem_da_referenciacaos', 'diagnostico_referenciacao_modos', 'histologias',
     ];
 

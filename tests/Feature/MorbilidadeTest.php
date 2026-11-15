@@ -49,15 +49,15 @@ test('alta com "sem complicações" e destino é gravada', function () {
 });
 
 test('complicação real exige o grau de Clavien-Dindo', function () {
-    guardar($this, ['morbilidade' => ['internamento' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => null]]])
-        ->assertSessionHasErrors('morbilidade.internamento.clavien_dindo_id');
+    guardar($this, ['morbilidade' => ['alta' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => null]]])
+        ->assertSessionHasErrors('morbilidade.alta.clavien_dindo_id');
 });
 
 test('"sem complicações" não pode vir com outras complicações', function () {
-    guardar($this, ['morbilidade' => ['internamento' => [
+    guardar($this, ['morbilidade' => ['alta' => [
         'complicacoes' => [['id' => Complicacao::SEM_COMPLICACOES, 'resolucoes' => []], ['id' => $this->complicacao, 'resolucoes' => []]],
         'clavien_dindo_id' => 2,
-    ]]])->assertSessionHasErrors('morbilidade.internamento.complicacoes');
+    ]]])->assertSessionHasErrors('morbilidade.alta.complicacoes');
 });
 
 test('a morbilidade aos 30 dias só pode ser registada depois da alta', function () {
@@ -65,7 +65,7 @@ test('a morbilidade aos 30 dias só pode ser registada depois da alta', function
         ->assertSessionHasErrors('morbilidade.30_dias.complicacoes');
 });
 
-test('grava os três momentos e o grau mais grave é o maior', function () {
+test('grava a alta e os 30 dias e o grau mais grave é o maior', function () {
     $alta = now()->subDays(35)->format('Y-m-d');
 
     guardar($this, [
@@ -73,14 +73,13 @@ test('grava os três momentos e o grau mais grave é o maior', function () {
         'destino_id' => $this->destinoVivo,
         'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
         'morbilidade' => [
-            'internamento' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => 2],
-            'alta' => semComplicacoes(),
+            'alta' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => 2],
             '30_dias' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => 3, 'data_registo' => now()->subDays(2)->format('Y-m-d')],
         ],
     ])->assertSessionHasNoErrors();
 
     $internamento = $this->internamento->fresh()->load('morbilidades');
-    expect($internamento->morbilidades)->toHaveCount(3)
+    expect($internamento->morbilidades)->toHaveCount(2)
         ->and($internamento->claviemMaisGrave())->toBe(3);
 });
 
@@ -96,10 +95,10 @@ test('óbito com complicação na alta fica em grau 5', function () {
 });
 
 test('um momento sem complicações escolhidas deixa de estar registado', function () {
-    guardar($this, ['morbilidade' => ['internamento' => semComplicacoes()]])->assertSessionHasNoErrors();
+    guardar($this, ['morbilidade' => ['alta' => semComplicacoes()]])->assertSessionHasNoErrors();
     expect($this->internamento->morbilidades()->count())->toBe(1);
 
-    guardar($this, ['morbilidade' => ['internamento' => ['complicacoes' => [], 'clavien_dindo_id' => null]]])->assertSessionHasNoErrors();
+    guardar($this, ['morbilidade' => ['alta' => ['complicacoes' => [], 'clavien_dindo_id' => null]]])->assertSessionHasNoErrors();
     expect($this->internamento->morbilidades()->count())->toBe(0);
 });
 
@@ -113,7 +112,7 @@ function resolucaoComGrau(?int $grau): int
 
 function morbilidadeInterna(object $t, array $resolucoes, $clavien = null): array
 {
-    return ['morbilidade' => ['internamento' => ['complicacoes' => [['id' => $t->complicacao, 'resolucoes' => $resolucoes]], 'clavien_dindo_id' => $clavien]]];
+    return ['morbilidade' => ['alta' => ['complicacoes' => [['id' => $t->complicacao, 'resolucoes' => $resolucoes]], 'clavien_dindo_id' => $clavien]]];
 }
 
 test('o grau de Clavien-Dindo calcula-se pela resolução, sem o indicar', function () {
@@ -135,8 +134,33 @@ test('o grau escolhido à mão prevalece sobre o calculado', function () {
 });
 
 test('sem resolução com grau associado, o grau continua obrigatório', function () {
-    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(null)]))->assertSessionHasErrors('morbilidade.internamento.clavien_dindo_id');
-    guardar($this, morbilidadeInterna($this, []))->assertSessionHasErrors('morbilidade.internamento.clavien_dindo_id');
+    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(null)]))->assertSessionHasErrors('morbilidade.alta.clavien_dindo_id');
+    guardar($this, morbilidadeInterna($this, []))->assertSessionHasErrors('morbilidade.alta.clavien_dindo_id');
 
     guardar($this, morbilidadeInterna($this, [resolucaoComGrau(null)], 2))->assertSessionHasNoErrors();
+});
+
+test('o momento antigo "durante o internamento" é recusado e não conta nos graus', function () {
+    guardar($this, [
+        'data_de_alta' => now()->format('Y-m-d'),
+        'destino_id' => $this->destinoVivo,
+        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
+        'morbilidade' => [
+            'internamento' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => 5],
+            'alta' => semComplicacoes(),
+        ],
+    ])->assertSessionHasErrors('morbilidade');
+
+    // Um registo antigo desse momento, já existente na base de dados, não entra no grau mais grave.
+    $this->internamento->morbilidades()->create(['momento' => 'internamento', 'clavien_dindo_id' => 5]);
+    expect($this->internamento->fresh()->load('morbilidades')->claviemMaisGrave())->toBeNull();
+});
+
+test('o estado da alta "Outro" já não se escolhe, mas um registo antigo que o tem mantém-no', function () {
+    $outro = DB::table('estado_da_altas')->where('nome', 'Outro')->value('id');
+
+    guardar($this, ['estado_da_alta_id' => $outro])->assertSessionHasErrors('estado_da_alta_id');
+
+    DB::table('internamentos')->where('id', $this->internamento->id)->update(['estado_da_alta_id' => $outro]);
+    guardar($this, ['estado_da_alta_id' => $outro])->assertSessionHasNoErrors();
 });

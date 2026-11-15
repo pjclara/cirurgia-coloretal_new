@@ -4,7 +4,7 @@ import { EscolhaMultipla } from './escolha-multipla';
 
 export type ComplicacaoEscolhida = { id: number; resolucoes: number[] };
 export type BlocoMorbilidade = { complicacoes: ComplicacaoEscolhida[]; clavien_dindo_id: number | ''; data_registo: string };
-export type Momento = 'internamento' | 'alta' | '30_dias';
+export type Momento = 'alta' | '30_dias';
 
 /** Resolução com o grau de Clavien-Dindo associado (null = sem grau automático). */
 export type ResolucaoComGrau = Opcao & { clavien_dindo_id?: number | null };

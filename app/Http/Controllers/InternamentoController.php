@@ -23,11 +23,10 @@ class InternamentoController extends Controller
         return $this->montarIndex($request, null);
     }
 
-    /** A lista de internamentos, opcionalmente com o formulário de registo numa modal por cima. */
+    /** A lista de internamentos com alta, opcionalmente com o formulário de registo numa modal por cima. */
     private function montarIndex(Request $request, ?array $modal): Response
     {
         $filtros = [
-            'estado' => in_array($request->query('estado'), ['internados', 'alta', 'todos'], true) ? $request->query('estado') : 'todos',
             'q' => trim((string) $request->query('q', '')),
             'ano' => ctype_digit((string) $request->query('ano')) ? (int) $request->query('ano') : null,
             'localizacao_id' => ctype_digit((string) $request->query('localizacao_id')) ? (int) $request->query('localizacao_id') : null,
@@ -36,8 +35,7 @@ class InternamentoController extends Controller
 
         $internamentos = Internamento::query()
             ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
-            ->when($filtros['estado'] === 'internados', fn ($q) => $q->internados())
-            ->when($filtros['estado'] === 'alta', fn ($q) => $q->comAlta())
+            ->comAlta() // esta lista é só para gerir altas; os internados estão no quadro
             ->when($filtros['ano'], fn ($q, $ano) => $q->whereYear('data_de_entrada', $ano))
             ->when($filtros['localizacao_id'], fn ($q, $id) => $q->where('localizacao_id', $id))
             ->when($filtros['responsavel_id'], fn ($q, $id) => $q->where('responsavel_id', $id))
@@ -136,11 +134,17 @@ class InternamentoController extends Controller
 
     public function create(Request $request): Response
     {
+        return $this->montarIndex($request, $this->propsCriacao($request) + ['fechar_url' => '/internamentos']);
+    }
+
+    /** Dados do formulário de novo registo; usados na modal da lista e na do quadro. */
+    public function propsCriacao(Request $request): array
+    {
         $utente = ctype_digit((string) $request->query('utente'))
             ? Utente::find((int) $request->query('utente'))
             : null;
 
-        return $this->montarIndex($request, [
+        return [
             'internamento' => null,
             'utente' => $utente ? $this->resumoUtente($utente) : null,
             'dominios' => $this->dominios(),
@@ -151,13 +155,17 @@ class InternamentoController extends Controller
             'podeDesbloquear' => $request->user()->eAdministrador(),
             'podeApagar' => false,
             'limites' => $this->limites(),
-            'fechar_url' => '/internamentos',
-        ]);
+        ];
     }
 
     public function store(InternamentoRequest $request, GuardarInternamento $guardar): RedirectResponse
     {
         $internamento = $guardar->executar(new Internamento, $request->validated());
+
+        // Registado a partir do quadro: fica no quadro.
+        if ($request->input('origem') === 'quadro') {
+            return redirect()->route('quadro')->with('sucesso', 'Internamento registado.');
+        }
 
         return redirect()
             ->route('internamentos.edit', $internamento)

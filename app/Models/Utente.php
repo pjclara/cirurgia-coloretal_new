@@ -67,8 +67,13 @@ class Utente extends Model
         }
 
         if (ctype_digit($termo)) {
+            // Números: o início do n.º de processo ou de utente chega (a partir de 3 dígitos); exacto abaixo disso.
             return $query->where(function (Builder $q) use ($termo) {
-                $q->where('numero_processo', $termo)->orWhere('numero_utente', $termo);
+                if (strlen($termo) >= 3) {
+                    $q->where('numero_processo', 'like', $termo.'%')->orWhere('numero_utente', 'like', $termo.'%');
+                } else {
+                    $q->where('numero_processo', $termo)->orWhere('numero_utente', $termo);
+                }
             });
         }
 

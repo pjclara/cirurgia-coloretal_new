@@ -19,7 +19,7 @@ type Utente = {
     classe_social_id: number | null;
 };
 
-type Props = {
+export type PropsUtente = {
     utente: Utente | null;
     processoSugerido: string;
     dominios: { sexos: Opcao[]; concelhos: Opcao[]; estados_civis: Opcao[]; etnias: Opcao[]; classes_sociais: Opcao[] };
@@ -37,7 +37,16 @@ type Dados = {
     classe_social_id: number | '';
 };
 
-export default function FormularioUtente({ utente, processoSugerido, dominios }: Props) {
+type Props = PropsUtente;
+
+/** O formulário do utente, sem página à volta; usado na página de edição e na modal de criação. */
+export function CorpoFormularioUtente({
+    utente,
+    processoSugerido,
+    dominios,
+    origem,
+    aoCancelar,
+}: PropsUtente & { origem?: 'quadro'; aoCancelar?: () => void }) {
     const form = useForm<Dados>({
         nome: utente?.nome ?? '',
         numero_processo: utente ? String(utente.numero_processo) : processoSugerido,
@@ -52,6 +61,7 @@ export default function FormularioUtente({ utente, processoSugerido, dominios }:
 
     const guardar = (evento: FormEvent) => {
         evento.preventDefault();
+        form.transform((atual) => (origem ? { ...atual, origem } : atual));
         if (utente) form.put(rotas.utentes.ficha(utente.id));
         else form.post(rotas.utentes.lista);
     };
@@ -59,108 +69,132 @@ export default function FormularioUtente({ utente, processoSugerido, dominios }:
     const { data, errors, setData } = form;
 
     return (
-        <ClinicoLayout titulo={utente ? 'Editar utente' : 'Criar utente'} subtitulo={utente?.nome}>
-            <form onSubmit={guardar} className="max-w-3xl space-y-5" noValidate>
-                <Seccao titulo="Identificação">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Campo rotulo="Nome completo" para="nome" erro={errors.nome} className="sm:col-span-2">
-                            <input
-                                id="nome"
-                                value={data.nome}
-                                onChange={(e) => setData('nome', e.target.value)}
-                                className={estiloEntrada}
-                                aria-invalid={!!errors.nome}
-                                autoComplete="off"
-                            />
-                        </Campo>
+        <form onSubmit={guardar} className="max-w-3xl space-y-5" noValidate>
+            <Seccao titulo="Identificação">
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Campo rotulo="Nome completo" para="nome" erro={errors.nome} className="sm:col-span-2">
+                        <input
+                            id="nome"
+                            value={data.nome}
+                            onChange={(e) => setData('nome', e.target.value)}
+                            className={estiloEntrada}
+                            aria-invalid={!!errors.nome}
+                            autoComplete="off"
+                        />
+                    </Campo>
 
-                        <Campo rotulo="Número de processo" para="numero_processo" erro={errors.numero_processo}>
-                            <input
-                                id="numero_processo"
-                                inputMode="numeric"
-                                value={data.numero_processo}
-                                onChange={(e) => setData('numero_processo', e.target.value.replace(/\D/g, ''))}
-                                className={`${estiloEntrada} tabular-nums`}
-                                aria-invalid={!!errors.numero_processo}
-                            />
-                        </Campo>
+                    <Campo rotulo="Número de processo" para="numero_processo" erro={errors.numero_processo}>
+                        <input
+                            id="numero_processo"
+                            inputMode="numeric"
+                            value={data.numero_processo}
+                            onChange={(e) => setData('numero_processo', e.target.value.replace(/\D/g, ''))}
+                            className={`${estiloEntrada} tabular-nums`}
+                            aria-invalid={!!errors.numero_processo}
+                        />
+                    </Campo>
 
-                        <Campo rotulo="Número de utente" para="numero_utente" erro={errors.numero_utente} ajuda="9 dígitos." opcional>
-                            <input
-                                id="numero_utente"
-                                inputMode="numeric"
-                                maxLength={9}
-                                value={data.numero_utente}
-                                onChange={(e) => setData('numero_utente', e.target.value.replace(/\D/g, ''))}
-                                className={`${estiloEntrada} tabular-nums`}
-                                aria-invalid={!!errors.numero_utente}
-                            />
-                        </Campo>
+                    <Campo rotulo="Número de utente" para="numero_utente" erro={errors.numero_utente} ajuda="9 dígitos." opcional>
+                        <input
+                            id="numero_utente"
+                            inputMode="numeric"
+                            maxLength={9}
+                            value={data.numero_utente}
+                            onChange={(e) => setData('numero_utente', e.target.value.replace(/\D/g, ''))}
+                            className={`${estiloEntrada} tabular-nums`}
+                            aria-invalid={!!errors.numero_utente}
+                        />
+                    </Campo>
 
-                        <Campo rotulo="Data de nascimento" para="data_nascimento" erro={errors.data_nascimento}>
-                            <input
-                                id="data_nascimento"
-                                type="date"
-                                min="1900-01-01"
-                                max={hojeIso()}
-                                value={data.data_nascimento}
-                                onChange={(e) => setData('data_nascimento', e.target.value)}
-                                className={estiloEntrada}
-                                aria-invalid={!!errors.data_nascimento}
-                            />
-                        </Campo>
+                    <Campo rotulo="Data de nascimento" para="data_nascimento" erro={errors.data_nascimento}>
+                        <input
+                            id="data_nascimento"
+                            type="date"
+                            min="1900-01-01"
+                            max={hojeIso()}
+                            value={data.data_nascimento}
+                            onChange={(e) => setData('data_nascimento', e.target.value)}
+                            className={estiloEntrada}
+                            aria-invalid={!!errors.data_nascimento}
+                        />
+                    </Campo>
 
-                        <Campo rotulo="Sexo" para="sexo_id" erro={errors.sexo_id}>
-                            <Selecao id="sexo_id" opcoes={dominios.sexos} valor={data.sexo_id} aoMudar={(v) => setData('sexo_id', v)} invalido={!!errors.sexo_id} />
-                        </Campo>
+                    <Campo rotulo="Sexo" para="sexo_id" erro={errors.sexo_id}>
+                        <Selecao
+                            id="sexo_id"
+                            opcoes={dominios.sexos}
+                            valor={data.sexo_id}
+                            aoMudar={(v) => setData('sexo_id', v)}
+                            invalido={!!errors.sexo_id}
+                        />
+                    </Campo>
 
-                        <Campo rotulo="Concelho" para="concelho_id" erro={errors.concelho_id}>
-                            <Selecao
-                                id="concelho_id"
-                                opcoes={dominios.concelhos}
-                                valor={data.concelho_id}
-                                aoMudar={(v) => setData('concelho_id', v)}
-                                invalido={!!errors.concelho_id}
-                            />
-                        </Campo>
-                    </div>
-                </Seccao>
+                    <Campo rotulo="Concelho" para="concelho_id" erro={errors.concelho_id}>
+                        <Selecao
+                            id="concelho_id"
+                            opcoes={dominios.concelhos}
+                            valor={data.concelho_id}
+                            aoMudar={(v) => setData('concelho_id', v)}
+                            invalido={!!errors.concelho_id}
+                        />
+                    </Campo>
+                </div>
+            </Seccao>
 
-                <Seccao titulo="Dados sociais">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Campo rotulo="Estado civil" para="estado_civil_id" erro={errors.estado_civil_id} opcional>
-                            <Selecao
-                                id="estado_civil_id"
-                                opcoes={dominios.estados_civis}
-                                valor={data.estado_civil_id}
-                                aoMudar={(v) => setData('estado_civil_id', v)}
-                                vazio="Sem informação"
-                            />
-                        </Campo>
-                        <Campo rotulo="Etnia" para="etnia_id" erro={errors.etnia_id} opcional>
-                            <Selecao id="etnia_id" opcoes={dominios.etnias} valor={data.etnia_id} aoMudar={(v) => setData('etnia_id', v)} vazio="Sem informação" />
-                        </Campo>
-                        <Campo rotulo="Classe social" para="classe_social_id" erro={errors.classe_social_id} opcional>
-                            <Selecao
-                                id="classe_social_id"
-                                opcoes={dominios.classes_sociais}
-                                valor={data.classe_social_id}
-                                aoMudar={(v) => setData('classe_social_id', v)}
-                                vazio="Sem informação"
-                            />
-                        </Campo>
-                    </div>
-                </Seccao>
+            <Seccao titulo="Dados sociais">
+                <div className="grid gap-4 sm:grid-cols-3">
+                    <Campo rotulo="Estado civil" para="estado_civil_id" erro={errors.estado_civil_id} opcional>
+                        <Selecao
+                            id="estado_civil_id"
+                            opcoes={dominios.estados_civis}
+                            valor={data.estado_civil_id}
+                            aoMudar={(v) => setData('estado_civil_id', v)}
+                            vazio="Sem informação"
+                        />
+                    </Campo>
+                    <Campo rotulo="Etnia" para="etnia_id" erro={errors.etnia_id} opcional>
+                        <Selecao
+                            id="etnia_id"
+                            opcoes={dominios.etnias}
+                            valor={data.etnia_id}
+                            aoMudar={(v) => setData('etnia_id', v)}
+                            vazio="Sem informação"
+                        />
+                    </Campo>
+                    <Campo rotulo="Classe social" para="classe_social_id" erro={errors.classe_social_id} opcional>
+                        <Selecao
+                            id="classe_social_id"
+                            opcoes={dominios.classes_sociais}
+                            valor={data.classe_social_id}
+                            aoMudar={(v) => setData('classe_social_id', v)}
+                            vazio="Sem informação"
+                        />
+                    </Campo>
+                </div>
+            </Seccao>
 
-                <div className="flex gap-2">
-                    <Botao type="submit" disabled={form.processing}>
-                        {utente ? 'Guardar alterações' : 'Criar utente'}
+            <div className="flex gap-2">
+                <Botao type="submit" disabled={form.processing}>
+                    {utente ? 'Guardar alterações' : 'Criar utente'}
+                </Botao>
+                {aoCancelar ? (
+                    <Botao type="button" variante="secundario" onClick={aoCancelar}>
+                        Cancelar
                     </Botao>
+                ) : (
                     <BotaoLigacao href={utente ? rotas.utentes.ficha(utente.id) : rotas.utentes.lista} variante="secundario">
                         Cancelar
                     </BotaoLigacao>
-                </div>
-            </form>
+                )}
+            </div>
+        </form>
+    );
+}
+
+export default function FormularioUtente(props: Props) {
+    return (
+        <ClinicoLayout titulo={props.utente ? 'Editar utente' : 'Criar utente'} subtitulo={props.utente?.nome}>
+            <CorpoFormularioUtente {...props} />
         </ClinicoLayout>
     );
 }

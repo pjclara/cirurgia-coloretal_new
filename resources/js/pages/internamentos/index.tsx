@@ -1,8 +1,8 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { diasEntre, formatarData, hojeIso } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
-import type { Opcao, Paginado, PropsPartilhadas, Responsavel } from '../../clinico/tipos';
+import type { Opcao, Paginado, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Selecao, estiloEntrada } from '../../components/clinico/campos';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
@@ -23,10 +23,7 @@ type Linha = {
     bloqueado: boolean;
 };
 
-type Estado = 'internados' | 'alta' | 'todos';
-
 type Filtros = {
-    estado: Estado;
     q: string;
     ano: number | null;
     localizacao_id: number | null;
@@ -42,20 +39,12 @@ type Props = {
     modal: ModalInternamentoDados | null;
 };
 
-const estados: { valor: Estado; rotulo: string }[] = [
-    { valor: 'todos', rotulo: 'Todos' },
-    { valor: 'internados', rotulo: 'Internados' },
-    { valor: 'alta', rotulo: 'Com alta' },
-];
-
 export default function Internamentos({ internamentos, filtros, localizacoes, responsaveis, anos, modal }: Props) {
-    const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(filtros.q);
 
     const aplicar = (alteracoes: Partial<Filtros>) => {
         const novos = { ...filtros, q: termo.trim(), ...alteracoes };
         const consulta: Record<string, string | number> = {};
-        if (novos.estado !== 'todos') consulta.estado = novos.estado;
         if (novos.q) consulta.q = novos.q;
         if (novos.ano) consulta.ano = novos.ano;
         if (novos.localizacao_id) consulta.localizacao_id = novos.localizacao_id;
@@ -68,7 +57,7 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
         aplicar({});
     };
 
-    const comFiltros = filtros.estado !== 'todos' || !!filtros.q || !!filtros.ano || !!filtros.localizacao_id || !!filtros.responsavel_id;
+    const comFiltros = !!filtros.q || !!filtros.ano || !!filtros.localizacao_id || !!filtros.responsavel_id;
 
     return (
         <ClinicoLayout
@@ -79,29 +68,10 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                     <BotaoLigacao href={rotas.internamentos.seguimentos} variante="secundario">
                         Seguimentos aos 30 dias
                     </BotaoLigacao>
-                    {permissoes.includes('create internamento') && (
-                        <BotaoLigacao href={rotas.internamentos.novo()}>Registar internamento</BotaoLigacao>
-                    )}
                 </>
             }
         >
             <div className="mb-4 flex flex-wrap items-end gap-3">
-                <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5" role="group" aria-label="Estado">
-                    {estados.map((e) => (
-                        <button
-                            key={e.valor}
-                            type="button"
-                            aria-pressed={filtros.estado === e.valor}
-                            onClick={() => aplicar({ estado: e.valor })}
-                            className={`rounded px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-teal-700 ${
-                                filtros.estado === e.valor ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-                            }`}
-                        >
-                            {e.rotulo}
-                        </button>
-                    ))}
-                </div>
-
                 <form onSubmit={procurar} className="flex min-w-64 flex-1 gap-2 sm:max-w-md" role="search">
                     <label htmlFor="q" className="sr-only">
                         Procurar por utente, processo ou motivo

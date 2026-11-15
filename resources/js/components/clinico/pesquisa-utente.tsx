@@ -116,7 +116,7 @@ export function PesquisaUtente({ aoEscolher, placeholder = 'Procurar utente por 
                 <div
                     id={idLista}
                     role="listbox"
-                    className="absolute z-30 mt-1 w-full min-w-72 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+                    className="absolute z-30 mt-1 max-h-80 w-full min-w-72 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg"
                 >
                     {resultados.map((utente, indice) => (
                         <button

@@ -9,21 +9,19 @@ type Props = {
     procurar: string;
     desativado?: boolean;
     vazio?: string;
+    /** Classe de altura máxima da lista (por omissão `max-h-56`). */
+    alturaLista?: string;
 };
 
 /**
  * Lista pesquisável com caixas de verificação, agrupada (ex.: diagnósticos por grupo).
  * As opções escolhidas ficam sempre visíveis no topo.
  */
-export function EscolhaMultipla({ opcoes, valor, aoMudar, procurar, desativado, vazio = 'Nada escolhido.' }: Props) {
+export function EscolhaMultipla({ opcoes, valor, aoMudar, procurar, desativado, vazio = 'Nada escolhido.', alturaLista = 'max-h-56' }: Props) {
     const [termo, setTermo] = useState('');
     const idPesquisa = useId();
 
-    const semAcentos = (texto: string) =>
-        texto
-            .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '')
-            .toLowerCase();
+    const semAcentos = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
     const grupos = useMemo(() => {
         const procurado = semAcentos(termo.trim());
@@ -79,7 +77,7 @@ export function EscolhaMultipla({ opcoes, valor, aoMudar, procurar, desativado, 
                         placeholder={procurar}
                         className={estiloEntrada}
                     />
-                    <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-slate-200">
+                    <div className={`mt-2 ${alturaLista} overflow-y-auto rounded-md border border-slate-200`}>
                         {grupos.length === 0 && <p className="px-3 py-2 text-sm text-slate-500">Nenhuma opção com esse nome.</p>}
                         {grupos.map(([grupo, lista]) => (
                             <fieldset key={grupo} className="border-b border-slate-100 last:border-b-0">

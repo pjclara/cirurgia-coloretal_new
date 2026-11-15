@@ -55,12 +55,12 @@ class CirurgiaController extends Controller
 
     public function create(Request $request, Internamento $internamento): Response
     {
-        return $this->formulario($request, $internamento, null);
+        return Inertia::render('cirurgias/formulario', $this->propsFormulario($request, $internamento, null));
     }
 
     public function edit(Request $request, BlocoOperatorio $bloco): Response
     {
-        return $this->formulario($request, $bloco->internamento, $bloco);
+        return Inertia::render('cirurgias/formulario', $this->propsFormulario($request, $bloco->internamento, $bloco));
     }
 
     public function store(Request $request, Internamento $internamento): RedirectResponse
@@ -78,7 +78,7 @@ class CirurgiaController extends Controller
             $bloco->intervencoes()->sync($intervencoes);
         });
 
-        return redirect()->route('utentes.cirurgias', $internamento->utente_id)->with('sucesso', 'Cirurgia registada.');
+        return $this->destino($request, $internamento->utente_id, 'Cirurgia registada.');
     }
 
     public function update(Request $request, BlocoOperatorio $bloco): RedirectResponse
@@ -94,7 +94,7 @@ class CirurgiaController extends Controller
             $bloco->intervencoes()->sync($intervencoes);
         });
 
-        return redirect()->route('utentes.cirurgias', $bloco->internamento->utente_id)->with('sucesso', 'Cirurgia atualizada.');
+        return $this->destino($request, $bloco->internamento->utente_id, 'Cirurgia atualizada.');
     }
 
     public function destroy(Request $request, BlocoOperatorio $bloco): RedirectResponse
@@ -105,7 +105,7 @@ class CirurgiaController extends Controller
         $bloco->forceFill(['deleted_by_id' => $request->user()->id])->saveQuietly();
         $bloco->delete();
 
-        return redirect()->route('utentes.cirurgias', $utenteId)->with('sucesso', 'Cirurgia apagada.');
+        return $this->destino($request, $utenteId, 'Cirurgia apagada.');
     }
 
     private function garantirEdicao(Request $request, Internamento $internamento): void
@@ -113,20 +113,20 @@ class CirurgiaController extends Controller
         abort_if($internamento->bloquear_tabela && ! $request->user()->eAdministrador(), 403, 'Internamento bloqueado.');
     }
 
-    private function formulario(Request $request, Internamento $internamento, ?BlocoOperatorio $bloco): Response
+    /** Dados do formulário; usados na página própria e na modal do quadro. */
+    public function propsFormulario(Request $request, Internamento $internamento, ?BlocoOperatorio $bloco): array
     {
         $internamento->load('utente');
         $utilizador = $request->user();
         $bloqueado = $internamento->bloquear_tabela && ! $utilizador->eAdministrador();
 
-        return Inertia::render('cirurgias/formulario', [
+        return [
             'cirurgia' => $bloco ? [
                 'id' => $bloco->id,
                 'data_de_inicio' => $bloco->data_de_inicio?->format('Y-m-d'),
                 'tipo_de_cirurgia_id' => $bloco->tipo_de_cirurgia_id,
                 'tipo_de_abordagem_id' => $bloco->tipo_de_abordagem_id,
                 'causa_de_conversao' => $bloco->causa_de_conversao ?? '',
-                'resseccao_de_orgao' => (int) $bloco->resseccao_de_orgao,
                 're_intervencao_nao_programada_id' => $bloco->re_intervencao_nao_programada_id,
                 'comentarios' => $bloco->comentarios ?? '',
                 'intervencoes' => $bloco->intervencoes()->pluck('intervencaos.id')->map(fn ($i) => (int) $i)->values(),
@@ -152,7 +152,17 @@ class CirurgiaController extends Controller
             'hoje' => now()->format('Y-m-d'),
             'podeEditar' => $utilizador->can($bloco ? 'update internamento' : 'create internamento') && ! $bloqueado,
             'podeApagar' => $bloco && $utilizador->can('delete internamento') && ! $bloqueado,
-        ]);
+        ];
+    }
+
+    /** Gravado a partir do quadro: volta ao quadro. */
+    private function destino(Request $request, int $utenteId, string $mensagem): RedirectResponse
+    {
+        if ($request->input('origem', $request->query('origem')) === 'quadro') {
+            return redirect()->route('quadro')->with('sucesso', $mensagem);
+        }
+
+        return redirect()->route('utentes.cirurgias', $utenteId)->with('sucesso', $mensagem);
     }
 
     private function validar(Request $request): array
@@ -162,7 +172,6 @@ class CirurgiaController extends Controller
             'tipo_de_cirurgia_id' => ['required', 'integer', Rule::exists('tipo_de_cirurgias', 'id')],
             'tipo_de_abordagem_id' => ['required', 'integer', Rule::exists('tipo_de_abordagems', 'id')],
             'causa_de_conversao' => ['nullable', 'string', 'max:255'],
-            'resseccao_de_orgao' => ['required', Rule::in([1, 2, 99])],
             're_intervencao_nao_programada_id' => ['required', 'integer', Rule::exists('re_intervencao_nao_programadas', 'id')],
             'comentarios' => ['nullable', 'string', 'max:2000'],
             'intervencoes' => ['required', 'array', 'min:1'],

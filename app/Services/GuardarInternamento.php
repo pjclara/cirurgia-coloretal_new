@@ -21,6 +21,13 @@ class GuardarInternamento
             $morbilidadeAntes = $internamento->exists ? $this->resumoMorbilidade($internamento) : [];
 
             $internamento->fill(collect($dados)->except(['diagnosticos', 'morbilidade'])->all());
+
+            // Com cirurgia, a alta fica pendente até à revisão aos 30 dias.
+            $tem30Dias = collect($dados['morbilidade']['30_dias']['complicacoes'] ?? [])->isNotEmpty();
+            if (! $tem30Dias && $internamento->temCirurgias()) {
+                $internamento->estado_da_alta_id = Internamento::ALTA_PENDENTE;
+            }
+
             $internamento->save();
 
             $diagnosticos = collect($dados['diagnosticos'] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values();
@@ -71,6 +78,11 @@ class GuardarInternamento
             $depois = $this->resumoMorbilidade($internamento);
             if ($antes !== $depois) {
                 $internamento->auditar('updated', ['morbilidade' => $antes], ['morbilidade' => $depois]);
+            }
+
+            // Revisão aos 30 dias feita: a alta de quem teve cirurgia deixa de estar pendente.
+            if ((int) $internamento->estado_da_alta_id === Internamento::ALTA_PENDENTE && $internamento->data_de_alta && $internamento->temCirurgias()) {
+                $internamento->update(['estado_da_alta_id' => Internamento::ALTA_CONCLUIDA]);
             }
 
             return $morbilidade;

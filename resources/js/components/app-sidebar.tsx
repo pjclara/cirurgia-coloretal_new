@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavGroup } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BarChart3, BedDouble, CalendarDays, ClipboardList, HeartPulse, LayoutGrid, Map, Network, ShieldCheck, Users } from 'lucide-react';
+import { BarChart3, BedDouble, CalendarDays, ClipboardList, LayoutGrid, Map, Network, ShieldCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const footerNavItems: never[] = [];
@@ -18,13 +18,7 @@ export function AppSidebar() {
             title: 'Clínica',
             items: [
                 { title: 'Quadro', url: '/quadro', icon: LayoutGrid },
-                {
-                    title: 'Internamentos',
-                    url: '/internamentos',
-                    icon: BedDouble,
-                    filhos: [{ title: 'Seguimento aos 30 dias', url: '/internamentos/seguimentos', icon: HeartPulse }],
-                },
-                { title: 'Utentes', url: '/utentes', icon: Users },
+                { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
             ],
         },
         ...(pode('show agendamento') || pode('show referenciacao')

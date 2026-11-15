@@ -58,7 +58,7 @@ class InternamentoRequest extends FormRequest
             'diagnosticos' => ['required', 'array', 'min:1'],
             'diagnosticos.*' => ['integer', 'distinct', Rule::exists('diagnosticos', 'id')],
 
-            // Morbilidade por momento: durante o internamento, na alta e aos 30 dias.
+            // Morbilidade por momento: na alta e aos 30 dias.
             'morbilidade' => ['present', 'array'],
             'morbilidade.*' => ['array'],
             'morbilidade.*.complicacoes' => ['nullable', 'array'],
@@ -70,7 +70,12 @@ class InternamentoRequest extends FormRequest
 
             'data_de_alta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:data_de_entrada', 'before_or_equal:today'],
             'data_de_saida' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:data_de_alta', 'before_or_equal:today'],
-            'estado_da_alta_id' => ['required', 'integer', Rule::exists('estado_da_altas', 'id')],
+            // "Outro" já não se escolhe; só se mantém num registo antigo que ainda o tenha.
+            'estado_da_alta_id' => ['required', 'integer', Rule::in(array_filter([
+                Internamento::ALTA_PENDENTE,
+                Internamento::ALTA_CONCLUIDA,
+                $this->route('internamento')?->estado_da_alta_id,
+            ]))],
             'destino_id' => ['nullable', 'required_with:data_de_alta', 'integer', Rule::exists('destinos', 'id')],
         ];
     }

@@ -154,11 +154,14 @@ test('o utente sinalizado aparece marcado no quadro e nos internamentos, até te
         ->where('internados', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true
             && collect($lista)->firstWhere('id', $vizinho->id)['centro_referencia'] === false));
 
-    $this->actingAs($leitor)->get('/internamentos')->assertInertia(fn (Assert $p) => $p
-        ->where('internamentos.data', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true));
-
     // Com saída do centro deixa de estar sinalizado.
     Referenciacao::first()->update(['data_de_saida' => $this->hoje, 'destino_id' => 1]);
     $this->actingAs($leitor)->get('/quadro')->assertInertia(fn (Assert $p) => $p
         ->where('internados', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === false));
+
+    // A lista de internamentos só tem altas: volta a sinalizar e dá alta.
+    Referenciacao::first()->update(['data_de_saida' => null, 'destino_id' => null]);
+    $internamento->update(['data_de_alta' => $this->hoje]);
+    $this->actingAs($leitor)->get('/internamentos')->assertInertia(fn (Assert $p) => $p
+        ->where('internamentos.data', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true));
 });

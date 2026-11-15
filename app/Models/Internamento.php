@@ -72,12 +72,19 @@ class Internamento extends Model
         return $this->hasMany(Morbilidade::class);
     }
 
-    /** Grau de Clavien-Dindo mais grave entre os três momentos de registo (null se não houver). */
+    /** Grau de Clavien-Dindo mais grave entre a alta e os 30 dias (null se não houver). */
     public function claviemMaisGrave(): ?int
     {
-        $graus = $this->morbilidades->pluck('clavien_dindo_id')->filter(fn ($g) => $g && $g !== Morbilidade::CLAVIEN_A_AGUARDAR);
+        $graus = $this->morbilidades->whereIn('momento', Morbilidade::MOMENTOS)->pluck('clavien_dindo_id')->filter(fn ($g) => $g && $g !== Morbilidade::CLAVIEN_A_AGUARDAR);
 
         return $graus->isEmpty() ? null : (int) $graus->max();
+    }
+
+    /** Tem cirurgias registadas (não apagadas). */
+    public function temCirurgias(): bool
+    {
+        return $this->exists && $this->getConnection()->table('bloco_operatorios')
+            ->where('internamento_id', $this->getKey())->whereNull('deleted_at')->exists();
     }
 
     public function scopeInternados(Builder $query): Builder

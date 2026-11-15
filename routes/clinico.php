@@ -26,6 +26,10 @@ Route::middleware('can:show internamento')->group(function () {
     Route::get('quadro', QuadroController::class)->name('quadro');
     Route::get('dashboard', AnaliseController::class)->name('dashboard');
     Route::get('quadro/imprimir', [QuadroController::class, 'imprimir'])->name('quadro.imprimir');
+    Route::get('quadro/novo', [QuadroController::class, 'novo'])->middleware('can:create internamento')->name('quadro.novo');
+    Route::get('quadro/novo-utente', [QuadroController::class, 'novoUtente'])->middleware('can:create internamento')->name('quadro.novo-utente');
+    Route::get('quadro/cirurgias/{bloco}', [QuadroController::class, 'editarCirurgia'])->whereNumber('bloco')->name('quadro.cirurgia.editar');
+    Route::get('quadro/{internamento}/cirurgias/nova', [QuadroController::class, 'novaCirurgia'])->whereNumber('internamento')->middleware('can:create internamento')->name('quadro.cirurgia.nova');
     Route::get('quadro/{internamento}', [QuadroController::class, 'editar'])->whereNumber('internamento')->name('quadro.editar');
 
     Route::get('utentes', [UtenteController::class, 'index'])->name('utentes.index');

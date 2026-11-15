@@ -1,5 +1,6 @@
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link, router, useForm } from '@inertiajs/react';
+import { Lock, LockOpen } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { diasEntre, formatarData, idade, plural } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
@@ -13,9 +14,10 @@ import {
     type Responsavel,
     type ResumoUtente,
 } from '../../clinico/tipos';
-import { BlocoMorbilidadeCampos, type BlocoMorbilidade, type Momento } from '../../components/clinico/bloco-morbilidade';
+import { type BlocoMorbilidade, type Momento } from '../../components/clinico/bloco-morbilidade';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../../components/clinico/campos';
 import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
+import { MomentoMorbilidade } from '../../components/clinico/momento-morbilidade';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -25,8 +27,7 @@ type RegistoMorbilidade = Record<
 >;
 
 const MOMENTOS: { id: Momento; rotulo: string; ajuda: string }[] = [
-    { id: 'internamento', rotulo: 'Durante o internamento', ajuda: 'Complicações que surgiram enquanto o doente esteve internado.' },
-    { id: 'alta', rotulo: 'Na alta', ajuda: 'Obrigatório para dar alta. Se não houve nenhuma, escolha "Sem complicações".' },
+    { id: 'alta', rotulo: 'Na alta', ajuda: 'Obrigatório para dar alta.' },
     { id: '30_dias', rotulo: 'Aos 30 dias', ajuda: 'Seguimento 30 dias depois da alta.' },
 ];
 
@@ -104,7 +105,7 @@ export type PropsFormulario = {
     };
     cirurgias: number;
     podeNovaCirurgia: boolean;
-    listaCirurgias: { data: string; tipo: string | null; intervencoes: string[] }[];
+    listaCirurgias: { id?: number; data: string; tipo: string | null; intervencoes: string[] }[];
     podeEditar: boolean;
     podeDesbloquear: boolean;
     podeApagar: boolean;
@@ -197,10 +198,11 @@ export function FormularioInternamento({
 
     const [separador, setSeparador] = useState<Separador>('dados');
     const [tentouAlta, setTentouAlta] = useState(false);
-    const [momento, setMomento] = useState<Momento>(internamento?.data_de_alta ? 'alta' : 'internamento');
     const obito = data.destino_id === DESTINO_FALECIDO;
     const temComplicacaoReal = (m: Momento) => data.morbilidade[m].complicacoes.some((c) => c.id !== SEM_COMPLICACOES);
     const registado = (m: Momento) => data.morbilidade[m].complicacoes.length > 0;
+    /** Com cirurgia, a alta fica pendente até à revisão aos 30 dias. */
+    const aguardaRevisao = listaCirurgias.length > 0 && !registado('30_dias');
     const bloqueadoAntes = internamento?.bloquear_tabela ?? false;
 
     const dias = data.data_de_entrada ? diasEntre(data.data_de_entrada, data.data_de_alta || limites.hoje) : null;
@@ -212,7 +214,7 @@ export function FormularioInternamento({
             ...atual,
             data_de_alta: valor,
             data_de_saida: valor ? atual.data_de_saida || valor : '',
-            estado_da_alta_id: valor ? (atual.data_de_alta ? atual.estado_da_alta_id : ALTA_CONCLUIDA) : ALTA_PENDENTE,
+            estado_da_alta_id: valor && !aguardaRevisao ? (atual.data_de_alta ? atual.estado_da_alta_id : ALTA_CONCLUIDA) : ALTA_PENDENTE,
         }));
     };
 
@@ -247,7 +249,11 @@ export function FormularioInternamento({
             setSeparador(pendenciasDeAlta[0].separador);
             return;
         }
-        form.transform((atual) => (origem ? { ...atual, origem } : atual));
+        form.transform((atual) => ({
+            ...atual,
+            ...(aguardaRevisao ? { estado_da_alta_id: ALTA_PENDENTE } : {}),
+            ...(origem ? { origem } : {}),
+        }));
         const opcoes = {
             preserveScroll: true,
             onError: (e: Record<string, string>) => {
@@ -318,13 +324,6 @@ export function FormularioInternamento({
                     </span>
                 ) : undefined
             }
-            acoes={
-                internamento && (
-                    <BotaoLigacao href={rotas.utentes.ficha(internamento.utente_id)} variante="secundario">
-                        Ver ficha do utente
-                    </BotaoLigacao>
-                )
-            }
         >
             {internamento && !podeEditar && (
                 <p className="mb-4 rounded-md border border-slate-300 bg-slate-100 px-4 py-2.5 text-sm text-slate-800">
@@ -340,13 +339,24 @@ export function FormularioInternamento({
                 </p>
             )}
 
-            <div role="tablist" aria-label="Secções do internamento" className="mb-5 flex max-w-4xl flex-wrap gap-1 border-b border-slate-200">
+            {utente && (internamento || separador !== 'dados') && (
+                <p className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 tabular-nums">
+                    <span className="font-semibold text-slate-900">{utente.nome}</span>
+                    <span>Processo {utente.numero_processo}</span>
+                    <span>
+                        {anos !== null && `${anos} anos`}
+                        {utente.sexo && `${anos !== null ? ', ' : ''}${utente.sexo.toLowerCase()}`}
+                    </span>
+                </p>
+            )}
+
+            <div role="tablist" aria-label="Secções do internamento" className="mb-5 flex flex-wrap gap-1 border-b border-slate-200">
                 {(
                     [
                         ['dados', internamento ? 'Dados do internamento' : 'Dados'],
-                        ['notas', 'Notas'],
                         ['cirurgias', `Cirurgias${listaCirurgias.length > 0 ? ` (${listaCirurgias.length})` : ''}`],
                         ['morbilidade', 'Morbilidade'],
+                        ['notas', 'Notas'],
                         ['alta', 'Alta'],
                     ] as [Separador, string][]
                 )
@@ -371,20 +381,30 @@ export function FormularioInternamento({
             </div>
 
             {internamento && separador === 'cirurgias' && (
-                <div className="mb-5 max-w-4xl">
+                <div className="mb-5">
                     <Seccao
                         titulo="Cirurgias"
                         descricao={listaCirurgias.length > 0 ? plural(listaCirurgias.length, 'registo', 'registos') : undefined}
                     >
                         {listaCirurgias.length === 0 && <p className="text-sm text-slate-600">Sem cirurgias registadas neste internamento.</p>}
                         <ul className="space-y-1.5">
-                            {listaCirurgias.map((c, n) => (
-                                <li key={n} className="text-sm font-medium text-[#7d1830]">
-                                    {formatarData(c.data)}
-                                    {c.tipo ? ` (${c.tipo})` : ''}
-                                    {c.intervencoes.length > 0 ? `: ${c.intervencoes.join(', ')}` : ''}
-                                </li>
-                            ))}
+                            {listaCirurgias.map((c, n) => {
+                                const texto = `${formatarData(c.data)}${c.tipo ? ` (${c.tipo})` : ''}${c.intervencoes.length > 0 ? `: ${c.intervencoes.join(', ')}` : ''}`;
+                                return (
+                                    <li key={n} className="text-sm font-medium text-[#7d1830]">
+                                        {c.id ? (
+                                            <Link
+                                                href={origem === 'quadro' ? `/quadro/cirurgias/${c.id}` : `/cirurgias/${c.id}`}
+                                                className="hover:underline"
+                                            >
+                                                {texto}
+                                            </Link>
+                                        ) : (
+                                            texto
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                         <div className="mt-3 flex flex-wrap gap-2">
                             {utente && (
@@ -392,117 +412,131 @@ export function FormularioInternamento({
                                     Ver cirurgias do utente
                                 </BotaoLigacao>
                             )}
-                            {podeNovaCirurgia && <BotaoLigacao href={`/internamentos/${internamento.id}/cirurgias/nova`}>Nova cirurgia</BotaoLigacao>}
+                            {podeNovaCirurgia && (
+                                <BotaoLigacao
+                                    href={
+                                        origem === 'quadro'
+                                            ? `/quadro/${internamento.id}/cirurgias/nova`
+                                            : `/internamentos/${internamento.id}/cirurgias/nova`
+                                    }
+                                >
+                                    Nova cirurgia
+                                </BotaoLigacao>
+                            )}
                         </div>
                     </Seccao>
                 </div>
             )}
 
             <form onSubmit={guardar} noValidate className={separador === 'cirurgias' ? 'hidden' : undefined}>
-                <fieldset disabled={!podeEditar} className="max-w-4xl space-y-5">
+                <fieldset disabled={!podeEditar} className="space-y-5">
                     {separador === 'dados' && (
-                        <>
-                            <Seccao titulo="Utente">
-                                {utente ? (
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div>
-                                            <p className="text-base font-semibold text-slate-900">{utente.nome}</p>
-                                            <p className="text-sm text-slate-600 tabular-nums">
-                                                Processo {utente.numero_processo}
-                                                {anos !== null && `, ${anos} anos`}
-                                                {utente.sexo && `, ${utente.sexo.toLowerCase()}`}
+                        <div className="grid items-start gap-5 lg:grid-cols-2">
+                            <div className="space-y-5">
+                                {!internamento && (
+                                <Seccao titulo="Utente">
+                                    {utente ? (
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-base font-semibold text-slate-900">{utente.nome}</p>
+                                                <p className="text-sm text-slate-600 tabular-nums">
+                                                    Processo {utente.numero_processo}
+                                                    {anos !== null && `, ${anos} anos`}
+                                                    {utente.sexo && `, ${utente.sexo.toLowerCase()}`}
+                                                </p>
+                                            </div>
+                                            {!internamento && (
+                                                <Botao
+                                                    variante="secundario"
+                                                    onClick={() => {
+                                                        setUtente(null);
+                                                        setData('utente_id', '');
+                                                    }}
+                                                >
+                                                    Escolher outro utente
+                                                </Botao>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="max-w-lg">
+                                            <PesquisaUtente
+                                                focoInicial
+                                                podeCriar
+                                                aoEscolher={(escolhido) => {
+                                                    setUtente(escolhido);
+                                                    setData('utente_id', escolhido.id);
+                                                }}
+                                            />
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Procure primeiro. Só crie uma ficha nova se o utente não existir.
                                             </p>
                                         </div>
-                                        {!internamento && (
-                                            <Botao
-                                                variante="secundario"
-                                                onClick={() => {
-                                                    setUtente(null);
-                                                    setData('utente_id', '');
-                                                }}
-                                            >
-                                                Escolher outro utente
-                                            </Botao>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="max-w-lg">
-                                        <PesquisaUtente
-                                            focoInicial
-                                            podeCriar
-                                            aoEscolher={(escolhido) => {
-                                                setUtente(escolhido);
-                                                setData('utente_id', escolhido.id);
-                                            }}
-                                        />
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Procure primeiro. Só crie uma ficha nova se o utente não existir.
+                                    )}
+                                    {erros.utente_id && (
+                                        <p className="mt-2 text-sm text-rose-700" role="alert">
+                                            {erros.utente_id}
                                         </p>
-                                    </div>
-                                )}
-                                {erros.utente_id && (
-                                    <p className="mt-2 text-sm text-rose-700" role="alert">
-                                        {erros.utente_id}
-                                    </p>
-                                )}
-                            </Seccao>
+                                    )}
+                                </Seccao>
+                            )}
 
-                            <Seccao titulo="Entrada">
-                                <div className="grid gap-4 sm:grid-cols-6">
-                                    <Campo rotulo="Data de entrada" para="data_de_entrada" erro={erros.data_de_entrada} className="sm:col-span-2">
-                                        <input
-                                            id="data_de_entrada"
-                                            type="date"
-                                            min={limites.data_minima}
-                                            max={limites.hoje}
-                                            value={data.data_de_entrada}
-                                            onChange={(e) => setData('data_de_entrada', e.target.value)}
-                                            className={estiloEntrada}
-                                            aria-invalid={!!erros.data_de_entrada}
-                                        />
-                                    </Campo>
-                                    <Campo rotulo="Origem" para="origem" erro={erros.origem_do_internamento_id} className="sm:col-span-2">
-                                        <Selecao
-                                            id="origem"
-                                            opcoes={dominios.origens}
-                                            valor={data.origem_do_internamento_id}
-                                            aoMudar={(v) => setData('origem_do_internamento_id', v)}
-                                            invalido={!!erros.origem_do_internamento_id}
-                                        />
-                                    </Campo>
-                                    <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id} className="sm:col-span-2">
-                                        <Selecao
-                                            id="responsavel"
-                                            opcoes={dominios.responsaveis.map((r) => ({
-                                                id: r.id,
-                                                nome: r.equipa ? `${r.nome} (equipa ${r.equipa})` : r.nome,
-                                            }))}
-                                            valor={data.responsavel_id}
-                                            aoMudar={(v) => setData('responsavel_id', v)}
-                                            invalido={!!erros.responsavel_id}
-                                        />
-                                    </Campo>
-                                    <Campo rotulo="Localização" para="localizacao" erro={erros.localizacao_id} className="sm:col-span-4">
-                                        <Selecao
-                                            id="localizacao"
-                                            opcoes={dominios.localizacoes}
-                                            valor={data.localizacao_id}
-                                            aoMudar={(v) => setData('localizacao_id', v)}
-                                            invalido={!!erros.localizacao_id}
-                                        />
-                                    </Campo>
-                                    <Campo rotulo="Cama" para="cama" erro={erros.cama} className="sm:col-span-2">
-                                        <input
-                                            id="cama"
-                                            value={data.cama}
-                                            maxLength={20}
-                                            onChange={(e) => setData('cama', e.target.value)}
-                                            className={`${estiloEntrada} tabular-nums`}
-                                            aria-invalid={!!erros.cama}
-                                        />
-                                    </Campo>
-                                </div>
-                            </Seccao>
+                                <Seccao titulo="Entrada">
+                                    <div className="grid gap-4 sm:grid-cols-6">
+                                        <Campo rotulo="Data de entrada" para="data_de_entrada" erro={erros.data_de_entrada} className="sm:col-span-2">
+                                            <input
+                                                id="data_de_entrada"
+                                                type="date"
+                                                min={limites.data_minima}
+                                                max={limites.hoje}
+                                                value={data.data_de_entrada}
+                                                onChange={(e) => setData('data_de_entrada', e.target.value)}
+                                                className={estiloEntrada}
+                                                aria-invalid={!!erros.data_de_entrada}
+                                            />
+                                        </Campo>
+                                        <Campo rotulo="Origem" para="origem" erro={erros.origem_do_internamento_id} className="sm:col-span-2">
+                                            <Selecao
+                                                id="origem"
+                                                opcoes={dominios.origens}
+                                                valor={data.origem_do_internamento_id}
+                                                aoMudar={(v) => setData('origem_do_internamento_id', v)}
+                                                invalido={!!erros.origem_do_internamento_id}
+                                            />
+                                        </Campo>
+                                        <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id} className="sm:col-span-2">
+                                            <Selecao
+                                                id="responsavel"
+                                                opcoes={dominios.responsaveis.map((r) => ({
+                                                    id: r.id,
+                                                    nome: r.equipa ? `${r.nome} (equipa ${r.equipa})` : r.nome,
+                                                }))}
+                                                valor={data.responsavel_id}
+                                                aoMudar={(v) => setData('responsavel_id', v)}
+                                                invalido={!!erros.responsavel_id}
+                                            />
+                                        </Campo>
+                                        <Campo rotulo="Localização" para="localizacao" erro={erros.localizacao_id} className="sm:col-span-4">
+                                            <Selecao
+                                                id="localizacao"
+                                                opcoes={dominios.localizacoes}
+                                                valor={data.localizacao_id}
+                                                aoMudar={(v) => setData('localizacao_id', v)}
+                                                invalido={!!erros.localizacao_id}
+                                            />
+                                        </Campo>
+                                        <Campo rotulo="Cama" para="cama" erro={erros.cama} className="sm:col-span-2">
+                                            <input
+                                                id="cama"
+                                                value={data.cama}
+                                                maxLength={20}
+                                                onChange={(e) => setData('cama', e.target.value)}
+                                                className={`${estiloEntrada} tabular-nums`}
+                                                aria-invalid={!!erros.cama}
+                                            />
+                                        </Campo>
+                                    </div>
+                                </Seccao>
+                            </div>
 
                             <Seccao
                                 titulo="Diagnósticos"
@@ -515,6 +549,7 @@ export function FormularioInternamento({
                                     procurar="Procurar diagnóstico"
                                     desativado={!podeEditar}
                                     vazio="Nenhum diagnóstico escolhido."
+                                    alturaLista="max-h-44"
                                 />
                                 {erros.diagnosticos && (
                                     <p className="mt-2 text-sm text-rose-700" role="alert">
@@ -533,7 +568,7 @@ export function FormularioInternamento({
                                     />
                                 </Campo>
                             </Seccao>
-                        </>
+                        </div>
                     )}
 
                     {separador === 'notas' && (
@@ -558,69 +593,30 @@ export function FormularioInternamento({
                                     />
                                 </Campo>
                             </div>
-                            {internamento && (
-                                <label className="mt-4 flex items-start gap-2 text-sm text-slate-800">
-                                    <input
-                                        type="checkbox"
-                                        className="mt-0.5 size-4 accent-teal-800"
-                                        checked={data.bloquear_tabela}
-                                        disabled={bloqueadoAntes && !podeDesbloquear}
-                                        onChange={(e) => setData('bloquear_tabela', e.target.checked)}
-                                    />
-                                    <span>
-                                        Bloquear este registo
-                                        <span className="block text-xs text-slate-500">Depois de bloqueado, só um administrador o pode alterar.</span>
-                                    </span>
-                                </label>
-                            )}
                         </Seccao>
                     )}
 
                     {internamento && separador === 'morbilidade' && (
                         <Seccao
                             titulo="Morbilidade"
-                            descricao="Complicações registadas em três momentos: durante o internamento, na alta e aos 30 dias."
+                            descricao="Escolha “Sem complicações” ou “Com complicações”. O grau de Clavien-Dindo calcula-se pelas resoluções."
                         >
-                            <div role="tablist" aria-label="Momento do registo" className="mb-4 flex flex-wrap gap-2 border-b border-slate-200">
-                                {MOMENTOS.map((m) => {
-                                    const desligado = m.id === '30_dias' && !data.data_de_alta;
-                                    return (
-                                        <button
-                                            key={m.id}
-                                            type="button"
-                                            role="tab"
-                                            aria-selected={momento === m.id}
-                                            disabled={desligado}
-                                            onClick={() => setMomento(m.id)}
-                                            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm ${
-                                                momento === m.id
-                                                    ? 'border-[#a3213e] font-semibold text-slate-900'
-                                                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                                            } disabled:cursor-not-allowed disabled:opacity-50`}
-                                        >
-                                            {m.rotulo}
-                                            <span
-                                                className={`size-2 rounded-full ${registado(m.id) ? 'bg-teal-700' : 'bg-slate-300'}`}
-                                                title={registado(m.id) ? 'Registado' : 'Por registar'}
-                                            />
-                                            {Object.keys(erros).some((k) => k.startsWith(`morbilidade.${m.id}.`)) && (
-                                                <span className="text-rose-700">!</span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {MOMENTOS.filter((m) => m.id === momento).map((m) => (
-                                <div key={m.id} role="tabpanel">
-                                    <p className="mb-3 text-sm text-slate-600">
-                                        {m.ajuda}
-                                        {m.id === '30_dias' &&
-                                            data.data_de_alta &&
-                                            ` Previsto para ${formatarData(somarDias(data.data_de_alta, 30))}.`}
-                                        {m.id === '30_dias' && !data.data_de_alta && ' Disponível depois de preenchida a data de alta.'}
-                                    </p>
-                                    <BlocoMorbilidadeCampos
+                            <div className="grid items-start gap-4 lg:grid-cols-2">
+                                {MOMENTOS.map((m) => (
+                                    <MomentoMorbilidade
+                                        key={m.id}
                                         id={`morbilidade-${m.id}`}
+                                        titulo={m.rotulo}
+                                        ajuda={
+                                            m.id === 'alta'
+                                                ? 'Obrigatório para dar alta.'
+                                                : data.data_de_alta
+                                                  ? `Previsto para ${formatarData(somarDias(data.data_de_alta, 30))}.`
+                                                  : undefined
+                                        }
+                                        indisponivel={
+                                            m.id === '30_dias' && !data.data_de_alta ? 'Disponível depois de preenchida a data de alta.' : undefined
+                                        }
                                         bloco={data.morbilidade[m.id]}
                                         aoMudar={(bloco) => setData('morbilidade', { ...data.morbilidade, [m.id]: bloco })}
                                         dominios={dominios}
@@ -637,8 +633,8 @@ export function FormularioInternamento({
                                             data: erros[`morbilidade.${m.id}.data_registo`],
                                         }}
                                     />
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </Seccao>
                     )}
 
@@ -680,19 +676,31 @@ export function FormularioInternamento({
                                         aria-invalid={!!erros.data_de_saida}
                                     />
                                 </Campo>
-                                <Campo rotulo="Estado da alta" para="estado" erro={erros.estado_da_alta_id} className="sm:col-span-2">
+                                <Campo
+                                    rotulo="Estado da alta"
+                                    para="estado"
+                                    erro={erros.estado_da_alta_id}
+                                    ajuda={aguardaRevisao ? "Com cirurgia, fica pendente até à revisão aos 30 dias." : undefined}
+                                    className="sm:col-span-2"
+                                >
                                     <select
                                         id="estado"
-                                        value={data.estado_da_alta_id}
+                                        value={aguardaRevisao ? ALTA_PENDENTE : data.estado_da_alta_id}
+                                        disabled={aguardaRevisao}
                                         onChange={(e) => setData('estado_da_alta_id', Number(e.target.value))}
                                         className={estiloEntrada}
                                         aria-invalid={!!erros.estado_da_alta_id}
                                     >
-                                        {dominios.estados_da_alta.map((e) => (
-                                            <option key={e.id} value={e.id} disabled={e.id === ALTA_CONCLUIDA && !data.data_de_alta}>
-                                                {e.nome}
-                                            </option>
-                                        ))}
+                                        {dominios.estados_da_alta
+                                            // "Outro" já não se escolhe; só aparece num registo antigo que ainda o tenha.
+                                            .filter(
+                                                (e) => e.id === ALTA_PENDENTE || e.id === ALTA_CONCLUIDA || e.id === internamento?.estado_da_alta_id,
+                                            )
+                                            .map((e) => (
+                                                <option key={e.id} value={e.id} disabled={e.id === ALTA_CONCLUIDA && !data.data_de_alta}>
+                                                    {e.nome}
+                                                </option>
+                                            ))}
                                     </select>
                                 </Campo>
                                 <Campo rotulo="Destino" para="destino" erro={erros.destino_id} className="sm:col-span-6">
@@ -710,7 +718,7 @@ export function FormularioInternamento({
                     )}
                 </fieldset>
 
-                <div className="sticky bottom-0 mt-5 flex max-w-4xl flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 py-3">
+                <div className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 py-3">
                     {podeEditar && (
                         <Botao type="submit" disabled={processing}>
                             {internamento ? 'Guardar alterações' : 'Registar internamento'}
@@ -724,6 +732,29 @@ export function FormularioInternamento({
                         <Link href={rotas.internamentos.lista} className="px-2 py-2 text-sm font-medium text-slate-700 hover:underline">
                             {podeEditar ? 'Cancelar' : 'Voltar à lista'}
                         </Link>
+                    )}
+
+                    {internamento && (
+                        <label
+                            className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
+                                data.bloquear_tabela ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-300 bg-white text-slate-800'
+                            }`}
+                            title="Depois de bloqueado, só um administrador pode alterar este registo."
+                        >
+                            <input
+                                type="checkbox"
+                                className="size-4 accent-teal-800"
+                                checked={data.bloquear_tabela}
+                                disabled={!podeEditar || (bloqueadoAntes && !podeDesbloquear)}
+                                onChange={(e) => setData('bloquear_tabela', e.target.checked)}
+                            />
+                            {data.bloquear_tabela ? (
+                                <Lock className="size-4" aria-hidden="true" />
+                            ) : (
+                                <LockOpen className="size-4" aria-hidden="true" />
+                            )}
+                            Bloquear este registo
+                        </label>
                     )}
 
                     {internamento && podeApagar && (

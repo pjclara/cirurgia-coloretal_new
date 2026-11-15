@@ -9,14 +9,14 @@ export const rotas = {
     utentes: {
         lista: '/utentes',
         pesquisa: '/utentes/pesquisa',
-        novo: '/utentes/novo',
+        novo: '/quadro/novo-utente',
         ficha: (id: number) => `/utentes/${id}`,
         editar: (id: number) => `/utentes/${id}/editar`,
     },
     internamentos: {
         lista: '/internamentos',
         seguimentos: '/internamentos/seguimentos',
-        novo: (utenteId?: number) => (utenteId ? `/internamentos/novo?utente=${utenteId}` : '/internamentos/novo'),
+        novo: (utenteId?: number) => (utenteId ? `/quadro/novo?utente=${utenteId}` : '/quadro/novo'),
         registo: (id: number) => `/internamentos/${id}`,
     },
 };

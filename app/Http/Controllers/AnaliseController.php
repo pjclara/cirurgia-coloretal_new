@@ -22,7 +22,7 @@ class AnaliseController extends Controller
 
     /** "Complicação real": qualquer complicação que não seja "Sem complicações". */
     private const COM_COMPLICACAO = 'exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
-        where m.internamento_id = i.id and c.complicacao_id <> '.\App\Models\Complicacao::SEM_COMPLICACOES.')';
+        where m.internamento_id = i.id and m.momento in (\'alta\', \'30_dias\') and c.complicacao_id <> '.\App\Models\Complicacao::SEM_COMPLICACOES.')';
 
     public function __invoke(Request $request): Response
     {
@@ -122,7 +122,7 @@ class AnaliseController extends Controller
     private function distribuicaoClavien(callable $internamentos, ?Carbon $desde): array
     {
         $graus = $internamentos()->join('morbilidades as m', 'm.internamento_id', '=', 'i.id')
-            ->whereNotNull('m.clavien_dindo_id')->where('m.clavien_dindo_id', '<>', \App\Models\Morbilidade::CLAVIEN_A_AGUARDAR)
+            ->whereIn('m.momento', ['alta', '30_dias'])->whereNotNull('m.clavien_dindo_id')->where('m.clavien_dindo_id', '<>', \App\Models\Morbilidade::CLAVIEN_A_AGUARDAR)
             ->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
             ->groupBy('i.id')->selectRaw('max(m.clavien_dindo_id) as grau')->pluck('grau');
 

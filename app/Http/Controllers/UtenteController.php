@@ -52,8 +52,10 @@ class UtenteController extends Controller
 
         $utentes = Utente::query()
             ->pesquisar($termo)
+            // Primeiro os que começam pelo que foi escrito, depois por nome.
+            ->orderByRaw('nome LIKE ? DESC', [addcslashes($termo, '%_\\').'%'])
             ->orderBy('nome')
-            ->limit(8)
+            ->limit(20)
             ->get(['id', 'nome', 'numero_processo', 'data_nascimento']);
 
         $internados = Internamento::query()
@@ -72,16 +74,27 @@ class UtenteController extends Controller
 
     public function create(Request $request): Response
     {
-        return Inertia::render('utentes/formulario', [
+        return Inertia::render('utentes/formulario', $this->propsCriacao($request));
+    }
+
+    /** Dados do formulário de novo utente; usados na página própria e na modal do quadro. */
+    public function propsCriacao(Request $request): array
+    {
+        return [
             'utente' => null,
             'dominios' => $this->dominios(),
             'processoSugerido' => ctype_digit((string) $request->query('processo')) ? (string) $request->query('processo') : '',
-        ]);
+        ];
     }
 
     public function store(UtenteRequest $request): RedirectResponse
     {
         $utente = Utente::create($request->validated());
+
+        // Criado a partir da modal do quadro: segue para o registo do internamento deste utente.
+        if ($request->input('origem') === 'quadro') {
+            return redirect('/quadro/novo?utente='.$utente->id)->with('sucesso', 'Utente criado. Registe agora o internamento.');
+        }
 
         return redirect()
             ->route('utentes.show', $utente)

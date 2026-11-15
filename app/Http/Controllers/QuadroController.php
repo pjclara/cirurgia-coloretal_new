@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BlocoOperatorio;
 use App\Models\Internamento;
 use App\Support\Cirurgias;
 use App\Support\Dominios;
@@ -31,7 +32,47 @@ class QuadroController extends Controller
         ]);
     }
 
-    private function montar(Request $request, ?array $modal): Response
+    /** O quadro com o formulário de novo internamento numa modal por cima. */
+    public function novo(Request $request, InternamentoController $formulario): Response
+    {
+        $equipa = $request->query('equipa');
+
+        return $this->montar($request, $formulario->propsCriacao($request) + [
+            'fechar_url' => $equipa ? '/quadro?equipa='.urlencode((string) $equipa) : '/quadro',
+            'origem' => 'quadro',
+        ]);
+    }
+
+    /** O quadro com o formulário de novo utente numa modal por cima. */
+    public function novoUtente(Request $request, UtenteController $formulario): Response
+    {
+        return $this->montar($request, null, $formulario->propsCriacao($request) + [
+            'fechar_url' => '/quadro',
+            'origem' => 'quadro',
+        ]);
+    }
+
+    /** O quadro com o formulário de nova cirurgia (deste internamento) numa modal por cima. */
+    public function novaCirurgia(Request $request, Internamento $internamento, CirurgiaController $formulario): Response
+    {
+        return $this->montar($request, null, null, $formulario->propsFormulario($request, $internamento, null) + [
+            'fechar_url' => '/quadro',
+            'voltar_url' => '/quadro/'.$internamento->id,
+            'origem' => 'quadro',
+        ]);
+    }
+
+    /** O quadro com o formulário de uma cirurgia existente numa modal por cima. */
+    public function editarCirurgia(Request $request, BlocoOperatorio $bloco, CirurgiaController $formulario): Response
+    {
+        return $this->montar($request, null, null, $formulario->propsFormulario($request, $bloco->internamento, $bloco) + [
+            'fechar_url' => '/quadro',
+            'voltar_url' => '/quadro/'.$bloco->internamento_id,
+            'origem' => 'quadro',
+        ]);
+    }
+
+    private function montar(Request $request, ?array $modal, ?array $modalUtente = null, ?array $modalCirurgia = null): Response
     {
         $equipa = in_array($request->query('equipa'), ['A', 'B'], true) ? $request->query('equipa') : null;
 
@@ -42,6 +83,8 @@ class QuadroController extends Controller
             'equipa' => $equipa,
             'hoje' => now()->format('Y-m-d'),
             'modal' => $modal,
+            'modalUtente' => $modalUtente,
+            'modalCirurgia' => $modalCirurgia,
         ]);
     }
 

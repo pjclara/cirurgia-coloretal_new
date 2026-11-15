@@ -9,18 +9,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\DB;
 
-/** Morbilidade de um internamento num dos três momentos de registo. */
+/** Morbilidade de um internamento, registada na alta e aos 30 dias. */
 class Morbilidade extends Model
 {
     use RegistaAuditoria, RegistaAutor;
-
-    public const DURANTE_INTERNAMENTO = 'internamento';
 
     public const NA_ALTA = 'alta';
 
     public const AOS_30_DIAS = '30_dias';
 
-    public const MOMENTOS = [self::DURANTE_INTERNAMENTO, self::NA_ALTA, self::AOS_30_DIAS];
+    /** Registos antigos "durante o internamento" mantêm-se na base de dados mas já não contam nem se editam. */
+    public const MOMENTOS = [self::NA_ALTA, self::AOS_30_DIAS];
 
     /** "A aguardar ..." na tabela clavien_dindos não é um grau. */
     public const CLAVIEN_A_AGUARDAR = 8;
