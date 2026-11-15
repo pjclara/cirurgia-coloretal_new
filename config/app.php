@@ -16,6 +16,12 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
+    | Versão instalada: o commit e a data da construção da imagem (definidos pelo atualizar.sh / docker build).
+    */
+    'versao' => env('APP_VERSION', 'dev'),
+    'versao_data' => env('APP_BUILD'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------

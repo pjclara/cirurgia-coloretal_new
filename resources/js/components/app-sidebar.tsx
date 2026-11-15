@@ -2,6 +2,7 @@ import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { VersaoDaApp } from '@/components/versao-da-app';
 import { type NavGroup } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { BarChart3, BedDouble, CalendarDays, ClipboardList, LayoutGrid, Map, Network, ShieldCheck } from 'lucide-react';
@@ -69,6 +70,7 @@ export function AppSidebar() {
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
+                <VersaoDaApp className="px-2 group-data-[collapsible=icon]:hidden" />
             </SidebarFooter>
         </Sidebar>
     );

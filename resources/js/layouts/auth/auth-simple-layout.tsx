@@ -1,4 +1,5 @@
 import AppLogoIcon from '@/components/app-logo-icon';
+import { VersaoDaApp } from '@/components/versao-da-app';
 import { Link } from '@inertiajs/react';
 
 interface AuthLayoutProps {
@@ -16,7 +17,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     <div className="flex flex-col items-center gap-4">
                         <Link href={route('home')} className="flex flex-col items-center gap-2 font-medium">
                             <AppLogoIcon className="size-20 object-contain" />
-                            <span className="text-center text-base font-semibold leading-tight">
+                            <span className="text-center text-base leading-tight font-semibold">
                                 Unidade Funcional de Cirurgia Colorectal
                                 <span className="text-muted-foreground block text-xs font-normal tracking-wide uppercase">ULS Região de Leiria</span>
                             </span>
@@ -30,6 +31,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     {children}
                 </div>
             </div>
+            <VersaoDaApp />
         </div>
     );
 }

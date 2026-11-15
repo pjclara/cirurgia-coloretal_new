@@ -1,6 +1,10 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        APP_BUILD: ${APP_BUILD:-}
     image: cirurgia-app
     restart: unless-stopped
     env_file: .env.docker

@@ -36,6 +36,11 @@ COPY --chown=www-data:www-data --from=assets /app/public/build ./public/build
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
+# Versão instalada (commit e data), passada pelo atualizar.sh; no fim para não invalidar as camadas anteriores.
+ARG APP_VERSION=dev
+ARG APP_BUILD=
+ENV APP_VERSION=$APP_VERSION APP_BUILD=$APP_BUILD
+
 EXPOSE 80
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]
