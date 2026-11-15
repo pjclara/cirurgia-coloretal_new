@@ -11,10 +11,12 @@ type Props = {
     /** Linha de contexto por baixo do título. */
     subtitulo?: ReactNode;
     largura?: 'normal' | 'larga';
+    /** Substitui a pesquisa de utentes por omissão (ex.: o quadro filtra os internados). */
+    pesquisa?: ReactNode;
     children: ReactNode;
 };
 
-export default function ClinicoLayout({ titulo, acoes, subtitulo, largura = 'normal', children }: Props) {
+export default function ClinicoLayout({ titulo, acoes, subtitulo, largura = 'normal', pesquisa, children }: Props) {
     const pagina = usePage<PropsPartilhadas>();
     const { permissoes, flash } = pagina.props.clinico;
     const pode = (permissao: string) => permissoes.includes(permissao);
@@ -25,11 +27,13 @@ export default function ClinicoLayout({ titulo, acoes, subtitulo, largura = 'nor
             <Head title={titulo} />
 
             <main id="conteudo" className={`mx-auto w-full ${contentor} px-4 py-6 font-sans text-slate-900 dark:text-slate-100`}>
-                {pode('show internamento') && (
-                    <div className="mb-5 max-w-sm">
-                        <PesquisaUtente podeCriar={pode('create internamento')} />
-                    </div>
-                )}
+                {pesquisa !== undefined
+                    ? pesquisa
+                    : pode('show internamento') && (
+                          <div className="mb-5 max-w-sm">
+                              <PesquisaUtente podeCriar={pode('create internamento')} />
+                          </div>
+                      )}
 
                 {flash.sucesso && (
                     <p role="status" className="mb-4 rounded-md border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm text-teal-900">

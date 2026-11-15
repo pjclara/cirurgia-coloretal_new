@@ -5,7 +5,7 @@ import { diasEntre, idade, plural } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { PropsPartilhadas } from '../../clinico/tipos';
 import { ModalCirurgia, type ModalCirurgiaDados } from '../../components/cirurgias/modal-cirurgia';
-import { BotaoLigacao } from '../../components/clinico/campos';
+import { BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import { ModalUtente, type ModalUtenteDados } from '../../components/utentes/modal-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -282,8 +282,31 @@ export default function Quadro({ internados, equipa, hoje, modal, modalUtente, m
         }
     };
 
+    const [termo, setTermo] = useState('');
+    const semAcentos = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    // Filtra os internados por nome, processo, cama, diagnóstico, localização ou responsável (todas as palavras têm de existir).
+    const palavras = semAcentos(termo.trim()).split(/\s+/).filter(Boolean);
+    const visiveis =
+        palavras.length === 0
+            ? internados
+            : internados.filter((i) => {
+                  const texto = semAcentos(
+                      [
+                          i.utente.nome,
+                          i.utente.numero_processo,
+                          i.cama,
+                          i.localizacao,
+                          i.motivo,
+                          i.diagnosticos.join(' '),
+                          i.responsavel?.abrev,
+                          i.responsavel?.nome,
+                      ].join(' '),
+                  );
+                  return palavras.every((p) => texto.includes(p));
+              });
+
     const porLocalizacao = new Map<string, Internado[]>();
-    for (const internado of internados) {
+    for (const internado of visiveis) {
         porLocalizacao.set(internado.localizacao, [...(porLocalizacao.get(internado.localizacao) ?? []), internado]);
     }
 
@@ -303,9 +326,27 @@ export default function Quadro({ internados, equipa, hoje, modal, modalUtente, m
         <ClinicoLayout
             titulo="Quadro do serviço"
             largura="larga"
+            pesquisa={
+                <div className="mb-5 max-w-sm">
+                    <label htmlFor="filtro-quadro" className="sr-only">
+                        Filtrar os doentes internados
+                    </label>
+                    <input
+                        id="filtro-quadro"
+                        type="search"
+                        value={termo}
+                        onChange={(e) => setTermo(e.target.value)}
+                        placeholder="Filtrar internados: nome, processo, cama…"
+                        className={estiloEntrada}
+                        autoComplete="off"
+                    />
+                </div>
+            }
             subtitulo={
                 <span className="tabular-nums">
-                    {plural(internados.length, 'doente internado', 'doentes internados')}
+                    {palavras.length > 0
+                        ? `${visiveis.length} de ${plural(internados.length, 'doente internado', 'doentes internados')}`
+                        : plural(internados.length, 'doente internado', 'doentes internados')}
                     {longos > 0 && `, ${longos} há mais de 14 dias`}
                     {sociais > 0 && `, ${plural(sociais, 'caso social', 'casos sociais')}`}
                 </span>
@@ -355,7 +396,18 @@ export default function Quadro({ internados, equipa, hoje, modal, modalUtente, m
                 </>
             }
         >
-            {internados.length === 0 ? (
+            {internados.length > 0 && visiveis.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+                    <p className="text-base font-medium text-slate-900">Nenhum internado corresponde a “{termo}”.</p>
+                    <button
+                        type="button"
+                        onClick={() => setTermo('')}
+                        className="mt-2 text-sm font-medium text-teal-800 underline underline-offset-2"
+                    >
+                        Limpar filtro
+                    </button>
+                </div>
+            ) : internados.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
                     <p className="text-base font-medium text-slate-900">
                         {equipa ? `A equipa ${equipa} não tem doentes internados.` : 'Não há doentes internados.'}

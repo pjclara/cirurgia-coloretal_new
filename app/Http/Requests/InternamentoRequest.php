@@ -34,7 +34,6 @@ class InternamentoRequest extends FormRequest
             'caso_social_id' => $vazioParaNulo($this->caso_social_id),
             'cama' => is_string($this->cama) ? trim($this->cama) : $this->cama,
             'motivo_internamento' => is_string($this->motivo_internamento) ? trim($this->motivo_internamento) : $this->motivo_internamento,
-            'bloquear_tabela' => $this->boolean('bloquear_tabela'),
             'comentarios' => $this->comentarios ?? '',
         ]);
     }
@@ -53,7 +52,6 @@ class InternamentoRequest extends FormRequest
             'motivo_internamento' => ['required', 'string', 'max:255'],
             'caso_social_id' => ['nullable', 'integer', Rule::exists('caso_socials', 'id')],
             'comentarios' => ['nullable', 'string', 'max:20000'],
-            'bloquear_tabela' => ['boolean'],
 
             'diagnosticos' => ['required', 'array', 'min:1'],
             'diagnosticos.*' => ['integer', 'distinct', Rule::exists('diagnosticos', 'id')],

@@ -1,6 +1,5 @@
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link, router, useForm } from '@inertiajs/react';
-import { Lock, LockOpen } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { diasEntre, formatarData, idade, plural } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
@@ -37,7 +36,7 @@ type Separador = 'dados' | 'notas' | 'cirurgias' | 'morbilidade' | 'alta';
 const separadorDoErro = (campo: string): Separador =>
     campo.startsWith('morbilidade')
         ? 'morbilidade'
-        : ['caso_social_id', 'comentarios', 'bloquear_tabela'].includes(campo)
+        : ['caso_social_id', 'comentarios'].includes(campo)
           ? 'notas'
           : ['data_de_alta', 'data_de_saida', 'estado_da_alta_id', 'destino_id'].includes(campo)
             ? 'alta'
@@ -59,7 +58,6 @@ type Dados = {
     motivo_internamento: string;
     caso_social_id: number | '';
     comentarios: string;
-    bloquear_tabela: boolean;
     diagnosticos: number[];
     morbilidade: Record<Momento, BlocoMorbilidade>;
     data_de_alta: string;
@@ -159,7 +157,6 @@ export function FormularioInternamento({
     listaCirurgias,
     podeEditar,
     podeNovaCirurgia,
-    podeDesbloquear,
     podeApagar,
     limites,
 }: Props) {
@@ -176,7 +173,6 @@ export function FormularioInternamento({
         motivo_internamento: internamento?.motivo_internamento ?? '',
         caso_social_id: internamento?.caso_social_id ?? 1,
         comentarios: internamento?.comentarios ?? '',
-        bloquear_tabela: internamento?.bloquear_tabela ?? false,
         diagnosticos: internamento?.diagnosticos ?? [],
         morbilidade: Object.fromEntries(
             MOMENTOS.map(({ id }) => {
@@ -434,51 +430,51 @@ export function FormularioInternamento({
                         <div className="grid items-start gap-5 lg:grid-cols-2">
                             <div className="space-y-5">
                                 {!internamento && (
-                                <Seccao titulo="Utente">
-                                    {utente ? (
-                                        <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <div>
-                                                <p className="text-base font-semibold text-slate-900">{utente.nome}</p>
-                                                <p className="text-sm text-slate-600 tabular-nums">
-                                                    Processo {utente.numero_processo}
-                                                    {anos !== null && `, ${anos} anos`}
-                                                    {utente.sexo && `, ${utente.sexo.toLowerCase()}`}
+                                    <Seccao titulo="Utente">
+                                        {utente ? (
+                                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                                <div>
+                                                    <p className="text-base font-semibold text-slate-900">{utente.nome}</p>
+                                                    <p className="text-sm text-slate-600 tabular-nums">
+                                                        Processo {utente.numero_processo}
+                                                        {anos !== null && `, ${anos} anos`}
+                                                        {utente.sexo && `, ${utente.sexo.toLowerCase()}`}
+                                                    </p>
+                                                </div>
+                                                {!internamento && (
+                                                    <Botao
+                                                        variante="secundario"
+                                                        onClick={() => {
+                                                            setUtente(null);
+                                                            setData('utente_id', '');
+                                                        }}
+                                                    >
+                                                        Escolher outro utente
+                                                    </Botao>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="max-w-lg">
+                                                <PesquisaUtente
+                                                    focoInicial
+                                                    podeCriar
+                                                    aoEscolher={(escolhido) => {
+                                                        setUtente(escolhido);
+                                                        setData('utente_id', escolhido.id);
+                                                    }}
+                                                />
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    Procure primeiro. Só crie uma ficha nova se o utente não existir.
                                                 </p>
                                             </div>
-                                            {!internamento && (
-                                                <Botao
-                                                    variante="secundario"
-                                                    onClick={() => {
-                                                        setUtente(null);
-                                                        setData('utente_id', '');
-                                                    }}
-                                                >
-                                                    Escolher outro utente
-                                                </Botao>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="max-w-lg">
-                                            <PesquisaUtente
-                                                focoInicial
-                                                podeCriar
-                                                aoEscolher={(escolhido) => {
-                                                    setUtente(escolhido);
-                                                    setData('utente_id', escolhido.id);
-                                                }}
-                                            />
-                                            <p className="mt-1 text-xs text-slate-500">
-                                                Procure primeiro. Só crie uma ficha nova se o utente não existir.
+                                        )}
+                                        {erros.utente_id && (
+                                            <p className="mt-2 text-sm text-rose-700" role="alert">
+                                                {erros.utente_id}
                                             </p>
-                                        </div>
-                                    )}
-                                    {erros.utente_id && (
-                                        <p className="mt-2 text-sm text-rose-700" role="alert">
-                                            {erros.utente_id}
-                                        </p>
-                                    )}
-                                </Seccao>
-                            )}
+                                        )}
+                                    </Seccao>
+                                )}
 
                                 <Seccao titulo="Entrada">
                                     <div className="grid gap-4 sm:grid-cols-6">
@@ -680,7 +676,7 @@ export function FormularioInternamento({
                                     rotulo="Estado da alta"
                                     para="estado"
                                     erro={erros.estado_da_alta_id}
-                                    ajuda={aguardaRevisao ? "Com cirurgia, fica pendente até à revisão aos 30 dias." : undefined}
+                                    ajuda={aguardaRevisao ? 'Com cirurgia, fica pendente até à revisão aos 30 dias.' : undefined}
                                     className="sm:col-span-2"
                                 >
                                     <select
@@ -732,29 +728,6 @@ export function FormularioInternamento({
                         <Link href={rotas.internamentos.lista} className="px-2 py-2 text-sm font-medium text-slate-700 hover:underline">
                             {podeEditar ? 'Cancelar' : 'Voltar à lista'}
                         </Link>
-                    )}
-
-                    {internamento && (
-                        <label
-                            className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
-                                data.bloquear_tabela ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-300 bg-white text-slate-800'
-                            }`}
-                            title="Depois de bloqueado, só um administrador pode alterar este registo."
-                        >
-                            <input
-                                type="checkbox"
-                                className="size-4 accent-teal-800"
-                                checked={data.bloquear_tabela}
-                                disabled={!podeEditar || (bloqueadoAntes && !podeDesbloquear)}
-                                onChange={(e) => setData('bloquear_tabela', e.target.checked)}
-                            />
-                            {data.bloquear_tabela ? (
-                                <Lock className="size-4" aria-hidden="true" />
-                            ) : (
-                                <LockOpen className="size-4" aria-hidden="true" />
-                            )}
-                            Bloquear este registo
-                        </label>
                     )}
 
                     {internamento && podeApagar && (

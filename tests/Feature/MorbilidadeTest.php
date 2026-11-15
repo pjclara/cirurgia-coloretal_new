@@ -164,3 +164,76 @@ test('o estado da alta "Outro" já não se escolhe, mas um registo antigo que o 
     DB::table('internamentos')->where('id', $this->internamento->id)->update(['estado_da_alta_id' => $outro]);
     guardar($this, ['estado_da_alta_id' => $outro])->assertSessionHasNoErrors();
 });
+
+function comCirurgia(object $teste): void
+{
+    $teste->actingAs($teste->utilizador)->post("/internamentos/{$teste->internamento->id}/cirurgias", [
+        'data_de_inicio' => now()->subDays(50)->format('Y-m-d'),
+        'tipo_de_cirurgia_id' => DB::table('tipo_de_cirurgias')->value('id'),
+        'tipo_de_abordagem_id' => DB::table('tipo_de_abordagems')->value('id'),
+        're_intervencao_nao_programada_id' => 1,
+        'intervencoes' => [DB::table('intervencaos')->value('id')],
+    ])->assertSessionHasNoErrors();
+}
+
+test('com cirurgia a alta fica pendente até à revisão aos 30 dias', function () {
+    comCirurgia($this);
+    $alta = [
+        'data_de_alta' => now()->subDays(40)->format('Y-m-d'),
+        'destino_id' => $this->destinoVivo,
+        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
+    ];
+
+    // Pede-se "Concluída" mas, sem o 30.º dia revisto, fica Pendente.
+    guardar($this, $alta + ['morbilidade' => ['alta' => semComplicacoes()]])->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_PENDENTE);
+
+    // Com a revisão aos 30 dias registada, já pode ficar concluída.
+    guardar($this, $alta + ['morbilidade' => ['alta' => semComplicacoes(), '30_dias' => semComplicacoes() + ['data_registo' => now()->subDays(5)->format('Y-m-d')]]])
+        ->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_CONCLUIDA);
+});
+
+test('sem cirurgia a alta pode ficar concluída logo', function () {
+    guardar($this, [
+        'data_de_alta' => now()->format('Y-m-d'),
+        'destino_id' => $this->destinoVivo,
+        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
+        'morbilidade' => ['alta' => semComplicacoes()],
+    ])->assertSessionHasNoErrors();
+
+    expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_CONCLUIDA);
+});
+
+test('registar o seguimento aos 30 dias conclui a alta de quem teve cirurgia', function () {
+    comCirurgia($this);
+    guardar($this, [
+        'data_de_alta' => now()->subDays(40)->format('Y-m-d'),
+        'destino_id' => $this->destinoVivo,
+        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
+        'morbilidade' => ['alta' => semComplicacoes()],
+    ])->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_PENDENTE);
+
+    $this->actingAs($this->utilizador)->post("/internamentos/{$this->internamento->id}/seguimento", [
+        'data_registo' => now()->format('Y-m-d'),
+        'complicacoes' => [['id' => Complicacao::SEM_COMPLICACOES, 'resolucoes' => []]],
+    ])->assertSessionHasNoErrors();
+
+    expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_CONCLUIDA);
+});
+
+test('o formulário já não tem o bloqueio: gravar não bloqueia nem desbloqueia o registo', function () {
+    // Um registo já bloqueado, gravado por um administrador, continua bloqueado.
+    Spatie\Permission\Models\Role::findOrCreate('admin', 'web');
+    $this->utilizador->assignRole('admin');
+    $this->internamento->forceFill(['bloquear_tabela' => true])->save();
+
+    guardar($this, ['motivo_internamento' => 'Motivo alterado'])->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->bloquear_tabela)->toBeTrue();
+
+    // E um enviado com o campo (versão antiga do formulário) não bloqueia um registo livre.
+    $this->internamento->forceFill(['bloquear_tabela' => false])->save();
+    guardar($this, ['bloquear_tabela' => true])->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->bloquear_tabela)->toBeFalse();
+});
