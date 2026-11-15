@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,8 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            // Aceita o email completo ou só o nome antes do @ (ver identificador()).
+            'email' => ['required', 'string', 'max:255', fn ($atributo, $valor, $falhar) => str_contains((string) $valor, '@') && ! filter_var($valor, FILTER_VALIDATE_EMAIL) ? $falhar('O email não é válido.') : null],
             'password' => ['required', 'string'],
         ];
     }
@@ -41,7 +43,7 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt([...$this->only('email', 'password'), 'activo' => true], $this->boolean('remember'))) {
+        if (! Auth::attempt(['email' => $this->identificador(), 'password' => $this->string('password')->toString(), 'activo' => true], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -50,6 +52,23 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * O email com que se tenta entrar: o escrito, ou, se só se escreveu o nome antes do @,
+     * o único utilizador cujo email começa por esse nome. Se não houver ou houver mais do que um, devolve o texto
+     * tal como está (o início de sessão falha com a mensagem normal, sem dizer se o nome existe).
+     */
+    private function identificador(): string
+    {
+        $escrito = trim($this->string('email')->toString());
+        if ($escrito === '' || str_contains($escrito, '@')) {
+            return $escrito;
+        }
+
+        $emails = User::query()->where('email', 'like', addcslashes($escrito, '%_\\').'@%')->limit(2)->pluck('email');
+
+        return $emails->count() === 1 ? $emails->first() : $escrito;
     }
 
     /**

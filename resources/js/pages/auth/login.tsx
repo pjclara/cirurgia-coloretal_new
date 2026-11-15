@@ -31,23 +31,25 @@ export default function Login({ status }: LoginProps) {
     };
 
     return (
-        <AuthLayout title="Iniciar sessão na sua conta" description="Introduza o seu email e palavra-passe para iniciar sessão">
+        <AuthLayout title="Iniciar sessão na sua conta" description="Introduza o seu utilizador (o nome antes do @) ou o email, e a palavra-passe">
             <Head title="Iniciar sessão" />
 
             <form className="flex flex-col gap-6" onSubmit={submit}>
                 <div className="grid gap-6">
                     <div className="grid gap-2">
-                        <Label htmlFor="email">Endereço de email</Label>
+                        <Label htmlFor="email">Utilizador ou email</Label>
                         <Input
                             id="email"
-                            type="email"
+                            type="text"
                             required
                             autoFocus
                             tabIndex={1}
-                            autoComplete="email"
+                            autoComplete="username"
+                            autoCapitalize="none"
+                            spellCheck={false}
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
-                            placeholder="email@exemplo.pt"
+                            placeholder="nome ou email@exemplo.pt"
                         />
                         <InputError message={errors.email} />
                     </div>
