@@ -21,7 +21,7 @@ class AnaliseController extends Controller
     private const PERIODOS = ['12' => 12, '24' => 24, 'todos' => null];
 
     /** "Complicação real": qualquer complicação que não seja "Sem complicações". */
-    private const COM_COMPLICACAO = 'exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
+    public const COM_COMPLICACAO = 'exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
         where m.internamento_id = i.id and m.momento in (\'alta\', \'30_dias\') and c.complicacao_id <> '.\App\Models\Complicacao::SEM_COMPLICACOES.')';
 
     public function __invoke(Request $request): Response

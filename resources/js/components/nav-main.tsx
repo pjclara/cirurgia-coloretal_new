@@ -13,18 +13,23 @@ import { Link, usePage } from '@inertiajs/react';
 
 const caminho = (url: string) => url.split('?')[0].replace(/\/+$/, '') || '/';
 
-/** Uma ligação corresponde à página se o caminho for igual ou for um sub-caminho dela. */
-const corresponde = (item: NavItem, atual: string) => {
-    const base = caminho(item.url);
-    return atual === base || atual.startsWith(base + '/');
-};
+/** Caminho mais longo, entre os da ligação, que corresponde à página (igual ou sub-caminho); 0 se nenhum. */
+const comprimentoDaCorrespondencia = (item: NavItem, atual: string) =>
+    [item.url, ...(item.alias ?? [])]
+        .map(caminho)
+        .filter((base) => atual === base || atual.startsWith(base + '/'))
+        .reduce((maior, base) => Math.max(maior, base.length), 0);
+
+const corresponde = (item: NavItem, atual: string) => comprimentoDaCorrespondencia(item, atual) > 0;
 
 export function NavMain({ grupos = [] }: { grupos: NavGroup[] }) {
     const atual = caminho(usePage().url);
 
     // A ligação mais específica (caminho mais longo) é a activa; evita realçar "Internamentos" em "/internamentos/seguimentos".
     const todas = grupos.flatMap((g) => g.items.flatMap((i) => [i, ...(i.filhos ?? [])]));
-    const activa = todas.filter((i) => corresponde(i, atual)).sort((a, b) => caminho(b.url).length - caminho(a.url).length)[0];
+    const activa = todas
+        .filter((i) => corresponde(i, atual))
+        .sort((a, b) => comprimentoDaCorrespondencia(b, atual) - comprimentoDaCorrespondencia(a, atual))[0];
 
     return (
         <>

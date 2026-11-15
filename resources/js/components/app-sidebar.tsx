@@ -45,7 +45,7 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        { title: 'Análise', items: [{ title: 'Painel de análise', url: '/dashboard', icon: BarChart3 }] },
+        { title: 'Análise', items: [{ title: 'Painel de análise', url: '/dashboard', icon: BarChart3, alias: ['/referenciacao/analise'] }] },
         ...(clinico?.administrador ? [{ title: 'Sistema', items: [{ title: 'Administração', url: '/admin/utilizadores', icon: ShieldCheck }] }] : []),
     ];
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\CirurgiaController;
 use App\Http\Controllers\ContaController;
 use App\Http\Controllers\InternamentoController;
 use App\Http\Controllers\QuadroController;
+use App\Http\Controllers\ReferenciacaoAnaliseController;
 use App\Http\Controllers\ReferenciacaoController;
 use App\Http\Controllers\UtenteController;
 use Illuminate\Support\Facades\Route;
@@ -115,6 +116,7 @@ Route::prefix('agendamento')->name('agendamento.')->group(function () {
 Route::prefix('referenciacao')->name('referenciacao.')->group(function () {
     Route::middleware('can:show referenciacao')->group(function () {
         Route::get('/', [ReferenciacaoController::class, 'index'])->name('index');
+        Route::get('analise', ReferenciacaoAnaliseController::class)->name('analise');
         Route::get('{referenciacao}', [ReferenciacaoController::class, 'editar'])->whereNumber('referenciacao')->name('edit');
     });
     Route::middleware('can:create referenciacao')->group(function () {

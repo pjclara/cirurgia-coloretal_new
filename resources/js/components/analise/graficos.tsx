@@ -2,6 +2,12 @@ import { useState, type ReactNode } from 'react';
 
 export type Ponto = { rotulo: string; valor: number | null };
 
+/** Tokens dos gráficos: uma cor de série validada (azul) em claro e escuro. */
+export const ESTILO_VIZ = `
+.viz-root { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --serie:#2a78d6; --serie-hover:#1c5cab; --border:rgba(11,11,11,0.10); }
+.dark .viz-root { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --axis:#383835; --serie:#3987e5; --serie-hover:#6da7ec; --border:rgba(255,255,255,0.10); }
+`;
+
 const numero = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 1 });
 export const formatar = (v: number, sufixo = '') => `${numero.format(v)}${sufixo}`;
 

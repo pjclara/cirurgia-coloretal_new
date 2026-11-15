@@ -1,6 +1,7 @@
 import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { BarrasH, Cartao, Colunas, Indicador, Linha, formatar, type Ponto } from '../components/analise/graficos';
+import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, Linha, formatar, type Ponto } from '../components/analise/graficos';
+import { SeparadoresAnalise } from '../components/analise/separadores';
 import ClinicoLayout from '../layouts/clinico-layout';
 
 type Props = {
@@ -32,12 +33,6 @@ const PERIODOS: { valor: Props['periodo']; rotulo: string }[] = [
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const nomeMes = (ym: string) => `${MESES[Number(ym.slice(5)) - 1]} ${ym.slice(2, 4)}`;
 
-/** Tokens do gráfico: uma cor de série validada (azul) em claro e escuro. */
-const ESTILO = `
-.viz-root { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --serie:#2a78d6; --serie-hover:#1c5cab; --border:rgba(11,11,11,0.10); }
-.dark .viz-root { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --axis:#383835; --serie:#3987e5; --serie-hover:#6da7ec; --border:rgba(255,255,255,0.10); }
-`;
-
 export default function Analise({ periodo, geradoEm, indicadores, mensal, anual, clavien, intervencoes, diagnosticos, espera }: Props) {
     const [aCarregar, setACarregar] = useState(false);
     const mudar = (valor: Props['periodo']) =>
@@ -56,7 +51,8 @@ export default function Analise({ periodo, geradoEm, indicadores, mensal, anual,
 
     return (
         <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga">
-            <style>{ESTILO}</style>
+            <style>{ESTILO_VIZ}</style>
+            <SeparadoresAnalise atual="geral" />
             <div className="viz-root space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
                     <div

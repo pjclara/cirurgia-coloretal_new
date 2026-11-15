@@ -19,6 +19,8 @@ export interface NavItem {
     url: string;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Outros caminhos que também activam esta ligação (ex.: separadores da mesma secção). */
+    alias?: string[];
     /** Ligações secundárias, mostradas quando a secção está activa. */
     filhos?: NavItem[];
 }
