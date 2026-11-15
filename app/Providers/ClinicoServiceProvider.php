@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Http\Middleware\BloquearRegistoPublico;
 use App\Http\Middleware\PasswordAlterada;
 use App\Http\Middleware\UtilizadorAtivo;
 use App\Models\User;
@@ -30,7 +29,6 @@ class ClinicoServiceProvider extends ServiceProvider
         $router->aliasMiddleware('clinico.ativo', UtilizadorAtivo::class);
         $router->aliasMiddleware('clinico.admin', \App\Http\Middleware\ApenasAdministrador::class);
         $router->aliasMiddleware('clinico.password', PasswordAlterada::class);
-        $router->pushMiddlewareToGroup('web', BloquearRegistoPublico::class);
 
         // superAdmin passa em todas as verificações de permissão.
         Gate::before(fn (User $utilizador) => $utilizador->hasRole('superAdmin') ? true : null);
