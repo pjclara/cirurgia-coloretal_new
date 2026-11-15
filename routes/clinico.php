@@ -52,6 +52,7 @@ Route::middleware('can:update internamento')->group(function () {
     Route::get('utentes/{utente}/editar', [UtenteController::class, 'edit'])->whereNumber('utente')->name('utentes.edit');
     Route::put('utentes/{utente}', [UtenteController::class, 'update'])->whereNumber('utente')->name('utentes.update');
     Route::put('internamentos/{internamento}', [InternamentoController::class, 'update'])->whereNumber('internamento')->name('internamentos.update');
+    Route::post('internamentos/{internamento}/seguimento', [InternamentoController::class, 'registarSeguimento'])->whereNumber('internamento')->name('internamentos.seguimento');
 });
 
 Route::delete('internamentos/{internamento}', [InternamentoController::class, 'destroy'])

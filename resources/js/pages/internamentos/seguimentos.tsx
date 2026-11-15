@@ -1,9 +1,12 @@
 import { Link, router } from '@inertiajs/react';
+import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
-import type { Paginado } from '../../clinico/tipos';
-import { BotaoLigacao } from '../../components/clinico/campos';
+import type { Opcao, OpcaoAgrupada, Paginado } from '../../clinico/tipos';
+import type { ResolucaoComGrau } from '../../components/clinico/bloco-morbilidade';
+import { Botao, BotaoLigacao } from '../../components/clinico/campos';
 import { Paginacao } from '../../components/clinico/paginacao';
+import { ModalSeguimento } from '../../components/internamentos/modal-seguimento';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Linha = {
@@ -15,6 +18,7 @@ type Linha = {
     dias_de_atraso: number;
     responsavel: string | null;
     clavien: string | null;
+    bloqueado: boolean;
 };
 
 type Estado = 'todos' | 'em_atraso' | 'a_decorrer';
@@ -24,6 +28,8 @@ type Props = {
     seguimentos: Paginado<Linha>;
     filtros: { estado: Estado; periodo: Periodo };
     contagens: { em_atraso: number; a_decorrer: number };
+    podeRegistar: boolean;
+    dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
 
 const PERIODOS: { valor: Periodo; rotulo: string }[] = [
@@ -32,7 +38,11 @@ const PERIODOS: { valor: Periodo; rotulo: string }[] = [
     { valor: 'todos', rotulo: 'Todas as altas' },
 ];
 
-export default function Seguimentos({ seguimentos, filtros, contagens }: Props) {
+export default function Seguimentos({ seguimentos, filtros, contagens, podeRegistar, dominios }: Props) {
+    const [abertoId, setAbertoId] = useState<number | null>(null);
+    const indice = seguimentos.data.findIndex((l) => l.id === abertoId);
+    const aberto = indice >= 0 ? seguimentos.data[indice] : null;
+    const seguinte = indice >= 0 ? (seguimentos.data[indice + 1] ?? null) : null;
     const aplicar = (alteracoes: Partial<Props['filtros']>) => {
         const novos = { ...filtros, ...alteracoes };
         const consulta: Record<string, string> = {};
@@ -143,9 +153,19 @@ export default function Seguimentos({ seguimentos, filtros, contagens }: Props) 
                                 </td>
                                 <td className="px-4 py-2.5">{l.responsavel ?? '—'}</td>
                                 <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                                    <Link href={rotas.internamentos.registo(l.id)} className="font-medium text-[#7d1830] hover:underline">
-                                        Registar
-                                    </Link>
+                                    {podeRegistar && !l.bloqueado ? (
+                                        <Botao variante="secundario" onClick={() => setAbertoId(l.id)}>
+                                            Registar
+                                        </Botao>
+                                    ) : (
+                                        <Link
+                                            href={rotas.internamentos.registo(l.id)}
+                                            className="font-medium text-[#7d1830] hover:underline"
+                                            title={l.bloqueado ? 'Registo bloqueado' : undefined}
+                                        >
+                                            Abrir
+                                        </Link>
+                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -153,6 +173,17 @@ export default function Seguimentos({ seguimentos, filtros, contagens }: Props) 
                 </table>
                 <Paginacao pagina={seguimentos} nome="seguimentos" />
             </div>
+
+            {aberto && (
+                <ModalSeguimento
+                    key={aberto.id}
+                    linha={aberto}
+                    dominios={dominios}
+                    temSeguinte={seguinte !== null}
+                    aoFechar={() => setAbertoId(null)}
+                    aoGuardar={(irParaSeguinte) => setAbertoId(irParaSeguinte && seguinte ? seguinte.id : null)}
+                />
+            )}
         </ClinicoLayout>
     );
 }

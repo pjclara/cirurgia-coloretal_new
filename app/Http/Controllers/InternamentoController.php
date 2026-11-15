@@ -11,6 +11,8 @@ use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -81,6 +83,7 @@ class InternamentoController extends Controller
         $periodos = ['90' => 90, '365' => 365, 'todos' => null];
         $periodo = array_key_exists($request->query('periodo'), $periodos) ? $request->query('periodo') : '90';
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
+        $administrador = $request->user()->eAdministrador();
         $hoje = now()->startOfDay();
         $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
 
@@ -101,7 +104,7 @@ class InternamentoController extends Controller
             ->orderBy('id')
             ->paginate(25)
             ->withQueryString()
-            ->through(function (Internamento $i) use ($hoje) {
+            ->through(function (Internamento $i) use ($hoje, $administrador) {
                 $prevista = $i->data_de_alta->copy()->addDays(30);
 
                 return [
@@ -114,10 +117,17 @@ class InternamentoController extends Controller
                     'dias_de_atraso' => (int) $prevista->startOfDay()->diffInDays($hoje, false),
                     'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
                     'clavien' => Dominios::nome('clavien_dindos', $i->claviemMaisGrave()),
+                    'bloqueado' => $i->bloquear_tabela && ! $administrador,
                 ];
             });
 
         return Inertia::render('internamentos/seguimentos', [
+            'podeRegistar' => $request->user()->can('update internamento'),
+            'dominios' => [
+                'complicacoes' => Dominios::complicacoes(),
+                'resolucoes' => $this->resolucoesComGrau(),
+                'clavien' => Dominios::lista('clavien_dindos'),
+            ],
             'seguimentos' => $lista,
             'filtros' => ['estado' => $estado, 'periodo' => $periodo],
             'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer],
@@ -251,6 +261,53 @@ class InternamentoController extends Controller
             ->with('sucesso', 'Internamento apagado.');
     }
 
+    private function resolucoesComGrau(): array
+    {
+        return DB::table('resolucao_complicacaos')->orderBy('id')->get(['id', 'nome', 'clavien_dindo_id'])
+            ->map(fn ($r) => ['id' => (int) $r->id, 'nome' => trim($r->nome), 'clavien_dindo_id' => $r->clavien_dindo_id ? (int) $r->clavien_dindo_id : null])
+            ->all();
+    }
+
+    /** Regista a morbilidade aos 30 dias a partir da lista de seguimentos (sem abrir o formulário completo). */
+    public function registarSeguimento(Request $request, Internamento $internamento, GuardarInternamento $guardar): RedirectResponse
+    {
+        $this->impedirSeBloqueado($request, $internamento);
+        abort_if(! $internamento->data_de_alta, 422, 'Só é possível registar o seguimento aos 30 dias depois da alta.');
+
+        $dados = $request->validate([
+            'data_registo' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$internamento->data_de_alta->format('Y-m-d'), 'before_or_equal:today'],
+            'complicacoes' => ['required', 'array', 'min:1'],
+            'complicacoes.*.id' => ['required', 'integer', Rule::exists('complicacaos', 'id')],
+            'complicacoes.*.resolucoes' => ['nullable', 'array'],
+            'complicacoes.*.resolucoes.*' => ['integer', Rule::exists('resolucao_complicacaos', 'id')],
+            'clavien_dindo_id' => ['nullable', 'integer', Rule::exists('clavien_dindos', 'id')],
+        ], [
+            'required' => 'Preencha este campo.',
+            'complicacoes.required' => 'Escolha "Sem complicações" ou as complicações registadas.',
+            'complicacoes.min' => 'Escolha "Sem complicações" ou as complicações registadas.',
+            'data_registo.after_or_equal' => 'O seguimento não pode ser anterior à alta.',
+            'before_or_equal' => 'A data não pode ser futura.',
+        ]);
+
+        $ids = collect($dados['complicacoes'])->pluck('id')->map(fn ($id) => (int) $id);
+        $temSem = $ids->contains(\App\Models\Complicacao::SEM_COMPLICACOES);
+        $temReal = $ids->contains(fn ($id) => $id !== \App\Models\Complicacao::SEM_COMPLICACOES);
+
+        if ($ids->count() !== $ids->unique()->count()) {
+            throw ValidationException::withMessages(['complicacoes' => 'Há complicações repetidas.']);
+        }
+        if ($temSem && $temReal) {
+            throw ValidationException::withMessages(['complicacoes' => '"Sem complicações" não pode ser escolhida em conjunto com outras complicações.']);
+        }
+        if ($temReal && empty($dados['clavien_dindo_id']) && Morbilidade::grauPelasResolucoes($dados['complicacoes']) === null) {
+            throw ValidationException::withMessages(['clavien_dindo_id' => 'Indique o grau de Clavien-Dindo das complicações registadas.']);
+        }
+
+        $guardar->registarSeguimento($internamento, $dados);
+
+        return back()->with('sucesso', 'Seguimento aos 30 dias registado.');
+    }
+
     private function impedirSeBloqueado(Request $request, Internamento $internamento): void
     {
         abort_if(
@@ -281,9 +338,7 @@ class InternamentoController extends Controller
             'casos_sociais' => Dominios::lista('caso_socials'),
             'clavien' => Dominios::lista('clavien_dindos'),
             // Cada resolução traz o grau de Clavien-Dindo associado (calculado automaticamente no formulário).
-            'resolucoes' => DB::table('resolucao_complicacaos')->orderBy('id')->get(['id', 'nome', 'clavien_dindo_id'])
-                ->map(fn ($r) => ['id' => (int) $r->id, 'nome' => trim($r->nome), 'clavien_dindo_id' => $r->clavien_dindo_id ? (int) $r->clavien_dindo_id : null])
-                ->all(),
+            'resolucoes' => $this->resolucoesComGrau(),
             'diagnosticos' => Dominios::diagnosticos(),
             'complicacoes' => Dominios::complicacoes(),
             'responsaveis' => Dominios::responsaveis($responsavelAtual),

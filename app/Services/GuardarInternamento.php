@@ -48,6 +48,35 @@ class GuardarInternamento
         });
     }
 
+    /**
+     * Circuito simplificado: regista só a morbilidade aos 30 dias, sem tocar no resto do internamento.
+     * O grau escolhido à mão prevalece; sem ele, calcula-se pelas resoluções.
+     */
+    public function registarSeguimento(Internamento $internamento, array $dados): Morbilidade
+    {
+        return DB::transaction(function () use ($internamento, $dados) {
+            $antes = $this->resumoMorbilidade($internamento);
+
+            $complicacoes = collect($dados['complicacoes'])
+                ->mapWithKeys(fn ($c) => [(int) $c['id'] => array_map('strval', $c['resolucoes'] ?? [])]);
+            $temReal = $complicacoes->keys()->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
+            $clavien = ! $temReal ? null : ($dados['clavien_dindo_id'] ?? Morbilidade::grauPelasResolucoes($dados['complicacoes']));
+
+            $morbilidade = $internamento->morbilidades()->firstOrNew(['momento' => Morbilidade::AOS_30_DIAS]);
+            $morbilidade->fill(['data_registo' => $dados['data_registo'], 'clavien_dindo_id' => $clavien])->save();
+            $morbilidade->complicacoes()->sync(
+                $complicacoes->map(fn ($resolucoes) => ['resolucao' => $resolucoes === [] ? null : json_encode(array_values($resolucoes))])->all()
+            );
+
+            $depois = $this->resumoMorbilidade($internamento);
+            if ($antes !== $depois) {
+                $internamento->auditar('updated', ['morbilidade' => $antes], ['morbilidade' => $depois]);
+            }
+
+            return $morbilidade;
+        });
+    }
+
     /** Cria, atualiza ou remove o registo de cada momento; sem complicações escolhidas, o momento fica por registar. */
     private function gravarMorbilidade(Internamento $internamento, array $blocos, bool $obito): void
     {
