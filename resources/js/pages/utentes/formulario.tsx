@@ -46,7 +46,7 @@ export function CorpoFormularioUtente({
     dominios,
     origem,
     aoCancelar,
-}: PropsUtente & { origem?: 'quadro'; aoCancelar?: () => void }) {
+}: PropsUtente & { origem?: 'quadro' | 'referenciacao'; aoCancelar?: () => void }) {
     const form = useForm<Dados>({
         nome: utente?.nome ?? '',
         numero_processo: utente ? String(utente.numero_processo) : processoSugerido,

@@ -10,6 +10,7 @@ use App\Support\Dominios;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -63,12 +64,17 @@ class UtenteController extends Controller
             ->whereIn('utente_id', $utentes->pluck('id'))
             ->pluck('id', 'utente_id');
 
+        $referenciados = DB::table('referenciacao_centro_de_referencias')
+            ->whereNull('deleted_at')->whereNull('data_de_saida')
+            ->whereIn('utente_id', $utentes->pluck('id'))->pluck('utente_id')->flip();
+
         return response()->json($utentes->map(fn (Utente $u) => [
             'id' => $u->id,
             'nome' => $u->nome,
             'numero_processo' => $u->numero_processo,
             'data_nascimento' => $u->data_nascimento?->format('Y-m-d'),
             'internamento_aberto_id' => $internados[$u->id] ?? null,
+            'referenciado' => $referenciados->has($u->id),
         ]));
     }
 
@@ -90,6 +96,11 @@ class UtenteController extends Controller
     public function store(UtenteRequest $request): RedirectResponse
     {
         $utente = Utente::create($request->validated());
+
+        // Criado a partir da Referenciação: segue para a referenciação rápida deste utente.
+        if ($request->input('origem') === 'referenciacao') {
+            return redirect('/referenciacao?referenciar='.$utente->id)->with('sucesso', 'Utente criado. Indique agora a origem e a data da referenciação.');
+        }
 
         // Criado a partir da modal do quadro: segue para o registo do internamento deste utente.
         if ($request->input('origem') === 'quadro') {
@@ -129,6 +140,7 @@ class UtenteController extends Controller
             ],
             'internamentos' => $internamentos,
             'origensReferenciacao' => request()->user()->can('create referenciacao') ? Dominios::lista('origem_da_referenciacaos') : [],
+            'responsaveisReferenciacao' => request()->user()->can('create referenciacao') ? Dominios::responsaveis() : [],
             'referenciacoes' => request()->user()->can('show referenciacao')
                 ? $utente->referenciacoes()->with(['responsavel:id,name,abrev', 'diagnosticos:id,nome,abrev'])->get()
                     ->each(fn ($r) => $r->setRelation('utente', $utente))

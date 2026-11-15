@@ -1,11 +1,14 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Link, router, usePage } from '@inertiajs/react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { formatarData } from '../../clinico/formato';
+import { rotas } from '../../clinico/rotas';
 import type { Paginado, PropsPartilhadas } from '../../clinico/tipos';
-import { Botao, estiloEntrada } from '../../components/clinico/campos';
+import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import { Paginacao } from '../../components/clinico/paginacao';
+import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import { FormularioReferenciacao, type PropsReferenciacao } from '../../components/referenciacao/formulario-referenciacao';
+import { SinalizarCentro } from '../../components/referenciacao/sinalizar-centro';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Linha = {
@@ -27,6 +30,10 @@ type Props = {
     lista: Paginado<Linha>;
     filtros: { situacao: Situacao; q: string };
     modal: PropsReferenciacao | null;
+    origens: { id: number; nome: string }[];
+    responsaveis: { id: number; nome: string; equipa: string | null }[];
+    /** Utente a sinalizar de imediato (acabado de criar). */
+    referenciar: { id: number; nome: string; numero_processo: number } | null;
 };
 
 const SITUACOES: { valor: Situacao; rotulo: string }[] = [
@@ -39,9 +46,17 @@ const SITUACOES: { valor: Situacao; rotulo: string }[] = [
 const COR = { referenciado: 'bg-sky-100 text-sky-900', no_centro: 'bg-amber-100 text-amber-900', saida: 'bg-teal-100 text-teal-900' } as const;
 const ROTULO = { referenciado: 'Referenciado', no_centro: 'No centro', saida: 'Saída registada' } as const;
 
-export default function Referenciacao({ lista, filtros, modal }: Props) {
+export default function Referenciacao({ lista, filtros, modal, origens, responsaveis, referenciar }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(filtros.q);
+    const podeReferenciar = permissoes.includes('create referenciacao');
+    // Referenciação rápida: um utente escolhido na pesquisa (ou acabado de criar), sem precisar de internamento nem de agendamento.
+    const [alvo, setAlvo] = useState<{ id: number; nome: string } | null>(referenciar);
+    useEffect(() => setAlvo(referenciar), [referenciar?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    const fecharSinalizacao = () => {
+        setAlvo(null);
+        if (referenciar) router.get('/referenciacao', {}, { replace: true, preserveState: true, preserveScroll: true });
+    };
     const aplicar = (alteracoes: Partial<Props['filtros']>) => {
         const novos = { ...filtros, q: termo.trim(), ...alteracoes };
         const consulta: Record<string, string> = {};
@@ -54,9 +69,29 @@ export default function Referenciacao({ lista, filtros, modal }: Props) {
     return (
         <ClinicoLayout
             titulo="Referenciação"
-            subtitulo={`${lista.total} referenciações ao centro de referência · para referenciar um utente, abra a sua ficha`}
+            subtitulo={`${lista.total} referenciações ao centro de referência`}
             largura="larga"
+            acoes={
+                <BotaoLigacao href="/referenciacao/analise" variante="secundario">
+                    Análise
+                </BotaoLigacao>
+            }
         >
+            {podeReferenciar && (
+                <section aria-label="Referenciar um doente" className="mb-5 max-w-xl rounded-lg border border-violet-200 bg-violet-50/60 px-4 py-3">
+                    <p className="mb-2 text-sm font-medium text-slate-900">Referenciar um doente</p>
+                    <PesquisaUtente
+                        podeCriar={permissoes.includes('create internamento')}
+                        criarHref="/quadro/novo-utente?origem=referenciacao"
+                        placeholder="Procurar o doente por nome ou processo"
+                        aoEscolher={(u) => (u.referenciado ? router.visit(rotas.utentes.ficha(u.id)) : setAlvo({ id: u.id, nome: u.nome }))}
+                    />
+                    <p className="mt-1.5 text-xs text-slate-600">
+                        Não precisa de estar internado nem agendado. Se já estiver referenciado, abre a ficha do doente.
+                    </p>
+                </section>
+            )}
+
             <div className="mb-4 flex flex-wrap items-end gap-3">
                 <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5" role="group" aria-label="Situação">
                     {SITUACOES.map((s) => (
@@ -155,6 +190,16 @@ export default function Referenciacao({ lista, filtros, modal }: Props) {
                 </table>
                 <Paginacao pagina={lista} nome="referenciações" />
             </div>
+
+            <SinalizarCentro
+                key={alvo?.id ?? 'nenhum'}
+                utenteId={alvo?.id ?? 0}
+                nome={alvo?.nome}
+                origens={origens}
+                responsaveis={responsaveis}
+                aberto={alvo !== null}
+                aoFechar={fecharSinalizacao}
+            />
 
             <Dialog open={modal !== null} onOpenChange={(aberto) => !aberto && fechar()}>
                 <DialogContent

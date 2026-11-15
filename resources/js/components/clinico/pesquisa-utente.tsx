@@ -10,11 +10,13 @@ type Props = {
     aoEscolher?: (utente: ResultadoPesquisa) => void;
     placeholder?: string;
     podeCriar?: boolean;
+    /** Destino de "Criar utente novo" (por omissão, a criação do utente). */
+    criarHref?: string;
     focoInicial?: boolean;
 };
 
 /** Pesquisa de utentes por nome, n.º de processo ou n.º de utente. */
-export function PesquisaUtente({ aoEscolher, placeholder = 'Procurar utente por nome ou processo', podeCriar, focoInicial }: Props) {
+export function PesquisaUtente({ aoEscolher, placeholder = 'Procurar utente por nome ou processo', podeCriar, criarHref, focoInicial }: Props) {
     const [termo, setTermo] = useState('');
     const [resultados, setResultados] = useState<ResultadoPesquisa[] | null>(null);
     const [aberto, setAberto] = useState(false);
@@ -136,9 +138,14 @@ export function PesquisaUtente({ aoEscolher, placeholder = 'Procurar utente por 
                                     Processo {utente.numero_processo}, nasc. {formatarData(utente.data_nascimento)}
                                 </span>
                             </span>
-                            {utente.internamento_aberto_id && (
-                                <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">Internado</span>
-                            )}
+                            <span className="flex shrink-0 gap-1">
+                                {utente.referenciado && (
+                                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900">Referenciado</span>
+                                )}
+                                {utente.internamento_aberto_id && (
+                                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">Internado</span>
+                                )}
+                            </span>
                         </button>
                     ))}
 
@@ -150,7 +157,11 @@ export function PesquisaUtente({ aoEscolher, placeholder = 'Procurar utente por 
 
                     {podeCriar && (
                         <Link
-                            href={soDigitos ? `${rotas.utentes.novo}?processo=${termo.trim()}` : rotas.utentes.novo}
+                            href={
+                                soDigitos
+                                    ? `${criarHref ?? rotas.utentes.novo}${criarHref?.includes('?') ? '&' : '?'}processo=${termo.trim()}`
+                                    : (criarHref ?? rotas.utentes.novo)
+                            }
                             className="block border-t border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-slate-100"
                         >
                             Criar utente novo

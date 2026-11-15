@@ -32,7 +32,7 @@ export type ResumoUtente = {
     sexo?: string | null;
 };
 
-export type ResultadoPesquisa = ResumoUtente & { internamento_aberto_id: number | null };
+export type ResultadoPesquisa = ResumoUtente & { internamento_aberto_id: number | null; referenciado?: boolean };
 
 export const SEM_COMPLICACOES = 1;
 export const ALTA_PENDENTE = 1;

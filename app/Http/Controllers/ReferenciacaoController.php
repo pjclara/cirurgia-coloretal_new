@@ -51,6 +51,7 @@ class ReferenciacaoController extends Controller
         $dados = $request->validate([
             'data_de_referenciacao' => ['required', 'date_format:Y-m-d', "after_or_equal:$minima", 'before_or_equal:today'],
             'origem_id' => ['required', 'integer', Rule::exists('origem_da_referenciacaos', 'id')],
+            'responsavel_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('activo', true)],
             'comentarios' => ['nullable', 'string', 'max:2000'],
         ], ['required' => 'Preencha este campo.', 'before_or_equal' => 'A data não pode ser futura.']);
 
@@ -58,9 +59,10 @@ class ReferenciacaoController extends Controller
             return back()->with('erro', 'Este utente já está sinalizado para o centro de referência.');
         }
 
-        $referenciacao = new Referenciacao($dados);
+        $referenciacao = new Referenciacao(collect($dados)->except('responsavel_id')->all());
         $referenciacao->utente_id = $utente->id;
-        $referenciacao->responsavel_id = $request->user()->id;
+        // O médico escolhido; sem escolha, quem está a registar.
+        $referenciacao->responsavel_id = $dados['responsavel_id'] ?? $request->user()->id;
         $referenciacao->save();
 
         return back()->with('sucesso', 'Utente sinalizado para o centro de referência.');
@@ -105,10 +107,24 @@ class ReferenciacaoController extends Controller
             ->withQueryString()
             ->through(fn (Referenciacao $r) => $this->resumo($r));
 
+        $podeReferenciar = $request->user()->can('create referenciacao');
+
+        // Utente acabado de criar (ou escolhido) para sinalizar de imediato, se ainda não estiver sinalizado.
+        $referenciar = null;
+        if ($podeReferenciar && ctype_digit((string) $request->query('referenciar'))) {
+            $utente = Utente::find((int) $request->query('referenciar'));
+            if ($utente && ! $utente->referenciacoesAtivas()->exists()) {
+                $referenciar = ['id' => $utente->id, 'nome' => $utente->nome, 'numero_processo' => $utente->numero_processo];
+            }
+        }
+
         return Inertia::render('referenciacao/index', [
             'lista' => $lista,
             'filtros' => ['situacao' => $situacao, 'q' => $q],
             'modal' => $modal,
+            'origens' => $podeReferenciar ? Dominios::lista('origem_da_referenciacaos') : [],
+            'responsaveis' => $podeReferenciar ? Dominios::responsaveis() : [],
+            'referenciar' => $referenciar,
         ]);
     }
 
