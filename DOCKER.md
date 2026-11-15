@@ -17,3 +17,15 @@ docker compose down              # parar (os dados ficam no volume db_data)
 - Testes: `docker compose exec app php artisan testes:preparar` não funciona na imagem (sem dev); os testes continuam a correr no ambiente local.
 - Depois de alterar código: `docker compose up -d --build`.
 - Backup: `docker compose exec db sh -c 'mysqldump -uroot -p$MYSQL_ROOT_PASSWORD cr_base' > backup.sql`
+
+## Instalar num servidor
+
+1. Servidor com Docker Engine + plugin Compose e git; clonar o repositório.
+2. `cp .env.docker.example .env.docker` e preencher `APP_KEY`, `APP_URL` e a password (em `DB_PASSWORD` **e** `MYSQL_ROOT_PASSWORD`).
+3. Copiar a base de dados para `docker/dados/cr_base.sql` (não vai para o git). Exportar no PC com
+   `mysqldump -uroot --single-transaction --default-character-set=utf8mb4 cr_base > cr_base.sql` e enviar com `scp`.
+4. `docker compose up -d --build`. O MySQL importa o `.sql` só na primeira vez (volume vazio).
+5. Abrir `http://SERVIDOR:8080` (ou pôr um proxy HTTPS à frente e usar `TRUSTED_PROXIES=*`, `SESSION_SECURE_COOKIE=true`).
+6. Actualizar: `git pull && docker compose up -d --build`; se houver migrações novas, fazer backup e
+   `docker compose exec app php artisan migrate --force`.
+7. Backup diário: `docker compose exec -T db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" cr_base' | gzip > backup_$(date +%F).sql.gz`.
