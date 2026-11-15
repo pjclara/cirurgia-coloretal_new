@@ -38,3 +38,22 @@ Para o usar a partir do PC, abrir um túnel SSH e depois `http://localhost:8083`
     ssh -L 8083:127.0.0.1:8083 UTILIZADOR@SERVIDOR
 
 Para mudar a porta ou expor à rede (não recomendado sem firewall/HTTPS), definir `PMA_PORT` e `PMA_BIND` no `.env`.
+
+## Atualização automática (sem SSH)
+
+O servidor segue o ramo `producao`. `atualizar.sh` (corre de 5 em 5 minutos pelo cron) vê se há novidades no GitHub e, se houver:
+faz backup da BD → `git checkout` do código novo → reconstrói a imagem → corre as migrações novas → arranca → confirma que `/up` responde
+(se não responder, volta ao código anterior). Tudo fica em `atualizar.log`; os backups ficam em `~/backups-cirurgia`.
+
+Instalação (uma vez, no servidor):
+
+    chmod +x atualizar.sh
+    ./atualizar.sh --forcar          # primeira execução manual, para ver que funciona
+    crontab -e                       # acrescentar a linha:
+    */5 * * * * /CAMINHO/DO/PROJETO/atualizar.sh >/dev/null 2>&1
+
+Publicar uma versão (do PC, de qualquer lado):
+
+    git push origin main:producao
+
+Opções em `.atualizar.env` (opcional): `RAMO`, `AUTO_MIGRAR=false`, `BACKUPS`, `MANTER_DIAS`.
