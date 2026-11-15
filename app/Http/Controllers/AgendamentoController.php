@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Agendamento;
 use App\Models\ListaDeEspera;
 use App\Models\Utente;
+use App\Services\SincronizarOperados;
 use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -54,9 +56,12 @@ class AgendamentoController extends Controller
             ->map(fn (Agendamento $a) => $this->resumo($a))
             ->groupBy('data');
 
+        $semAgendamento = $this->cirurgiasSemAgendamento($inicio, $fim);
+
         $dias = collect(range(0, $nDias - 1))->map(fn ($n) => [
             'data' => $inicio->copy()->addDays($n)->format('Y-m-d'),
             'agendamentos' => $agendamentos->get($inicio->copy()->addDays($n)->format('Y-m-d'), collect())->values(),
+            'cirurgias' => $semAgendamento->get($inicio->copy()->addDays($n)->format('Y-m-d'), collect())->values(),
         ]);
 
         [$espera, $esperaFiltro, $esperaQ, $esperaTotal] = $this->listaParaArrastar($request);
@@ -74,6 +79,58 @@ class AgendamentoController extends Controller
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
+    }
+
+    /**
+     * Cirurgias registadas no bloco operatório que não têm agendamento (urgências, adicionais, etc.), para o calendário
+     * mostrar tudo o que foi operado. Uma cirurgia conta como agendada se o mesmo utente tiver um agendamento não cancelado
+     * até SincronizarOperados::TOLERANCIA_DIAS dias antes ou depois (a mesma regra que marca o agendamento como operado).
+     *
+     * @return Collection<string, Collection> data (Y-m-d) => cirurgias
+     */
+    private function cirurgiasSemAgendamento(Carbon $inicio, Carbon $fim): Collection
+    {
+        $blocos = DB::table('bloco_operatorios as b')
+            ->join('internamentos as i', 'i.id', '=', 'b.internamento_id')
+            ->join('utentes as u', 'u.id', '=', 'i.utente_id')
+            ->leftJoin('tipo_de_cirurgias as t', 't.id', '=', 'b.tipo_de_cirurgia_id')
+            ->whereNull('b.deleted_at')->whereNull('i.deleted_at')
+            ->whereBetween('b.data_de_inicio', [$inicio->format('Y-m-d'), $fim->format('Y-m-d')])
+            ->orderBy('b.data_de_inicio')->orderBy('b.id')
+            ->get(['b.id', 'b.data_de_inicio', 'i.utente_id', 'u.nome', 'u.numero_processo', 't.nome as tipo']);
+
+        if ($blocos->isEmpty()) {
+            return collect();
+        }
+
+        $folga = SincronizarOperados::TOLERANCIA_DIAS;
+        $agendadosPorUtente = DB::table('agendamentos as a')
+            ->join('lista_de_esperas as l', 'l.id', '=', 'a.lista_de_espera_id')
+            ->whereNull('a.deleted_at')->whereNull('l.deleted_at')
+            ->whereIn('l.utente_id', $blocos->pluck('utente_id')->unique())
+            ->whereBetween('a.start', [$inicio->copy()->subDays($folga)->startOfDay(), $fim->copy()->addDays($folga)->endOfDay()])
+            ->whereRaw('cast(coalesce(a.estado_de_agendamento_id, a.estado_de_agendamento) as unsigned) <> ?', [ListaDeEspera::ESTADO_CANCELADO])
+            ->selectRaw('l.utente_id, date(a.start) as dia')->get()
+            ->groupBy('utente_id')->map(fn ($l) => $l->pluck('dia')->map(fn ($d) => strtotime((string) $d)));
+
+        $semAgendamento = $blocos->reject(function ($b) use ($agendadosPorUtente, $folga) {
+            $dia = strtotime(substr((string) $b->data_de_inicio, 0, 10));
+
+            return ($agendadosPorUtente[$b->utente_id] ?? collect())->contains(fn ($d) => abs(($d - $dia) / 86400) <= $folga);
+        })->values();
+
+        $intervencoes = DB::table('bloco_operatorio_intervencao as bi')
+            ->join('intervencaos as i', 'i.id', '=', 'bi.intervencao_id')
+            ->whereIn('bi.bloco_operatorio_id', $semAgendamento->pluck('id'))
+            ->get(['bi.bloco_operatorio_id', 'i.nome', 'i.abrev'])->groupBy('bloco_operatorio_id');
+
+        return $semAgendamento->map(fn ($b) => [
+            'id' => (int) $b->id,
+            'data' => substr((string) $b->data_de_inicio, 0, 10),
+            'utente' => ['id' => (int) $b->utente_id, 'nome' => $b->nome, 'numero_processo' => $b->numero_processo],
+            'tipo' => $b->tipo ? trim($b->tipo) : null,
+            'intervencoes' => ($intervencoes[$b->id] ?? collect())->map(fn ($i) => trim($i->abrev ?: $i->nome))->values()->all(),
+        ])->groupBy('data');
     }
 
     /**
@@ -279,7 +336,8 @@ class AgendamentoController extends Controller
             $this->espelharEstado($espera, $dados['estado']);
         });
 
-        return redirect()->route('agendamento.agenda', ['semana' => $dados['data']])->with('sucesso', 'Cirurgia agendada.');
+        return redirect()->route('agendamento.agenda', ['semana' => $dados['data']])
+            ->with('sucesso', 'Cirurgia agendada.'.$this->jaOperado($espera->utente_id));
     }
 
     public function atualizarAgendamento(Request $request, Agendamento $agendamento): RedirectResponse
@@ -295,7 +353,8 @@ class AgendamentoController extends Controller
             $this->espelharEstado($agendamento->espera, $dados['estado']);
         });
 
-        return redirect()->route('agendamento.agenda', ['semana' => $dados['data']])->with('sucesso', 'Agendamento atualizado.');
+        return redirect()->route('agendamento.agenda', ['semana' => $dados['data']])
+            ->with('sucesso', 'Agendamento atualizado.'.$this->jaOperado($agendamento->espera->utente_id));
     }
 
     public function apagarAgendamento(Request $request, Agendamento $agendamento): RedirectResponse
@@ -319,7 +378,7 @@ class AgendamentoController extends Controller
 
         $agendamento->update(['start' => $dados['data'].' 00:00:00', 'end' => $dados['data'].' 00:00:00']);
 
-        return back()->with('sucesso', 'Agendamento movido para '.Carbon::parse($dados['data'])->format('d/m/Y').'.');
+        return back()->with('sucesso', 'Agendamento movido para '.Carbon::parse($dados['data'])->format('d/m/Y').'.'.$this->jaOperado($agendamento->espera->utente_id));
     }
 
     private function dataAlvo(Request $request): ?string
@@ -515,6 +574,12 @@ class AgendamentoController extends Controller
             'reserva_sangue' => $d['reserva_sangue'] ? '1' : '0',
             'comentarios' => $d['comentarios'] ?? null,
         ];
+    }
+
+    /** Se o utente já tem a cirurgia registada nesse dia, o agendamento passa a operado; devolve o aviso para a mensagem. */
+    private function jaOperado(int $utenteId): string
+    {
+        return app(SincronizarOperados::class)->paraUtente($utenteId)->isEmpty() ? '' : ' Já tem a cirurgia registada: ficou como operado.';
     }
 
     /** Mantém o estado da inscrição coerente com o do agendamento (Agendado, Pendente ou Cancelado). */

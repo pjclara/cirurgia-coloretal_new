@@ -153,7 +153,7 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                                     )}
                                 </td>
                                 <td className="space-x-3 px-4 py-2 text-right whitespace-nowrap">
-                                    {permissoes.includes('create agendamento') && l.estado !== 4 && (
+                                    {permissoes.includes('create agendamento') && ![4, 5].includes(l.estado) && (
                                         <Link
                                             href={`/agendamento/lista-de-espera/${l.id}/agendar${dataAlvo ? `?agendar_em=${dataAlvo}` : ''}`}
                                             className="font-medium text-[#7d1830] hover:underline"

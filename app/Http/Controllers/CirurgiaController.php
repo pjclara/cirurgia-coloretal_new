@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BlocoOperatorio;
 use App\Models\Internamento;
 use App\Models\Utente;
+use App\Services\SincronizarOperados;
 use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -78,7 +79,7 @@ class CirurgiaController extends Controller
             $bloco->intervencoes()->sync($intervencoes);
         });
 
-        return $this->destino($request, $internamento->utente_id, 'Cirurgia registada.');
+        return $this->destino($request, $internamento->utente_id, 'Cirurgia registada.'.$this->agendamentosAtualizados($internamento->utente_id));
     }
 
     public function update(Request $request, BlocoOperatorio $bloco): RedirectResponse
@@ -94,7 +95,7 @@ class CirurgiaController extends Controller
             $bloco->intervencoes()->sync($intervencoes);
         });
 
-        return $this->destino($request, $bloco->internamento->utente_id, 'Cirurgia atualizada.');
+        return $this->destino($request, $bloco->internamento->utente_id, 'Cirurgia atualizada.'.$this->agendamentosAtualizados($bloco->internamento->utente_id));
     }
 
     public function destroy(Request $request, BlocoOperatorio $bloco): RedirectResponse
@@ -106,6 +107,14 @@ class CirurgiaController extends Controller
         $bloco->delete();
 
         return $this->destino($request, $utenteId, 'Cirurgia apagada.');
+    }
+
+    /** Com a cirurgia registada, o agendamento (e a lista de espera) do utente passam a operados; devolve o aviso para a mensagem. */
+    private function agendamentosAtualizados(int $utenteId): string
+    {
+        $n = app(SincronizarOperados::class)->paraUtente($utenteId)->count();
+
+        return $n === 0 ? '' : ($n === 1 ? ' O agendamento foi marcado como operado.' : " $n agendamentos foram marcados como operados.");
     }
 
     private function garantirEdicao(Request $request, Internamento $internamento): void

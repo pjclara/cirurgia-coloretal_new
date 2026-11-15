@@ -23,9 +23,11 @@ function doenteAgendado(object $t, int $estado, int $agendadoHa, ?int $operadoHa
 
     if ($operadoHa !== null) {
         registarCirurgia($t, $utente, $operadoHa);
+        // Hoje registar a cirurgia já actualiza o agendamento; a migração serve para os registos antigos, por isso volta-se ao estado de então.
+        DB::table('agendamentos')->where('id', $agendamento->id)->update(['estado_de_agendamento_id' => $estado, 'estado_de_agendamento' => (string) min($estado, 4)]);
     }
 
-    return $agendamento;
+    return $agendamento->fresh();
 }
 
 /** Cirurgia do utente (num internamento seu), dias atrás. */
