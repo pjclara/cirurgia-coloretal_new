@@ -70,8 +70,20 @@ class SincronizarOperados
             }
         }
 
-        DB::transaction(function () use ($marcar) {
-            foreach ($marcar as $agendamento) {
+        $this->marcarOperados($marcar);
+
+        return $marcar;
+    }
+
+    /**
+     * Passa os agendamentos a "Operado" e a inscrição na lista de espera também.
+     *
+     * @param  iterable<Agendamento>  $agendamentos
+     */
+    public function marcarOperados(iterable $agendamentos): void
+    {
+        DB::transaction(function () use ($agendamentos) {
+            foreach ($agendamentos as $agendamento) {
                 // O campo antigo só admite 1 a 4: Operado guarda-se lá como Agendado; vale o estado_de_agendamento_id.
                 $agendamento->update([
                     'estado_de_agendamento_id' => ListaDeEspera::ESTADO_OPERADO,
@@ -80,7 +92,5 @@ class SincronizarOperados
                 $agendamento->espera?->update(['estado_lista_espera' => (string) ListaDeEspera::ESTADO_OPERADO]);
             }
         });
-
-        return $marcar;
     }
 }

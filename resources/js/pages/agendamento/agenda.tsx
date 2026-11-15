@@ -299,6 +299,9 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                             ) : (
                                                                 <span className="text-sm font-semibold">Utente sem ficha</span>
                                                             )}
+                                                            <span className="ml-2 text-sm text-slate-600 tabular-nums">
+                                                                Processo {a.utente.numero_processo ?? '—'}
+                                                            </span>
                                                             <p className="text-sm text-slate-700">
                                                                 {a.intervencoes.length > 0 ? a.intervencoes.join(', ') : 'Sem intervenção indicada'}
                                                             </p>

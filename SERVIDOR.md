@@ -73,3 +73,17 @@ gunzip -c backup_AAAA-MM-DD_HHMM.sql.gz | docker compose exec -T db sh -c 'mysql
 - Firewall: 8082 só para a rede da ULS; 8083 (phpMyAdmin) só para o IP de quem gere.
 - A stack antiga tem MySQL `3306` com `root/secret` e phpMyAdmin `8081` com `PMA_ARBITRARY`: mudar a password e restringir o acesso.
 - Backups diários, guardados **fora** do servidor.
+
+## Cruzar o Excel do bloco operatório com os agendamentos
+
+Comando `agendamentos:cruzar-bloco` (lê `.xlsx` ou `.csv` com as colunas `NUM_PROCESSO` e `DTA_INTERVENCAO`).
+Por omissão **só mostra** o que mudaria; com `--aplicar` grava (agendamento e lista de espera passam a "Operado") e guarda um CSV do que mudou em `storage/app/private/`.
+Tolerância por omissão: 1 dia (`--tolerancia=N`). Cancelados e agendamentos que o ficheiro não confirma ficam como estão.
+
+```bash
+docker compose cp /caminho/bloco_2022_2026.xlsx app:/tmp/bloco.xlsx
+docker compose exec app php artisan agendamentos:cruzar-bloco /tmp/bloco.xlsx            # simulação
+# backup da BD, e depois:
+docker compose exec app php artisan agendamentos:cruzar-bloco /tmp/bloco.xlsx --aplicar
+docker compose exec app rm /tmp/bloco.xlsx                                               # o ficheiro tem dados de doentes
+```
