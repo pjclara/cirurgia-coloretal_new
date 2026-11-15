@@ -31,6 +31,7 @@ type Props = {
 const ESTADOS = [
     ['abertas', 'Em espera'],
     ['agendadas', 'Agendadas'],
+    ['operadas', 'Operadas'],
     ['canceladas', 'Canceladas'],
     ['todas', 'Todas'],
 ];

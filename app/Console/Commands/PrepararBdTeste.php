@@ -66,6 +66,12 @@ class PrepararBdTeste extends Command
         }
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
+        // A base de testes fica com as migrações ainda por correr na base de trabalho: liga-se mesmo à de testes para as correr.
+        $ligacao = DB::getDefaultConnection();
+        config(['database.connections.'.$ligacao.'.database' => $destino]);
+        DB::purge($ligacao);
+        $this->call('migrate', ['--force' => true]);
+
         $this->info("Base de testes `$destino` pronta: {$tabelas->count()} tabelas, {$copiadas} com dados de referência.");
 
         return self::SUCCESS;

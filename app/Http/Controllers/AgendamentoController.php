@@ -162,7 +162,7 @@ class AgendamentoController extends Controller
 
     private function montarLista(Request $request, ?array $modal): Response
     {
-        $estados = ['abertas' => [1, 2], 'agendadas' => [3], 'canceladas' => [4], 'todas' => null];
+        $estados = ['abertas' => [1, 2], 'agendadas' => [3], 'operadas' => [5], 'canceladas' => [4], 'todas' => null];
         $estado = array_key_exists($request->query('estado'), $estados) ? $request->query('estado') : 'abertas';
         $prioridade = in_array((int) $request->query('prioridade'), array_keys(ListaDeEspera::PRIORIDADES), true) ? (int) $request->query('prioridade') : null;
         $q = trim((string) $request->query('q', ''));
@@ -510,7 +510,8 @@ class AgendamentoController extends Controller
             'tipo_de_agendamento_id' => $d['tipo_id'],
             'responsavel_id' => $d['responsavel_id'],
             'estado_de_agendamento_id' => $d['estado'],
-            'estado_de_agendamento' => (string) $d['estado'],
+            // O campo antigo só admite 1 a 4: Operado e Outro guardam-se como Agendado; vale o estado_de_agendamento_id.
+            'estado_de_agendamento' => (string) ($d['estado'] <= 4 ? $d['estado'] : ListaDeEspera::ESTADO_AGENDADO),
             'reserva_sangue' => $d['reserva_sangue'] ? '1' : '0',
             'comentarios' => $d['comentarios'] ?? null,
         ];
@@ -519,7 +520,8 @@ class AgendamentoController extends Controller
     /** Mantém o estado da inscrição coerente com o do agendamento (Agendado, Pendente ou Cancelado). */
     private function espelharEstado(ListaDeEspera $espera, int $estado): void
     {
-        if (in_array($estado, [ListaDeEspera::ESTADO_PENDENTE, ListaDeEspera::ESTADO_AGENDADO, ListaDeEspera::ESTADO_CANCELADO], true)) {
+        // A lista tem os mesmos estados do agendamento (1 a 6).
+        if (in_array($estado, [1, 2, 3, 4, 5, 6], true)) {
             $espera->update(['estado_lista_espera' => (string) $estado]);
         }
     }

@@ -5,7 +5,7 @@ use App\Models\ListaDeEspera;
 /** Carrega a migration e corre só o alinhamento (sem criar a tabela de cópia, que obrigaria a um commit implícito). */
 function alinharEstados(): int
 {
-    $migration = require base_path('database/migrations/2026_11_16_000001_alinhar_estado_da_lista_de_espera_com_o_agendamento.php');
+    $migration = require base_path('database/migrations/2026_11_16_000003_alinhar_estado_da_lista_de_espera_com_o_agendamento.php');
 
     return $migration->alinhar(false);
 }
@@ -39,7 +39,7 @@ test('a lista de espera passa a ter o estado do agendamento', function () {
         ->and((int) $cancelado->fresh()->estado_lista_espera)->toBe(4)
         ->and((int) $proposto->fresh()->estado_lista_espera)->toBe(1)
         ->and((int) $pendente->fresh()->estado_lista_espera)->toBe(2)
-        ->and((int) $operado->fresh()->estado_lista_espera)->toBe(3);   // operado: já não está por agendar
+        ->and((int) $operado->fresh()->estado_lista_espera)->toBe(5);   // operado: a lista passa a ter o mesmo estado
 });
 
 test('com vários agendamentos conta o mais recente que não esteja cancelado', function () {
@@ -89,4 +89,12 @@ test('uma segunda execução já não altera nada', function () {
     alinharEstados();
 
     expect(alinharEstados())->toBe(0);
+});
+
+test('simular conta as alterações sem gravar nada', function () {
+    $agendado = inscricaoComAgendamentos(ListaDeEspera::ESTADO_PENDENTE, [[3, 10]]);
+    $migration = require base_path('database/migrations/2026_11_16_000003_alinhar_estado_da_lista_de_espera_com_o_agendamento.php');
+
+    expect($migration->alinhar(false, simular: true))->toBeGreaterThanOrEqual(1)
+        ->and((int) $agendado->fresh()->estado_lista_espera)->toBe(2);
 });

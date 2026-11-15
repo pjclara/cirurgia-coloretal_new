@@ -26,6 +26,10 @@ class ListaDeEspera extends Model
 
     public const ESTADO_CANCELADO = 4;
 
+    public const ESTADO_OPERADO = 5;
+
+    public const ESTADO_OUTRO = 6;
+
     public const PRIORIDADES = [1 => 'Normal', 2 => 'Prioritária', 3 => 'Prioridade 3', 99 => 'Não definida'];
 
     protected $fillable = ['prioridade_id', 'utente_id', 'data_de_lista', 'estado_lista_espera', 'comentarios', 'responsavel_id'];
