@@ -23,3 +23,8 @@ Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
+
+# Docker
+.env.docker
+/docker/dados/*
+!/docker/dados/.gitkeep
