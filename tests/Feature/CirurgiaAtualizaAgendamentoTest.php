@@ -100,24 +100,3 @@ test('apagar a cirurgia não repõe o agendamento', function () {
 
     expect($agendamento->fresh()->estado())->toBe(5);
 });
-
-test('o calendário mostra as cirurgias registadas que não têm agendamento', function () {
-    $semana = now()->subDays(3)->format('Y-m-d');
-    [$comAgendamento] = utenteAgendado($this, ListaDeEspera::ESTADO_AGENDADO, 3);
-    $urgencia = novoUtente(['nome' => 'Doente Operado Em Urgencia']);
-    [$cancelado] = utenteAgendado($this, ListaDeEspera::ESTADO_CANCELADO, 3);
-
-    operarUtente($this, $comAgendamento, 3);   // tem agendamento: não duplica
-    operarUtente($this, $urgencia, 3);          // sem agendamento: aparece
-    operarUtente($this, $cancelado, 3);         // o agendamento está cancelado: não conta como agendada
-
-    $this->actingAs($this->utilizador)->get("/agendamento?vista=semana&semana=$semana")->assertInertia(fn (Assert $p) => $p
-        ->where('dias', function ($dias) use ($urgencia, $cancelado, $comAgendamento) {
-            $feitas = collect($dias)->flatMap(fn ($d) => $d['cirurgias']);
-            $utentes = $feitas->pluck('utente.id')->all();
-
-            return in_array($urgencia->id, $utentes) && in_array($cancelado->id, $utentes) && ! in_array($comAgendamento->id, $utentes)
-                && $feitas->firstWhere('utente.id', $urgencia->id)['utente']['nome'] === 'Doente Operado Em Urgencia'
-                && count($feitas->firstWhere('utente.id', $urgencia->id)['intervencoes']) >= 1;
-        }));
-});

@@ -9,6 +9,7 @@ type Item = {
     utente: { id: number | null; nome: string | null; numero_processo: number | null };
     idade: number | null;
     intervencoes: string[];
+    hora: string | null;
     periodo: string | null;
     local: string | null;
     sala: string | null;
@@ -92,7 +93,7 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, estados,
                                 <table className="w-full border-collapse text-left text-xs">
                                     <thead>
                                         <tr className="border-b border-slate-300 text-slate-600">
-                                            <th className="py-1 pr-2 font-medium">Período / sala</th>
+                                            <th className="py-1 pr-2 font-medium">Hora / sala</th>
                                             <th className="py-1 pr-2 font-medium">Utente</th>
                                             <th className="py-1 pr-2 font-medium">Processo</th>
                                             <th className="py-1 pr-2 font-medium">Intervenção</th>
@@ -106,7 +107,7 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, estados,
                                         {dia.agendamentos.map((a) => (
                                             <tr key={a.id} className="border-b border-slate-200 align-top">
                                                 <td className="py-1.5 pr-2 whitespace-nowrap">
-                                                    {[a.periodo, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
+                                                    {[a.hora, a.periodo, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
                                                 </td>
                                                 <td className="py-1.5 pr-2 font-medium">
                                                     {a.utente.nome ?? 'Utente sem ficha'}

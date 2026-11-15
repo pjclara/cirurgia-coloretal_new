@@ -48,20 +48,15 @@ class AgendamentoController extends Controller
         $agendamentos = Agendamento::query()
             ->with(['espera.utente:id,nome,numero_processo', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
             ->whereBetween('start', [$inicio->copy()->startOfDay(), $fim->copy()->endOfDay()])
-            ->orderBy('start')
-            ->orderBy('periodo_de_agendamento_id')
-            ->orderBy('sala_de_agendamento_id')
+            ->tap(fn ($q) => $this->ordenarPorDiaSalaEHora($q))
             ->get()
             ->filter(fn (Agendamento $a) => $mostrarCancelados || $a->estado() !== ListaDeEspera::ESTADO_CANCELADO)
             ->map(fn (Agendamento $a) => $this->resumo($a))
             ->groupBy('data');
 
-        $semAgendamento = $this->cirurgiasSemAgendamento($inicio, $fim);
-
         $dias = collect(range(0, $nDias - 1))->map(fn ($n) => [
             'data' => $inicio->copy()->addDays($n)->format('Y-m-d'),
             'agendamentos' => $agendamentos->get($inicio->copy()->addDays($n)->format('Y-m-d'), collect())->values(),
-            'cirurgias' => $semAgendamento->get($inicio->copy()->addDays($n)->format('Y-m-d'), collect())->values(),
         ]);
 
         [$espera, $esperaFiltro, $esperaQ, $esperaTotal] = $this->listaParaArrastar($request);
@@ -79,58 +74,6 @@ class AgendamentoController extends Controller
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
-    }
-
-    /**
-     * Cirurgias registadas no bloco operatório que não têm agendamento (urgências, adicionais, etc.), para o calendário
-     * mostrar tudo o que foi operado. Uma cirurgia conta como agendada se o mesmo utente tiver um agendamento não cancelado
-     * até SincronizarOperados::TOLERANCIA_DIAS dias antes ou depois (a mesma regra que marca o agendamento como operado).
-     *
-     * @return Collection<string, Collection> data (Y-m-d) => cirurgias
-     */
-    private function cirurgiasSemAgendamento(Carbon $inicio, Carbon $fim): Collection
-    {
-        $blocos = DB::table('bloco_operatorios as b')
-            ->join('internamentos as i', 'i.id', '=', 'b.internamento_id')
-            ->join('utentes as u', 'u.id', '=', 'i.utente_id')
-            ->leftJoin('tipo_de_cirurgias as t', 't.id', '=', 'b.tipo_de_cirurgia_id')
-            ->whereNull('b.deleted_at')->whereNull('i.deleted_at')
-            ->whereBetween('b.data_de_inicio', [$inicio->format('Y-m-d'), $fim->format('Y-m-d')])
-            ->orderBy('b.data_de_inicio')->orderBy('b.id')
-            ->get(['b.id', 'b.data_de_inicio', 'i.utente_id', 'u.nome', 'u.numero_processo', 't.nome as tipo']);
-
-        if ($blocos->isEmpty()) {
-            return collect();
-        }
-
-        $folga = SincronizarOperados::TOLERANCIA_DIAS;
-        $agendadosPorUtente = DB::table('agendamentos as a')
-            ->join('lista_de_esperas as l', 'l.id', '=', 'a.lista_de_espera_id')
-            ->whereNull('a.deleted_at')->whereNull('l.deleted_at')
-            ->whereIn('l.utente_id', $blocos->pluck('utente_id')->unique())
-            ->whereBetween('a.start', [$inicio->copy()->subDays($folga)->startOfDay(), $fim->copy()->addDays($folga)->endOfDay()])
-            ->whereRaw('cast(coalesce(a.estado_de_agendamento_id, a.estado_de_agendamento) as unsigned) <> ?', [ListaDeEspera::ESTADO_CANCELADO])
-            ->selectRaw('l.utente_id, date(a.start) as dia')->get()
-            ->groupBy('utente_id')->map(fn ($l) => $l->pluck('dia')->map(fn ($d) => strtotime((string) $d)));
-
-        $semAgendamento = $blocos->reject(function ($b) use ($agendadosPorUtente, $folga) {
-            $dia = strtotime(substr((string) $b->data_de_inicio, 0, 10));
-
-            return ($agendadosPorUtente[$b->utente_id] ?? collect())->contains(fn ($d) => abs(($d - $dia) / 86400) <= $folga);
-        })->values();
-
-        $intervencoes = DB::table('bloco_operatorio_intervencao as bi')
-            ->join('intervencaos as i', 'i.id', '=', 'bi.intervencao_id')
-            ->whereIn('bi.bloco_operatorio_id', $semAgendamento->pluck('id'))
-            ->get(['bi.bloco_operatorio_id', 'i.nome', 'i.abrev'])->groupBy('bloco_operatorio_id');
-
-        return $semAgendamento->map(fn ($b) => [
-            'id' => (int) $b->id,
-            'data' => substr((string) $b->data_de_inicio, 0, 10),
-            'utente' => ['id' => (int) $b->utente_id, 'nome' => $b->nome, 'numero_processo' => $b->numero_processo],
-            'tipo' => $b->tipo ? trim($b->tipo) : null,
-            'intervencoes' => ($intervencoes[$b->id] ?? collect())->map(fn ($i) => trim($i->abrev ?: $i->nome))->values()->all(),
-        ])->groupBy('data');
     }
 
     /**
@@ -168,6 +111,17 @@ class AgendamentoController extends Controller
         return [$itens, $filtro, $q, $total];
     }
 
+    /** Ordem dos agendamentos: dia, sala, hora (sem hora no fim), período e, por fim, o registo. */
+    private function ordenarPorDiaSalaEHora($consulta): void
+    {
+        $consulta->orderByRaw('date(start)')
+            ->orderBy('sala_de_agendamento_id')
+            ->orderByRaw('hora is null')
+            ->orderBy('hora')
+            ->orderBy('periodo_de_agendamento_id')
+            ->orderBy('id');
+    }
+
     /** Mapa operatório do dia ou da semana, em formato próprio para imprimir. */
     public function mapa(Request $request): Response
     {
@@ -184,9 +138,7 @@ class AgendamentoController extends Controller
         $agendamentos = Agendamento::query()
             ->with(['espera.utente:id,nome,numero_processo,data_nascimento', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
             ->whereBetween('start', [$inicio, $fim])
-            ->orderBy('periodo_de_agendamento_id')
-            ->orderBy('sala_de_agendamento_id')
-            ->orderBy('id')
+            ->tap(fn ($q) => $this->ordenarPorDiaSalaEHora($q))
             ->get()
             ->filter(fn (Agendamento $a) => $a->estado() !== ListaDeEspera::ESTADO_CANCELADO)
             ->map(fn (Agendamento $a) => $this->resumo($a) + [
@@ -397,6 +349,7 @@ class AgendamentoController extends Controller
             'data' => $a->start?->format('Y-m-d'),
             'utente' => ['id' => $a->espera?->utente?->id, 'nome' => $a->espera?->utente?->nome, 'numero_processo' => $a->espera?->utente?->numero_processo],
             'intervencoes' => ($a->espera?->intervencoes ?? collect())->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),
+            'hora' => $a->horaCurta(),
             'periodo' => Dominios::tabela('periodo_de_agendamentos', $a->periodo_de_agendamento_id),
             'local' => Dominios::tabela('local_de_agendamentos', $a->local_de_agendamento_id),
             'sala' => Dominios::tabela('sala_de_agendamentos', $a->sala_de_agendamento_id),
@@ -453,6 +406,7 @@ class AgendamentoController extends Controller
                 'id' => $agendamento->id,
                 'data' => $agendamento->start?->format('Y-m-d'),
                 'periodo_id' => $agendamento->periodo_de_agendamento_id,
+                'hora' => $agendamento->horaCurta() ?? '',
                 'local_id' => $agendamento->local_de_agendamento_id,
                 'sala_id' => $agendamento->sala_de_agendamento_id,
                 'tipo_id' => $agendamento->tipo_de_agendamento_id,
@@ -514,6 +468,7 @@ class AgendamentoController extends Controller
         return $request->validate([
             'data' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:'.now()->addYears(3)->format('Y-m-d')],
             'periodo_id' => ['required', 'integer', Rule::exists('periodo_de_agendamentos', 'id')],
+            'hora' => ['nullable', 'date_format:H:i'],
             'local_id' => ['required', 'integer', Rule::exists('local_de_agendamentos', 'id')],
             'sala_id' => ['required', 'integer', Rule::exists('sala_de_agendamentos', 'id')], // a coluna é obrigatória na base
             'tipo_id' => ['required', 'integer', Rule::exists('tipo_de_agendamentos', 'id')],
@@ -564,6 +519,7 @@ class AgendamentoController extends Controller
             'start' => $data,
             'end' => $data,
             'periodo_de_agendamento_id' => $d['periodo_id'],
+            'hora' => ! empty($d['hora']) ? $d['hora'].':00' : null,
             'local_de_agendamento_id' => $d['local_id'],
             'sala_de_agendamento_id' => $d['sala_id'] ?? null,
             'tipo_de_agendamento_id' => $d['tipo_id'],

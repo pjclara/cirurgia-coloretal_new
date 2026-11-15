@@ -33,6 +33,7 @@ class Agendamento extends Model
         'local_de_agendamento_id',
         'sala_de_agendamento_id',
         'periodo_de_agendamento_id',
+        'hora',
         'estado_de_agendamento',
         'estado_de_agendamento_id',
         'reserva_sangue',
@@ -66,6 +67,12 @@ class Agendamento extends Model
             (int) $this->tipo_de_agendamento_id === self::TIPO_PROGRAMADA => 'programada',
             default => 'outra',
         };
+    }
+
+    /** Hora da cirurgia como HH:MM, ou null se não foi indicada. */
+    public function horaCurta(): ?string
+    {
+        return $this->hora ? substr((string) $this->hora, 0, 5) : null;
     }
 
     /** Os registos antigos guardam o estado em `estado_de_agendamento`, os novos em `estado_de_agendamento_id`. */

@@ -13,6 +13,7 @@ type Item = {
     data: string;
     utente: { id: number | null; nome: string | null; numero_processo: number | null };
     intervencoes: string[];
+    hora: string | null;
     periodo: string | null;
     local: string | null;
     sala: string | null;
@@ -23,17 +24,8 @@ type Item = {
     reserva_sangue: boolean;
 };
 
-/** Cirurgia registada no bloco operatório sem agendamento (urgência, adicional...): já foi feita, por isso aparece riscada. */
-type CirurgiaFeita = {
-    id: number;
-    data: string;
-    utente: { id: number | null; nome: string | null; numero_processo: number | null };
-    tipo: string | null;
-    intervencoes: string[];
-};
-
 type Props = {
-    dias: { data: string; agendamentos: Item[]; cirurgias: CirurgiaFeita[] }[];
+    dias: { data: string; agendamentos: Item[] }[];
     vista: 'semana' | 'mes';
     semana: string;
     mes: string;
@@ -109,12 +101,11 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
     const referencia = eMes ? mes : semana;
     const mesAtual = new Date(mes + 'T00:00:00').getMonth();
     const total = dias.reduce((soma, d) => soma + d.agendamentos.length, 0);
-    const semAgendar = dias.reduce((soma, d) => soma + d.cirurgias.length, 0);
 
     return (
         <ClinicoLayout
             titulo="Agendamento"
-            subtitulo={`${eMes ? nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) : `Semana de ${formatarData(semana)}`} · ${total} ${total === 1 ? 'cirurgia agendada' : 'cirurgias agendadas'}${semAgendar > 0 ? ` · ${semAgendar} ${semAgendar === 1 ? 'operada' : 'operadas'} sem agendamento` : ''}`}
+            subtitulo={`${eMes ? nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1) : `Semana de ${formatarData(semana)}`} · ${total} ${total === 1 ? 'cirurgia agendada' : 'cirurgias agendadas'}`}
             largura="larga"
             acoes={
                 <>
@@ -173,7 +164,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                         </li>
                     );
                 })}
-                <li className="text-xs text-slate-500">✓ riscado = operado · ✕ esbatido = cancelado · ✓ cinzento = cirurgia sem agendamento</li>
+                <li className="text-xs text-slate-500">✓ riscado = operado · ✕ esbatido = cancelado</li>
             </ul>
 
             <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -228,33 +219,32 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                             }}
                                                             href={permissoes.includes('show agendamento') ? `/agendamento/${a.id}` : '#'}
                                                             title={`${CATEGORIAS[a.categoria].rotulo}${a.estado === 4 ? ' (cancelado)' : a.estado === 5 ? ' (operado)' : ''} · Processo ${a.utente.numero_processo ?? '—'} — ${a.intervencoes.join(', ')}`}
-                                                            className={`block truncate rounded px-1.5 py-0.5 text-xs ${CATEGORIAS[a.categoria].chip} ${estiloDoEstado(a.estado)}`}
+                                                            className={`block rounded px-1.5 py-0.5 text-xs leading-tight ${CATEGORIAS[a.categoria].chip} ${estiloDoEstado(a.estado)}`}
                                                         >
-                                                            {a.estado === 5 ? '✓ ' : a.estado === 4 ? '✕ ' : ''}
-                                                            {a.periodo ? `${a.periodo.charAt(0)} · ` : ''}
-                                                            {a.utente.numero_processo ?? 'Sem processo'}
+                                                            <span className="block truncate font-medium">
+                                                                {a.estado === 5 ? '✓ ' : a.estado === 4 ? '✕ ' : ''}
+                                                                {[
+                                                                    a.hora ?? a.periodo?.charAt(0),
+                                                                    a.sala ? `S${a.sala}` : null,
+                                                                    a.utente.numero_processo ?? 'Sem processo',
+                                                                ]
+                                                                    .filter(Boolean)
+                                                                    .join(' · ')}
+                                                            </span>
+                                                            <span className="block truncate opacity-80">
+                                                                {a.intervencoes.length > 0 ? a.intervencoes.join(', ') : 'Sem intervenção'}
+                                                            </span>
                                                         </Link>
                                                     </li>
                                                 ))}
-                                                {dia.cirurgias.slice(0, Math.max(0, MAX_NO_DIA - dia.agendamentos.length)).map((c) => (
-                                                    <li key={`c${c.id}`}>
-                                                        <Link
-                                                            href={`/cirurgias/${c.id}`}
-                                                            title={`Cirurgia sem agendamento${c.tipo ? ` (${c.tipo})` : ''} · Processo ${c.utente.numero_processo ?? '—'} — ${c.intervencoes.join(', ')}`}
-                                                            className="block truncate rounded border-l-[3px] border-slate-400 bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 line-through decoration-2 opacity-70"
-                                                        >
-                                                            ✓ {c.utente.numero_processo ?? 'Sem processo'}
-                                                        </Link>
-                                                    </li>
-                                                ))}
-                                                {dia.agendamentos.length + dia.cirurgias.length > MAX_NO_DIA && (
+                                                {dia.agendamentos.length > MAX_NO_DIA && (
                                                     <li>
                                                         <button
                                                             type="button"
                                                             onClick={() => ir({ vista: 'semana', semana: dia.data, cancelados })}
                                                             className="px-1.5 text-xs text-[#7d1830] hover:underline"
                                                         >
-                                                            + {dia.agendamentos.length + dia.cirurgias.length - MAX_NO_DIA} mais
+                                                            + {dia.agendamentos.length - MAX_NO_DIA} mais
                                                         </button>
                                                     </li>
                                                 )}
@@ -284,7 +274,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                             <span className="text-sm text-slate-600 tabular-nums">{formatarData(dia.data)}</span>
                                             {eHoje && <span className="rounded bg-[#a3213e] px-1.5 py-0.5 text-xs font-medium text-white">Hoje</span>}
                                         </header>
-                                        {dia.agendamentos.length === 0 && dia.cirurgias.length === 0 ? (
+                                        {dia.agendamentos.length === 0 ? (
                                             <p className="px-4 py-3 text-sm text-slate-500">Sem cirurgias agendadas.</p>
                                         ) : (
                                             <ul className="divide-y divide-slate-100">
@@ -294,7 +284,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                         className={`flex flex-wrap items-baseline gap-x-5 gap-y-1 border-l-4 px-4 py-2.5 ${CATEGORIAS[a.categoria].faixa} ${a.estado === 4 ? 'opacity-60' : ''}`}
                                                     >
                                                         <p className="w-36 shrink-0 text-xs text-slate-600">
-                                                            {[a.periodo, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
+                                                            {[a.hora, a.periodo, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
                                                         </p>
                                                         <div
                                                             className={`min-w-0 flex-1 ${a.estado === 5 ? 'line-through decoration-2 opacity-70' : ''}`}
@@ -325,34 +315,6 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                                 Abrir
                                                             </Link>
                                                         )}
-                                                    </li>
-                                                ))}
-                                                {dia.cirurgias.map((c) => (
-                                                    <li
-                                                        key={`c${c.id}`}
-                                                        className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-l-4 border-l-slate-400 px-4 py-2.5"
-                                                    >
-                                                        <p className="w-36 shrink-0 text-xs text-slate-600">Sem agendamento</p>
-                                                        <div className="min-w-0 flex-1 line-through decoration-2 opacity-70">
-                                                            {c.utente.id ? (
-                                                                <Link
-                                                                    href={`/utentes/${c.utente.id}`}
-                                                                    className="text-sm font-semibold hover:underline"
-                                                                >
-                                                                    {c.utente.nome}
-                                                                </Link>
-                                                            ) : (
-                                                                <span className="text-sm font-semibold">Utente sem ficha</span>
-                                                            )}
-                                                            <p className="text-sm text-slate-700">
-                                                                {c.intervencoes.length > 0 ? c.intervencoes.join(', ') : 'Sem intervenção indicada'}
-                                                            </p>
-                                                            {c.tipo && <p className="text-xs text-slate-500">{c.tipo}</p>}
-                                                        </div>
-                                                        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${COR_ESTADO[5]}`}>Operado</span>
-                                                        <Link href={`/cirurgias/${c.id}`} className="text-sm text-[#7d1830] hover:underline">
-                                                            Abrir
-                                                        </Link>
                                                     </li>
                                                 ))}
                                             </ul>

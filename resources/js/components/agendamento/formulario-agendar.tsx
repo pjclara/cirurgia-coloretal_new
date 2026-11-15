@@ -9,6 +9,7 @@ export type PropsAgendar = {
         id: number;
         data: string | null;
         periodo_id: number | null;
+        hora: string;
         local_id: number | null;
         sala_id: number | null;
         tipo_id: number | null;
@@ -33,6 +34,7 @@ type Props = PropsAgendar & { fechar: () => void };
 export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSugerida, fechar }: Props) {
     const form = useForm({
         data: agendamento?.data ?? dataSugerida ?? '',
+        hora: agendamento?.hora ?? '',
         periodo_id: (agendamento?.periodo_id ?? 1) as number | '',
         local_id: (agendamento?.local_id ?? 1) as number | '',
         sala_id: (agendamento?.sala_id ?? '') as number | '',
@@ -91,6 +93,16 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
                                 onChange={(e) => setData('data', e.target.value)}
                                 className={estiloEntrada}
                                 aria-invalid={!!erros.data}
+                            />
+                        </Campo>
+                        <Campo rotulo="Hora" para="hora" erro={erros.hora} opcional>
+                            <input
+                                id="hora"
+                                type="time"
+                                value={data.hora}
+                                onChange={(e) => setData('hora', e.target.value)}
+                                className={estiloEntrada}
+                                aria-invalid={!!erros.hora}
                             />
                         </Campo>
                         <Campo rotulo="Período" para="periodo" erro={erros.periodo_id}>
