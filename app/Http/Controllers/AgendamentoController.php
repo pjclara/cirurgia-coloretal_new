@@ -59,8 +59,11 @@ class AgendamentoController extends Controller
             'agendamentos' => $agendamentos->get($inicio->copy()->addDays($n)->format('Y-m-d'), collect())->values(),
         ]);
 
+        [$espera, $esperaFiltro, $esperaQ, $esperaTotal] = $this->listaParaArrastar($request);
+
         return Inertia::render('agendamento/agenda', [
             'dias' => $dias,
+            'espera' => ['itens' => $espera, 'filtro' => $esperaFiltro, 'q' => $esperaQ, 'total' => $esperaTotal],
             'vista' => $vista,
             'semana' => $semanaBase->format('Y-m-d'),
             'anterior' => $vista === 'mes' ? $mesBase->copy()->subMonth()->format('Y-m-d') : $semanaBase->copy()->subWeek()->format('Y-m-d'),
@@ -71,6 +74,41 @@ class AgendamentoController extends Controller
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
+    }
+
+    /**
+     * Doentes em lista de espera por agendar, para o painel ao lado do calendário (arrastar para um dia).
+     * Por omissão só os do próprio utilizador (responsável); "todos" mostra os de toda a equipa. A escolha fica na sessão.
+     */
+    private function listaParaArrastar(Request $request): array
+    {
+        if (in_array($request->query('espera'), ['meus', 'todos'], true)) {
+            $request->session()->put('agenda.espera', $request->query('espera'));
+        }
+        $filtro = $request->session()->get('agenda.espera', 'meus');
+        $q = trim((string) $request->query('espera_q', ''));
+
+        $consulta = ListaDeEspera::query()
+            ->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), [ListaDeEspera::ESTADO_PROPOSTO, ListaDeEspera::ESTADO_PENDENTE])
+            ->when($filtro === 'meus', fn ($query) => $query->where('responsavel_id', $request->user()->id))
+            ->when($q !== '', fn ($query) => $query->whereHas('utente', fn ($u) => $u->pesquisar($q)));
+
+        $total = (clone $consulta)->count();
+        $itens = $consulta
+            ->with(['utente:id,nome,numero_processo', 'intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
+            ->orderByRaw('CASE prioridade_id WHEN 2 THEN 0 WHEN 3 THEN 1 WHEN 1 THEN 2 ELSE 3 END')
+            ->orderBy('data_de_lista')
+            ->limit(60)->get()
+            ->map(fn (ListaDeEspera $e) => [
+                'id' => $e->id,
+                'utente' => ['id' => $e->utente?->id, 'nome' => $e->utente?->nome, 'numero_processo' => $e->utente?->numero_processo],
+                'data' => $e->data_de_lista?->format('Y-m-d'),
+                'prioridade' => (int) $e->prioridade_id,
+                'intervencoes' => $e->intervencoes->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),
+                'responsavel' => $e->responsavel?->abrev ?: $e->responsavel?->name,
+            ])->values()->all();
+
+        return [$itens, $filtro, $q, $total];
     }
 
     /** Mapa operatório do dia ou da semana, em formato próprio para imprimir. */
