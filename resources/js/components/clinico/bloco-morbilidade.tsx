@@ -101,7 +101,7 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
                         .map((c) => (
                             <fieldset key={c.id}>
                                 <legend className="text-sm font-medium text-slate-800">Como foi resolvida: {nome(c.id)}</legend>
-                                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+                                <div className="mt-1.5 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
                                     {dominios.resolucoes.map((r) => (
                                         <label key={r.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
                                             <input

@@ -116,6 +116,15 @@ class Dominios
     /** Utilizadores que podem ser responsáveis: ativos, mais o responsável atual do registo. */
     public static function responsaveis(?int $incluirId = null): array
     {
+        // Primeiro perfil (role) de cada utilizador, para agrupar quem não tem equipa.
+        $perfis = DB::table('model_has_roles as m')
+            ->join('roles as r', 'r.id', '=', 'm.role_id')
+            ->where('m.model_type', \App\Models\User::class)
+            ->orderBy('r.id')
+            ->get(['m.model_id', 'r.name'])
+            ->unique('model_id')
+            ->pluck('name', 'model_id');
+
         return DB::table('users')
             ->where('activo', true)
             ->when($incluirId, fn ($q) => $q->orWhere('id', $incluirId))
@@ -126,6 +135,7 @@ class Dominios
                 'nome' => $u->name,
                 'abrev' => $u->abrev,
                 'equipa' => $u->equipa,
+                'perfil' => $perfis[$u->id] ?? null,
             ])
             ->all();
     }

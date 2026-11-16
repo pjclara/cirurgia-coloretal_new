@@ -2,7 +2,7 @@ import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/di
 import { router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
-import { Botao, Campo, Seccao, Selecao, estiloEntrada } from '../clinico/campos';
+import { Botao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 
 type Linha = { diagnostico_id: number | ''; modo_id: number | ''; histologia_id: number | ''; data_diagnostico: string };
 
@@ -187,13 +187,8 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
                                     />
                                 </Campo>
                                 <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id} className="sm:col-span-3">
-                                    <Selecao
-                                        id="responsavel"
-                                        opcoes={dominios.responsaveis.map((r) => ({
-                                            id: r.id,
-                                            nome: r.equipa ? `${r.nome} (equipa ${r.equipa})` : r.nome,
-                                        }))}
-                                        valor={data.responsavel_id}
+                                    <SelecaoResponsavel
+                                        id="responsavel" responsaveis={dominios.responsaveis} valor={data.responsavel_id}
                                         aoMudar={(v) => setData('responsavel_id', v)}
                                         invalido={!!erros.responsavel_id}
                                     />

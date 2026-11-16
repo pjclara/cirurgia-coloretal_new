@@ -2,7 +2,7 @@ import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/di
 import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import type { Opcao, Responsavel } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../clinico/campos';
+import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 
 export type PropsAgendar = {
     agendamento: {
@@ -124,10 +124,8 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
                             />
                         </Campo>
                         <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
-                            <Selecao
-                                id="responsavel"
-                                opcoes={dominios.responsaveis.map((r) => ({ id: r.id, nome: r.nome }))}
-                                valor={data.responsavel_id}
+                            <SelecaoResponsavel
+                                id="responsavel" responsaveis={dominios.responsaveis} valor={data.responsavel_id}
                                 aoMudar={(v) => setData('responsavel_id', v)}
                                 invalido={!!erros.responsavel_id}
                             />

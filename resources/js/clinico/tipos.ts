@@ -1,6 +1,6 @@
 export type Opcao = { id: number; nome: string };
 export type OpcaoAgrupada = Opcao & { grupo: string };
-export type Responsavel = { id: number; nome: string; abrev: string | null; equipa: string | null };
+export type Responsavel = { id: number; nome: string; abrev: string | null; equipa: string | null; perfil?: string | null };
 
 /** Dados partilhados pelo ClinicoServiceProvider em todas as páginas. */
 export type Clinico = {

@@ -123,3 +123,46 @@ export function Seccao({ titulo, descricao, children }: { titulo: string; descri
         </section>
     );
 }
+
+type OpcaoResponsavel = { id: number; nome: string; equipa: string | null; perfil?: string | null };
+
+/** Equipas primeiro (A, B) e, a seguir, quem não tem equipa agrupado por perfil. */
+function gruposResponsaveis(lista: OpcaoResponsavel[]): [string, OpcaoResponsavel[]][] {
+    const grupos = new Map<string, OpcaoResponsavel[]>();
+    const add = (g: string, r: OpcaoResponsavel) => grupos.set(g, [...(grupos.get(g) ?? []), r]);
+    for (const e of ['A', 'B']) lista.filter((r) => r.equipa === e).forEach((r) => add(`Equipa ${e}`, r));
+    lista.filter((r) => r.equipa !== 'A' && r.equipa !== 'B').forEach((r) => add(r.perfil ? `Perfil: ${r.perfil}` : 'Sem equipa nem perfil', r));
+    return [...grupos.entries()];
+}
+
+type PropsResponsavel = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange'> & {
+    responsaveis: OpcaoResponsavel[];
+    valor: number | '';
+    aoMudar: (valor: number | '') => void;
+    vazio?: string;
+    invalido?: boolean;
+};
+
+/** Lista de responsáveis agrupada por equipa e, depois, por perfil. */
+export function SelecaoResponsavel({ responsaveis, valor, aoMudar, vazio = 'Escolher…', invalido, className = '', ...resto }: PropsResponsavel) {
+    return (
+        <select
+            {...resto}
+            className={`${estiloEntrada} ${className}`}
+            aria-invalid={invalido || undefined}
+            value={valor === '' ? '' : String(valor)}
+            onChange={(e) => aoMudar(e.target.value === '' ? '' : Number(e.target.value))}
+        >
+            <option value="">{vazio}</option>
+            {gruposResponsaveis(responsaveis).map(([grupo, lista]) => (
+                <optgroup key={grupo} label={grupo}>
+                    {lista.map((r) => (
+                        <option key={r.id} value={r.id}>
+                            {r.nome}
+                        </option>
+                    ))}
+                </optgroup>
+            ))}
+        </select>
+    );
+}

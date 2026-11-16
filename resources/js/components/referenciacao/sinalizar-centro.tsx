@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useForm, usePage } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { hojeIso } from '../../clinico/formato';
-import { Botao, Campo, Selecao, estiloEntrada } from '../clinico/campos';
+import { Botao, Campo, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 
 /** Sinalização rápida para o centro de referência: só a origem e a data; o resto preenche-se depois. */
 export function SinalizarCentro({
@@ -56,10 +56,8 @@ export function SinalizarCentro({
                         />
                     </Campo>
                     <Campo rotulo="Médico responsável" para="sin-medico" erro={erros.responsavel_id}>
-                        <Selecao
-                            id="sin-medico"
-                            opcoes={responsaveis.map((r) => ({ id: r.id, nome: r.equipa ? `${r.nome} (equipa ${r.equipa})` : r.nome }))}
-                            valor={form.data.responsavel_id}
+                        <SelecaoResponsavel
+                            id="sin-medico" responsaveis={responsaveis} valor={form.data.responsavel_id}
                             aoMudar={(v) => form.setData('responsavel_id', v)}
                             vazio="Eu (quem está a registar)"
                             invalido={!!erros.responsavel_id}

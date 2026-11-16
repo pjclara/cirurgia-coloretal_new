@@ -14,7 +14,7 @@ import {
     type ResumoUtente,
 } from '../../clinico/tipos';
 import { type BlocoMorbilidade, type Momento } from '../../components/clinico/bloco-morbilidade';
-import { Botao, BotaoLigacao, Campo, Seccao, Selecao, estiloEntrada } from '../../components/clinico/campos';
+import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../../components/clinico/campos';
 import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
 import { MomentoMorbilidade } from '../../components/clinico/momento-morbilidade';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
@@ -500,12 +500,9 @@ export function FormularioInternamento({
                                             />
                                         </Campo>
                                         <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id} className="sm:col-span-2">
-                                            <Selecao
+                                            <SelecaoResponsavel
                                                 id="responsavel"
-                                                opcoes={dominios.responsaveis.map((r) => ({
-                                                    id: r.id,
-                                                    nome: r.equipa ? `${r.nome} (equipa ${r.equipa})` : r.nome,
-                                                }))}
+                                                responsaveis={dominios.responsaveis}
                                                 valor={data.responsavel_id}
                                                 aoMudar={(v) => setData('responsavel_id', v)}
                                                 invalido={!!erros.responsavel_id}
