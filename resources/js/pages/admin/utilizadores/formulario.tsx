@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { Botao, BotaoLigacao, Campo, Seccao, estiloEntrada } from '../../../components/clinico/campos';
 import ClinicoLayout from '../../../layouts/clinico-layout';
 
-type Utilizador = {
+export type Utilizador = {
     id: number;
     name: string;
     username: string;
@@ -15,18 +15,28 @@ type Utilizador = {
     proprio: boolean;
 };
 
-type Props = { utilizador: Utilizador | null; perfis: string[]; perfisReservados: string[]; temMudarPassword: boolean };
+export type PropsConta = { utilizador: Utilizador | null; perfis: string[]; perfisReservados: string[]; temMudarPassword: boolean };
+type Props = PropsConta;
+type PropsFormulario = PropsConta & { aoGuardar?: () => void; aoCancelar?: () => void };
 
-export default function FormularioUtilizador({ utilizador, perfis, perfisReservados, temMudarPassword }: Props) {
+export default function FormularioUtilizador(props: Props) {
+    return (
+        <ClinicoLayout titulo={props.utilizador ? 'Editar conta' : 'Nova conta'} subtitulo={props.utilizador?.email}>
+            <FormularioConta {...props} />
+        </ClinicoLayout>
+    );
+}
+
+export function FormularioConta({ utilizador, perfis, perfisReservados, temMudarPassword, aoGuardar, aoCancelar }: PropsFormulario) {
     const form = useForm({
         name: utilizador?.name ?? '',
         username: utilizador?.username ?? '',
         abrev: utilizador?.abrev ?? '',
         email: utilizador?.email ?? '',
         equipa: utilizador?.equipa ?? '',
-        activo: utilizador?.activo ?? true,
+        activo: (utilizador?.activo ?? true) as boolean,
         password: '',
-        mudar_password: true,
+        mudar_password: true as boolean,
         roles: utilizador?.roles ?? ([] as string[]),
     });
     const { data, setData, processing } = form;
@@ -37,12 +47,13 @@ export default function FormularioUtilizador({ utilizador, perfis, perfisReserva
 
     const guardar = (e: FormEvent) => {
         e.preventDefault();
-        if (utilizador) form.put(`/admin/utilizadores/${utilizador.id}`, { preserveScroll: true });
-        else form.post('/admin/utilizadores', { preserveScroll: true });
+        const opcoes = { preserveScroll: true, onSuccess: () => aoGuardar?.() };
+        if (utilizador) form.put(`/admin/utilizadores/${utilizador.id}`, opcoes);
+        else form.post('/admin/utilizadores', opcoes);
     };
 
     return (
-        <ClinicoLayout titulo={utilizador ? 'Editar conta' : 'Nova conta'} subtitulo={utilizador?.email}>
+        <>
             <form onSubmit={guardar} noValidate className="max-w-3xl space-y-5">
                 <Seccao titulo="Dados">
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -119,12 +130,18 @@ export default function FormularioUtilizador({ utilizador, perfis, perfisReserva
                     <Botao type="submit" disabled={processing}>
                         {utilizador ? 'Guardar alterações' : 'Criar conta'}
                     </Botao>
-                    <BotaoLigacao href="/admin/utilizadores" variante="secundario">
-                        Cancelar
-                    </BotaoLigacao>
+                    {aoCancelar ? (
+                        <Botao variante="secundario" onClick={aoCancelar}>
+                            Cancelar
+                        </Botao>
+                    ) : (
+                        <BotaoLigacao href="/admin/utilizadores" variante="secundario">
+                            Cancelar
+                        </BotaoLigacao>
+                    )}
                 </div>
             </form>
-        </ClinicoLayout>
+        </>
     );
 }
 

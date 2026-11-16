@@ -39,6 +39,8 @@ class UtilizadorController extends Controller
             ->through(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
+                'username' => $u->username ?? '',
+                'proprio' => $u->is($request->user()),
                 'email' => $u->email,
                 'abrev' => $u->abrev,
                 'equipa' => $u->equipa,
@@ -50,6 +52,9 @@ class UtilizadorController extends Controller
         return Inertia::render('admin/utilizadores/index', [
             'utilizadores' => $utilizadores,
             'filtros' => ['q' => $q, 'estado' => $estado],
+            'perfis' => Role::orderBy('id')->pluck('name')->values(),
+            'perfisReservados' => $request->user()->hasRole('superAdmin') ? [] : self::PERFIS_RESERVADOS,
+            'temMudarPassword' => Schema::hasColumn('users', 'must_change_password'),
         ]);
     }
 

@@ -2,11 +2,14 @@ import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatarData } from '../../../clinico/formato';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../../components/clinico/campos';
+import { FormularioConta } from './formulario';
 import ClinicoLayout from '../../../layouts/clinico-layout';
 
 type Linha = {
     id: number;
     name: string;
+    username: string;
+    proprio: boolean;
     email: string;
     abrev: string | null;
     equipa: string | null;
@@ -18,10 +21,14 @@ type Linha = {
 type Props = {
     utilizadores: { data: Linha[]; links: { url: string | null; label: string; active: boolean }[]; total: number };
     filtros: { q: string; estado: 'todos' | 'ativos' | 'inativos' };
+    perfis: string[];
+    perfisReservados: string[];
+    temMudarPassword: boolean;
 };
 
-export default function ListaUtilizadores({ utilizadores, filtros }: Props) {
+export default function ListaUtilizadores({ utilizadores, filtros, perfis, perfisReservados, temMudarPassword }: Props) {
     const [q, setQ] = useState(filtros.q);
+    const [aEditar, setAEditar] = useState<Linha | null>(null);
 
     const filtrar = (novos: Partial<Props['filtros']>) =>
         router.get('/admin/utilizadores', { ...filtros, ...novos }, { preserveState: true, replace: true });
@@ -67,15 +74,18 @@ export default function ListaUtilizadores({ utilizadores, filtros }: Props) {
                             <th className="px-4 py-2 font-medium">Perfis</th>
                             <th className="px-4 py-2 font-medium">Último acesso</th>
                             <th className="px-4 py-2 font-medium">Estado</th>
+                            <th className="px-4 py-2 font-medium">
+                                <span className="sr-only">Ações</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {utilizadores.data.map((u) => (
                             <tr key={u.id} className={u.activo ? '' : 'text-slate-500'}>
                                 <td className="px-4 py-2">
-                                    <Link href={`/admin/utilizadores/${u.id}`} className="font-medium text-[#7d1830] hover:underline">
+                                    <button type="button" onClick={() => setAEditar(u)} className="font-medium text-[#7d1830] hover:underline">
                                         {u.name}
-                                    </Link>
+                                    </button>
                                     {u.abrev && <span className="ml-2 text-xs text-slate-500">{u.abrev}</span>}
                                 </td>
                                 <td className="px-4 py-2">{u.email}</td>
@@ -89,11 +99,21 @@ export default function ListaUtilizadores({ utilizadores, filtros }: Props) {
                                         {u.activo ? 'Ativa' : 'Desativada'}
                                     </span>
                                 </td>
+                                <td className="px-4 py-2 text-right">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAEditar(u)}
+                                        className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50"
+                                        aria-label={`Editar ${u.name}`}
+                                    >
+                                        Editar
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                         {utilizadores.data.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="px-4 py-6 text-center text-slate-600">
+                                <td colSpan={7} className="px-4 py-6 text-center text-slate-600">
                                     Nenhuma conta encontrada.
                                 </td>
                             </tr>
@@ -114,6 +134,27 @@ export default function ListaUtilizadores({ utilizadores, filtros }: Props) {
                         />
                     ))}
                 </nav>
+            )}
+
+            {aEditar && (
+                <div
+                    className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4"
+                    onMouseDown={(e) => e.target === e.currentTarget && setAEditar(null)}
+                    onKeyDown={(e) => e.key === 'Escape' && setAEditar(null)}
+                >
+                    <div role="dialog" aria-modal="true" aria-label={`Editar ${aEditar.name}`} className="my-8 w-full max-w-3xl rounded-lg bg-slate-50 p-5 shadow-xl">
+                        <h2 className="mb-4 text-lg font-semibold text-slate-900">Editar conta</h2>
+                        <FormularioConta
+                            key={aEditar.id}
+                            utilizador={{ ...aEditar, abrev: aEditar.abrev ?? '', equipa: aEditar.equipa ?? '' }}
+                            perfis={perfis}
+                            perfisReservados={perfisReservados}
+                            temMudarPassword={temMudarPassword}
+                            aoGuardar={() => setAEditar(null)}
+                            aoCancelar={() => setAEditar(null)}
+                        />
+                    </div>
+                </div>
             )}
         </ClinicoLayout>
     );
