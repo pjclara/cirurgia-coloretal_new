@@ -193,6 +193,7 @@ export function FormularioInternamento({
     const erros = form.errors as Record<string, string | undefined>;
 
     const [separador, setSeparador] = useState<Separador>('dados');
+    const [momentoAtivo, setMomentoAtivo] = useState<Momento>('alta');
     const [tentouAlta, setTentouAlta] = useState(false);
     const obito = data.destino_id === DESTINO_FALECIDO;
     const temComplicacaoReal = (m: Momento) => data.morbilidade[m].complicacoes.some((c) => c.id !== SEM_COMPLICACOES);
@@ -594,8 +595,38 @@ export function FormularioInternamento({
                             titulo="Morbilidade"
                             descricao="Escolha “Sem complicações” ou “Com complicações”. O grau de Clavien-Dindo calcula-se pelas resoluções."
                         >
-                            <div className="grid items-start gap-4 lg:grid-cols-2">
-                                {MOMENTOS.map((m) => (
+                            <div role="tablist" aria-label="Momento da morbilidade" className="mb-3 flex gap-1 border-b border-slate-200">
+                                {MOMENTOS.map((m) => {
+                                    const bloco = data.morbilidade[m.id];
+                                    const resumo =
+                                        bloco.complicacoes.length === 0
+                                            ? 'por registar'
+                                            : bloco.complicacoes.every((c) => c.id === SEM_COMPLICACOES)
+                                              ? 'sem complicações'
+                                              : `${bloco.complicacoes.length} complicaç${bloco.complicacoes.length === 1 ? 'ão' : 'ões'}`;
+                                    const comErro = Object.keys(erros).some((k) => k.startsWith(`morbilidade.${m.id}.`));
+                                    return (
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={momentoAtivo === m.id}
+                                            onClick={() => setMomentoAtivo(m.id)}
+                                            className={`-mb-px flex items-baseline gap-2 border-b-2 px-4 py-2 text-sm ${
+                                                momentoAtivo === m.id
+                                                    ? 'border-[#a3213e] font-semibold text-slate-900'
+                                                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            {m.rotulo}
+                                            <span className="text-xs font-normal text-slate-500">{resumo}</span>
+                                            {comErro && <span className="text-rose-700">!</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div>
+                                {MOMENTOS.filter((m) => m.id === momentoAtivo).map((m) => (
                                     <MomentoMorbilidade
                                         key={m.id}
                                         id={`morbilidade-${m.id}`}

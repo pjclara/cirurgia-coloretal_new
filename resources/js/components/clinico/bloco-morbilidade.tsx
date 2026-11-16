@@ -80,69 +80,75 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
                 </Campo>
             )}
 
-            <EscolhaMultipla
-                opcoes={dominios.complicacoes}
-                valor={ids}
-                aoMudar={mudarComplicacoes}
-                procurar="Procurar complicação"
-                desativado={desativado}
-                vazio="Nenhuma complicação registada."
-            />
-            {erros.complicacoes && (
-                <p className="mt-2 text-sm text-rose-700" role="alert">
-                    {erros.complicacoes}
-                </p>
-            )}
-
-            {temReal && (
-                <div className="mt-5 space-y-4 border-t border-slate-200 pt-4">
-                    {bloco.complicacoes
-                        .filter((c) => c.id !== SEM_COMPLICACOES)
-                        .map((c) => (
-                            <fieldset key={c.id}>
-                                <legend className="text-sm font-medium text-slate-800">Como foi resolvida: {nome(c.id)}</legend>
-                                <div className="mt-1.5 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
-                                    {dominios.resolucoes.map((r) => (
-                                        <label key={r.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                className="size-4 accent-teal-800"
-                                                checked={c.resolucoes.includes(r.id)}
-                                                onChange={() => alternarResolucao(c.id, r.id)}
-                                                disabled={desativado}
-                                            />
-                                            {r.nome}
-                                            {r.clavien_dindo_id && <span className="text-xs text-slate-500">({nomeGrau(r.clavien_dindo_id)})</span>}
-                                        </label>
-                                    ))}
-                                </div>
-                            </fieldset>
-                        ))}
-
-                    <Campo
-                        rotulo="Grau de Clavien-Dindo"
-                        para={`${id}-clavien`}
-                        erro={erros.clavien}
-                        ajuda={
-                            clavienFixo
-                                ? 'Óbito com complicação: fica registado como grau 5.'
-                                : sugerido !== null
-                                  ? `Calculado pelas resoluções (${nomeGrau(sugerido)}, o mais alto). Pode ajustar.`
-                                  : 'Sem resolução com grau associado: escolha o grau mais alto entre as complicações.'
-                        }
-                        className="max-w-xs"
-                    >
-                        <Selecao
-                            id={`${id}-clavien`}
-                            opcoes={dominios.clavien}
-                            valor={clavienFixo ? CLAVIEN_GRAU_5 : bloco.clavien_dindo_id}
-                            aoMudar={(v) => aoMudar({ ...bloco, clavien_dindo_id: v })}
-                            disabled={clavienFixo || desativado}
-                            invalido={!!erros.clavien}
-                        />
-                    </Campo>
+            <div className={temReal ? 'grid items-start gap-5 lg:grid-cols-2' : ''}>
+                <div>
+                    <EscolhaMultipla
+                        opcoes={dominios.complicacoes}
+                        valor={ids}
+                        aoMudar={mudarComplicacoes}
+                        procurar="Procurar complicação"
+                        desativado={desativado}
+                        vazio="Nenhuma complicação registada."
+                    />
+                    {erros.complicacoes && (
+                        <p className="mt-2 text-sm text-rose-700" role="alert">
+                            {erros.complicacoes}
+                        </p>
+                    )}
                 </div>
-            )}
+
+                {temReal && (
+                    <div className="space-y-3">
+                        {bloco.complicacoes
+                            .filter((c) => c.id !== SEM_COMPLICACOES)
+                            .map((c) => (
+                                <fieldset key={c.id} className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
+                                    <legend className="px-1 text-sm font-medium text-slate-800">Como foi resolvida: {nome(c.id)}</legend>
+                                    <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                                        {dominios.resolucoes.map((r) => (
+                                            <label key={r.id} className="flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+                                                <input
+                                                    type="checkbox"
+                                                    className="size-4 accent-teal-800"
+                                                    checked={c.resolucoes.includes(r.id)}
+                                                    onChange={() => alternarResolucao(c.id, r.id)}
+                                                    disabled={desativado}
+                                                />
+                                                {r.nome}
+                                                {r.clavien_dindo_id && (
+                                                    <span className="text-xs text-slate-500">({nomeGrau(r.clavien_dindo_id)})</span>
+                                                )}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </fieldset>
+                            ))}
+
+                        <Campo
+                            rotulo="Grau de Clavien-Dindo"
+                            para={`${id}-clavien`}
+                            erro={erros.clavien}
+                            ajuda={
+                                clavienFixo
+                                    ? 'Óbito com complicação: fica registado como grau 5.'
+                                    : sugerido !== null
+                                      ? `Calculado pelas resoluções (${nomeGrau(sugerido)}, o mais alto). Pode ajustar.`
+                                      : 'Sem resolução com grau associado: escolha o grau mais alto entre as complicações.'
+                            }
+                            className="max-w-xs"
+                        >
+                            <Selecao
+                                id={`${id}-clavien`}
+                                opcoes={dominios.clavien}
+                                valor={clavienFixo ? CLAVIEN_GRAU_5 : bloco.clavien_dindo_id}
+                                aoMudar={(v) => aoMudar({ ...bloco, clavien_dindo_id: v })}
+                                disabled={clavienFixo || desativado}
+                                invalido={!!erros.clavien}
+                            />
+                        </Campo>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
