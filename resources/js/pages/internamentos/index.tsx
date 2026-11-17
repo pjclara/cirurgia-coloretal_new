@@ -162,7 +162,7 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                             return (
                                 <tr key={i.id} className="hover:bg-slate-50">
                                     <td className="px-4 py-2.5">
-                                        <Link href={rotas.internamentos.registo(i.id)} className="font-medium text-teal-800 hover:underline">
+                                        <Link href={rotas.internamentos.naLista(i.id)} className="font-medium text-teal-800 hover:underline">
                                             {i.utente.nome ?? 'Utente sem ficha'}
                                         </Link>
                                         <span className="block text-xs text-slate-600 tabular-nums">

@@ -1,6 +1,7 @@
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link, router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { corDaCirurgia } from '../../clinico/cor-cirurgia';
 import { diasEntre, formatarData, idade, plural } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import {
@@ -110,7 +111,7 @@ export type PropsFormulario = {
     limites: { data_minima: string; hoje: string };
 };
 
-type Props = PropsFormulario & { aoFechar?: () => void; origem?: 'quadro' };
+type Props = PropsFormulario & { aoFechar?: () => void; origem?: 'quadro' | 'lista' };
 
 /** Página completa ou, com `modal`, apenas o cabeçalho e o conteúdo para uma janela modal. */
 function Quadro({
@@ -210,6 +211,24 @@ export function FormularioInternamento({
             data_de_alta: valor,
             data_de_saida: valor ? atual.data_de_saida || valor : '',
             estado_da_alta_id: valor && !aguardaRevisao ? (atual.data_de_alta ? atual.estado_da_alta_id : ALTA_CONCLUIDA) : ALTA_PENDENTE,
+        }));
+    };
+
+    /** Cancelar a alta: o doente volta a estar internado. Limpa a alta e o seguimento aos 30 dias; fica por guardar. */
+    const cancelarAlta = () => {
+        if (
+            !window.confirm(
+                'Cancelar a alta? O doente volta a ficar internado e o seguimento aos 30 dias registado é retirado. Só fica guardado ao carregar em "Guardar".',
+            )
+        )
+            return;
+        setData((atual) => ({
+            ...atual,
+            data_de_alta: '',
+            data_de_saida: '',
+            destino_id: '',
+            estado_da_alta_id: ALTA_PENDENTE,
+            morbilidade: { ...atual.morbilidade, '30_dias': { complicacoes: [], clavien_dindo_id: '', data_registo: '' } },
         }));
     };
 
@@ -386,7 +405,7 @@ export function FormularioInternamento({
                             {listaCirurgias.map((c, n) => {
                                 const texto = `${formatarData(c.data)}${c.tipo ? ` (${c.tipo})` : ''}${c.intervencoes.length > 0 ? `: ${c.intervencoes.join(', ')}` : ''}`;
                                 return (
-                                    <li key={n} className="text-sm font-medium text-[#7d1830]">
+                                    <li key={n} className={`text-sm font-medium ${corDaCirurgia(c.tipo).texto}`}>
                                         {c.id ? (
                                             <Link
                                                 href={origem === 'quadro' ? `/quadro/cirurgias/${c.id}` : `/cirurgias/${c.id}`}
@@ -662,6 +681,14 @@ export function FormularioInternamento({
                             descricao="Deixe a data de alta vazia enquanto o doente estiver internado. As complicações da alta registam-se em Morbilidade."
                         >
                             {painelDeAlta}
+                            {podeEditar && data.data_de_alta && (
+                                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                    <span>Pode corrigir os dados da alta aqui em baixo ou cancelá-la, se foi dada por engano.</span>
+                                    <Botao variante="perigo" onClick={cancelarAlta}>
+                                        Cancelar alta
+                                    </Botao>
+                                </div>
+                            )}
                             <div className="grid gap-4 sm:grid-cols-6">
                                 <Campo rotulo="Data de alta" para="data_de_alta" erro={erros.data_de_alta} className="sm:col-span-2">
                                     <input

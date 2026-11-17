@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { corDaCirurgia } from '../../clinico/cor-cirurgia';
 import { diasEntre, idade, plural } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { PropsPartilhadas } from '../../clinico/tipos';
@@ -94,7 +95,7 @@ function Cama({ internado, hoje, equipa, podeCriar }: { internado: Internado; ho
                         href={`/quadro/cirurgias/${c.id}`}
                         preserveScroll
                         title="Abrir a cirurgia"
-                        className="relative z-10 mx-3 mt-2 block rounded bg-[#a3213e]/10 px-2 py-1 text-xs font-medium text-[#7d1830] hover:bg-[#a3213e]/20 focus-visible:outline-2 focus-visible:outline-[#7d1830]"
+                        className={`relative z-10 mx-3 mt-2 block rounded px-2 py-1 text-xs font-medium focus-visible:outline-2 ${corDaCirurgia(c.tipo).chip}`}
                     >
                         Cirurgia {c.data.split('-').reverse().join('/')}
                         {c.tipo ? ` (${c.tipo})` : ''}

@@ -18,5 +18,7 @@ export const rotas = {
         seguimentos: '/internamentos/seguimentos',
         novo: (utenteId?: number) => (utenteId ? `/quadro/novo?utente=${utenteId}` : '/quadro/novo'),
         registo: (id: number) => `/internamentos/${id}`,
+        /** Abre o internamento numa modal por cima da lista. */
+        naLista: (id: number) => `/internamentos/${id}/editar`,
     },
 };

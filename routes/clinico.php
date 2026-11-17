@@ -51,6 +51,7 @@ Route::middleware('can:create internamento')->group(function () {
 Route::middleware('can:show internamento')->group(function () {
     Route::get('utentes/{utente}', [UtenteController::class, 'show'])->whereNumber('utente')->name('utentes.show');
     Route::get('internamentos/{internamento}', [InternamentoController::class, 'edit'])->whereNumber('internamento')->name('internamentos.edit');
+    Route::get('internamentos/{internamento}/editar', [InternamentoController::class, 'editarNaLista'])->whereNumber('internamento')->name('internamentos.editar-na-lista');
 });
 
 Route::middleware('can:update internamento')->group(function () {

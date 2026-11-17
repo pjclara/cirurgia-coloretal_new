@@ -177,6 +177,17 @@ class InternamentoController extends Controller
             ->with('sucesso', 'Internamento criado.');
     }
 
+    /** A lista de internamentos com alta e o formulário do internamento numa modal por cima (editar a alta sem sair da lista). */
+    public function editarNaLista(Request $request, Internamento $internamento): Response
+    {
+        $consulta = $request->getQueryString();
+
+        return $this->montarIndex($request, $this->propsEdicao($request, $internamento) + [
+            'fechar_url' => '/internamentos'.($consulta ? '?'.$consulta : ''),
+            'origem' => 'lista',
+        ]);
+    }
+
     public function edit(Request $request, Internamento $internamento): Response
     {
         return Inertia::render('internamentos/formulario', $this->propsEdicao($request, $internamento));
@@ -242,9 +253,12 @@ class InternamentoController extends Controller
 
         $guardar->executar($internamento, $request->validated());
 
-        // Gravado a partir da modal do quadro: volta ao quadro.
+        // Gravado a partir de uma modal: volta à página que a abriu.
         if ($request->input('origem') === 'quadro') {
             return redirect()->route('quadro')->with('sucesso', 'Alterações guardadas.');
+        }
+        if ($request->input('origem') === 'lista') {
+            return redirect()->route('internamentos.index')->with('sucesso', 'Alterações guardadas.');
         }
 
         return redirect()
