@@ -72,12 +72,16 @@ class Internamento extends Model
         return $this->hasMany(Morbilidade::class);
     }
 
-    /** Grau de Clavien-Dindo mais grave entre a alta e os 30 dias (null se não houver). */
+    /**
+     * Grau de Clavien-Dindo definitivo: só existe depois do seguimento aos 30 dias (que completa o registo da alta).
+     * Quem faleceu com complicação não tem seguimento: vale o grau 5 da alta. Antes disso, null.
+     */
     public function claviemMaisGrave(): ?int
     {
-        $graus = $this->morbilidades->whereIn('momento', Morbilidade::MOMENTOS)->pluck('clavien_dindo_id')->filter(fn ($g) => $g && $g !== Morbilidade::CLAVIEN_A_AGUARDAR);
+        $momento = (int) $this->destino_id === self::DESTINO_FALECIDO ? Morbilidade::NA_ALTA : Morbilidade::AOS_30_DIAS;
+        $grau = $this->morbilidades->firstWhere('momento', $momento)?->clavien_dindo_id;
 
-        return $graus->isEmpty() ? null : (int) $graus->max();
+        return $grau && $grau !== Morbilidade::CLAVIEN_A_AGUARDAR ? (int) $grau : null;
     }
 
     /** Tem cirurgias registadas (não apagadas). */

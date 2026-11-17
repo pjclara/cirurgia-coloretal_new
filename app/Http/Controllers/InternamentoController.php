@@ -34,7 +34,7 @@ class InternamentoController extends Controller
         ];
 
         $internamentos = Internamento::query()
-            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
+            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->comAlta() // esta lista é só para gerir altas; os internados estão no quadro
             ->when($filtros['ano'], fn ($q, $ano) => $q->whereYear('data_de_entrada', $ano))
             ->when($filtros['localizacao_id'], fn ($q, $id) => $q->where('localizacao_id', $id))
@@ -100,7 +100,7 @@ class InternamentoController extends Controller
         $aDecorrer = (clone $base)->whereDate('data_de_alta', '>=', $limiteAtraso)->count();
 
         $lista = (clone $base)
-            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,clavien_dindo_id'])
+            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->when($estado === 'em_atraso', fn ($q) => $q->whereDate('data_de_alta', '<', $limiteAtraso))
             ->when($estado === 'a_decorrer', fn ($q) => $q->whereDate('data_de_alta', '>=', $limiteAtraso))
             ->orderBy('data_de_alta')
@@ -119,7 +119,6 @@ class InternamentoController extends Controller
                     // positivo = dias de atraso; negativo = dias que faltam
                     'dias_de_atraso' => (int) $prevista->startOfDay()->diffInDays($hoje, false),
                     'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
-                    'clavien' => Dominios::nome('clavien_dindos', $i->claviemMaisGrave()),
                     'bloqueado' => $i->bloquear_tabela && ! $administrador,
                 ];
             });
@@ -312,9 +311,6 @@ class InternamentoController extends Controller
         }
         if ($temSem && $temReal) {
             throw ValidationException::withMessages(['complicacoes' => '"Sem complicações" não pode ser escolhida em conjunto com outras complicações.']);
-        }
-        if ($temReal && empty($dados['clavien_dindo_id']) && Morbilidade::grauPelasResolucoes($dados['complicacoes']) === null) {
-            throw ValidationException::withMessages(['clavien_dindo_id' => 'Indique o grau de Clavien-Dindo das complicações registadas.']);
         }
 
         $guardar->registarSeguimento($internamento, $dados);

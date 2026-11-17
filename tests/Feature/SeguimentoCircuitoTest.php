@@ -42,23 +42,31 @@ test('registar "sem complicações" grava o seguimento e tira-o da lista', funct
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 0));
 });
 
-test('com complicação, o grau calcula-se pela resolução, e o escolhido à mão prevalece', function () {
+test('com complicação, o grau definitivo calcula-se pelas resoluções e o indicado à mão é ignorado', function () {
     $resolucao = (int) DB::table('resolucao_complicacaos')->where('clavien_dindo_id', 3)->value('id');
     $corpo = ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => [$resolucao]]]];
 
-    registarSeguimento($this, $this->internamento, $corpo)->assertSessionHasNoErrors();
+    registarSeguimento($this, $this->internamento, $corpo + ['clavien_dindo_id' => 6])->assertSessionHasNoErrors();
     expect($this->internamento->morbilidades()->where('momento', '30_dias')->value('clavien_dindo_id'))->toBe(3);
 
-    registarSeguimento($this, $this->internamento, $corpo + ['clavien_dindo_id' => 6])->assertSessionHasNoErrors();
-    expect($this->internamento->morbilidades()->where('momento', '30_dias')->count())->toBe(1)
-        ->and($this->internamento->morbilidades()->where('momento', '30_dias')->value('clavien_dindo_id'))->toBe(6);
+    registarSeguimento($this, $this->internamento, $corpo)->assertSessionHasNoErrors();
+    expect($this->internamento->morbilidades()->where('momento', '30_dias')->count())->toBe(1);
 });
 
-test('complicação sem resolução com grau exige o grau de Clavien-Dindo', function () {
-    registarSeguimento($this, $this->internamento, ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]]])
-        ->assertSessionHasErrors('clavien_dindo_id');
+test('o seguimento junta as resoluções da alta: vale o grau mais alto dos dois momentos', function () {
+    $alta = $this->internamento->morbilidades()->create(['momento' => 'alta']);
+    $alta->complicacoes()->sync([$this->complicacao => ['resolucao' => json_encode([(string) DB::table('resolucao_complicacaos')->where('clavien_dindo_id', 5)->value('id')])]]);
 
-    expect($this->internamento->morbilidades()->count())->toBe(0);
+    registarSeguimento($this, $this->internamento)->assertSessionHasNoErrors();
+
+    expect($this->internamento->fresh()->load('morbilidades')->claviemMaisGrave())->toBe(5);
+});
+
+test('complicação sem resolução com grau regista-se sem grau definitivo', function () {
+    registarSeguimento($this, $this->internamento, ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]]])
+        ->assertSessionHasNoErrors();
+
+    expect($this->internamento->fresh()->load('morbilidades')->claviemMaisGrave())->toBeNull();
 });
 
 test('"sem complicações" não vem com outras e é preciso escolher uma opção', function () {

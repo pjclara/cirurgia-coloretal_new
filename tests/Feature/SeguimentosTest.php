@@ -49,3 +49,12 @@ test('por defeito só mostra altas dos últimos 90 dias', function () {
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 0));
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?periodo=365')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 1));
 });
+
+test('a lista não mostra o grau da alta: o grau definitivo só existe depois dos 30 dias', function () {
+    $i = internamentoComAlta($this, 40);
+    $i->morbilidades()->create(['momento' => 'alta', 'clavien_dindo_id' => 3]);
+
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p
+        ->missing('seguimentos.data.0.clavien'));
+    expect($i->fresh()->load('morbilidades')->claviemMaisGrave())->toBeNull();
+});

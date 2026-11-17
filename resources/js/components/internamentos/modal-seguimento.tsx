@@ -13,7 +13,7 @@ export type LinhaSeguimento = {
     motivo: string;
     data_de_alta: string;
     prevista: string;
-    clavien: string | null;
+    clavien?: string | null;
 };
 
 type Props = {
@@ -76,10 +76,7 @@ export function ModalSeguimento({ linha, dominios, temSeguinte, aoFechar, aoGuar
                             <p>
                                 Alta a {formatarData(linha.data_de_alta)} · seguimento previsto a {formatarData(linha.prevista)}
                             </p>
-                            <p className="truncate">
-                                {linha.motivo}
-                                {linha.clavien && <span className="text-rose-800"> · Clavien-Dindo no internamento: {linha.clavien}</span>}
-                            </p>
+                            <p className="truncate">{linha.motivo}</p>
                         </div>
                     </DialogDescription>
                 </DialogHeader>

@@ -152,8 +152,6 @@ class InternamentoRequest extends FormRequest
     /** Cada momento é validado à parte; um momento sem complicações escolhidas conta como não registado. */
     private function validarMorbilidade(Validator $validator): void
     {
-        $destinoFalecido = (int) $this->destino_id === Internamento::DESTINO_FALECIDO;
-
         foreach ($this->input('morbilidade', []) as $momento => $bloco) {
             if (! in_array($momento, Morbilidade::MOMENTOS, true)) {
                 $validator->errors()->add('morbilidade', 'Momento de morbilidade desconhecido.');
@@ -175,13 +173,6 @@ class InternamentoRequest extends FormRequest
 
             if ($temSem && $temReal) {
                 $validator->errors()->add("morbilidade.$momento.complicacoes", '"Sem complicações" não pode ser escolhida em conjunto com outras complicações.');
-            }
-
-            // Óbito com complicação na alta fica automaticamente em grau 5.
-            $grauAutomatico = ($momento === Morbilidade::NA_ALTA && $destinoFalecido)
-                || Morbilidade::grauPelasResolucoes($bloco['complicacoes'] ?? []) !== null; // calculado pelas resoluções
-            if ($temReal && empty($bloco['clavien_dindo_id']) && ! $grauAutomatico) {
-                $validator->errors()->add("morbilidade.$momento.clavien_dindo_id", 'Indique o grau de Clavien-Dindo das complicações registadas.');
             }
 
             if ($momento === Morbilidade::AOS_30_DIAS && ! $this->data_de_alta) {

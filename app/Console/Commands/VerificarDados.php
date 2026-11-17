@@ -81,9 +81,9 @@ class VerificarDados extends Command
             DB::table('utentes')->whereNull('deleted_at')->whereNotNull('numero_utente')
                 ->whereRaw('CHAR_LENGTH(numero_utente) <> 9')->get(['id', 'numero_utente']), 'numero_utente');
 
-        $registar('Complicações registadas sem grau de Clavien-Dindo', 'internamentos',
+        $registar('Seguimento aos 30 dias com complicações sem grau de Clavien-Dindo', 'internamentos',
             DB::table('morbilidades as m')->join('internamentos as i', 'i.id', '=', 'm.internamento_id')
-                ->whereNull('i.deleted_at')->whereIn('m.momento', ['alta', '30_dias'])->whereNull('m.clavien_dindo_id')
+                ->whereNull('i.deleted_at')->where('m.momento', '30_dias')->whereNull('m.clavien_dindo_id')
                 ->whereExists(fn ($q) => $q->select(DB::raw(1))->from('complicacao_morbilidade as c')
                     ->whereColumn('c.morbilidade_id', 'm.id')->where('c.complicacao_id', '<>', 1))
                 ->get(['i.id', 'i.data_de_entrada']), 'data_de_entrada');

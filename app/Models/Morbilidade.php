@@ -55,6 +55,28 @@ class Morbilidade extends Model
         return $grau === null ? null : (int) $grau;
     }
 
+    /**
+     * Grau definitivo do internamento: o mais alto entre as resoluções da alta e dos 30 dias.
+     * Chama-se depois de gravar os dois momentos; só atualiza o registo dos 30 dias.
+     */
+    public static function recalcularGrauDefinitivo(Internamento $internamento): void
+    {
+        $registo = $internamento->morbilidades()->where('momento', self::AOS_30_DIAS)->first();
+        if (! $registo) {
+            return;
+        }
+
+        $complicacoes = DB::table('complicacao_morbilidade as cm')
+            ->join('morbilidades as m', 'm.id', '=', 'cm.morbilidade_id')
+            ->where('m.internamento_id', $internamento->getKey())
+            ->whereIn('m.momento', self::MOMENTOS)
+            ->get(['cm.complicacao_id', 'cm.resolucao'])
+            ->map(fn ($c) => ['id' => $c->complicacao_id, 'resolucoes' => json_decode($c->resolucao ?? '[]', true) ?: []])
+            ->all();
+
+        $registo->update(['clavien_dindo_id' => self::grauPelasResolucoes($complicacoes)]);
+    }
+
     public function internamento(): BelongsTo
     {
         return $this->belongsTo(Internamento::class);

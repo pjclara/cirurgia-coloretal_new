@@ -117,7 +117,7 @@ class UtenteController extends Controller
         $cirurgias = Cirurgias::porInternamento($utente->internamentos()->select('id'));
 
         $internamentos = $utente->internamentos()
-            ->with(['responsavel:id,name,abrev', 'diagnosticos:id,nome', 'morbilidades:id,internamento_id,clavien_dindo_id'])
+            ->with(['responsavel:id,name,abrev', 'diagnosticos:id,nome', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->get()
             ->map(fn (Internamento $i) => [
                 'id' => $i->id,

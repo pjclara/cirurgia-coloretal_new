@@ -72,13 +72,15 @@ class GuardarInternamento
             $complicacoes = collect($dados['complicacoes'])
                 ->mapWithKeys(fn ($c) => [(int) $c['id'] => array_map('strval', $c['resolucoes'] ?? [])]);
             $temReal = $complicacoes->keys()->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
-            $clavien = ! $temReal ? null : ($dados['clavien_dindo_id'] ?? Morbilidade::grauPelasResolucoes($dados['complicacoes']));
+            $clavien = null; // calculado a seguir, com as resoluções da alta e dos 30 dias
 
             $morbilidade = $internamento->morbilidades()->firstOrNew(['momento' => Morbilidade::AOS_30_DIAS]);
             $morbilidade->fill(['data_registo' => $dados['data_registo'], 'clavien_dindo_id' => $clavien])->save();
             $morbilidade->complicacoes()->sync(
                 $complicacoes->map(fn ($resolucoes) => ['resolucao' => $resolucoes === [] ? null : json_encode(array_values($resolucoes))])->all()
             );
+
+            Morbilidade::recalcularGrauDefinitivo($internamento);
 
             $depois = $this->resumoMorbilidade($internamento);
             if ($antes !== $depois) {
@@ -108,11 +110,8 @@ class GuardarInternamento
             }
 
             $temReal = $complicacoes->keys()->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
-            // Clavien-Dindo só existe quando há complicação. Óbito com complicação na alta é grau 5;
-            // o grau escolhido à mão prevalece; sem ele, calcula-se pelas resoluções.
-            $clavien = ! $temReal ? null : ($momento === Morbilidade::NA_ALTA && $obito
-                ? Internamento::CLAVIEN_GRAU_5
-                : ($blocos[$momento]['clavien_dindo_id'] ?? Morbilidade::grauPelasResolucoes($blocos[$momento]['complicacoes'] ?? [])));
+            // Na alta não se guarda grau: o grau definitivo calcula-se aos 30 dias. Óbito com complicação é grau 5.
+            $clavien = $temReal && $momento === Morbilidade::NA_ALTA && $obito ? Internamento::CLAVIEN_GRAU_5 : null;
 
             $morbilidade = $internamento->morbilidades()->firstOrNew(['momento' => $momento]);
             $morbilidade->fill([
@@ -126,6 +125,8 @@ class GuardarInternamento
                 ])->all()
             );
         }
+
+        Morbilidade::recalcularGrauDefinitivo($internamento);
     }
 
     /** Forma comparável do estado da morbilidade, para auditar alterações. */

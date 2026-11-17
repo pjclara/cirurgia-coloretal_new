@@ -49,9 +49,11 @@ test('alta com "sem complicações" e destino é gravada', function () {
         ->and($this->internamento->morbilidades()->where('momento', Morbilidade::NA_ALTA)->exists())->toBeTrue();
 });
 
-test('complicação real exige o grau de Clavien-Dindo', function () {
+test('na alta não se pede nem se guarda o grau de Clavien-Dindo', function () {
     guardar($this, ['morbilidade' => ['alta' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => null]]])
-        ->assertSessionHasErrors('morbilidade.alta.clavien_dindo_id');
+        ->assertSessionHasNoErrors();
+
+    expect($this->internamento->morbilidades()->where('momento', Morbilidade::NA_ALTA)->value('clavien_dindo_id'))->toBeNull();
 });
 
 test('"sem complicações" não pode vir com outras complicações', function () {
@@ -66,22 +68,22 @@ test('a morbilidade aos 30 dias só pode ser registada depois da alta', function
         ->assertSessionHasErrors('morbilidade.30_dias.complicacoes');
 });
 
-test('grava a alta e os 30 dias e o grau mais grave é o maior', function () {
+test('o grau definitivo só existe aos 30 dias e é o mais alto entre as resoluções da alta e dos 30 dias', function () {
     $alta = now()->subDays(35)->format('Y-m-d');
+    $base = ['data_de_alta' => $alta, 'destino_id' => $this->destinoVivo, 'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA];
+    $complicacao = fn (int $grau) => [['id' => $this->complicacao, 'resolucoes' => [resolucaoComGrau($grau)]]];
 
-    guardar($this, [
-        'data_de_alta' => $alta,
-        'destino_id' => $this->destinoVivo,
-        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
-        'morbilidade' => [
-            'alta' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => 2],
-            '30_dias' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => []]], 'clavien_dindo_id' => 3, 'data_registo' => now()->subDays(2)->format('Y-m-d')],
-        ],
-    ])->assertSessionHasNoErrors();
+    // Só com a alta registada ainda não há grau.
+    guardar($this, $base + ['morbilidade' => ['alta' => ['complicacoes' => $complicacao(5)]]])->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->load('morbilidades')->claviemMaisGrave())->toBeNull();
 
-    $internamento = $this->internamento->fresh()->load('morbilidades');
-    expect($internamento->morbilidades)->toHaveCount(2)
-        ->and($internamento->claviemMaisGrave())->toBe(3);
+    // Aos 30 dias completa-se: vale o mais alto entre os dois momentos.
+    guardar($this, $base + ['morbilidade' => [
+        'alta' => ['complicacoes' => $complicacao(5)],
+        '30_dias' => ['complicacoes' => $complicacao(3), 'data_registo' => now()->subDays(2)->format('Y-m-d')],
+    ]])->assertSessionHasNoErrors();
+
+    expect($this->internamento->fresh()->load('morbilidades')->claviemMaisGrave())->toBe(5);
 });
 
 test('óbito com complicação na alta fica em grau 5', function () {
@@ -116,29 +118,20 @@ function morbilidadeInterna(object $t, array $resolucoes, $clavien = null): arra
     return ['morbilidade' => ['alta' => ['complicacoes' => [['id' => $t->complicacao, 'resolucoes' => $resolucoes]], 'clavien_dindo_id' => $clavien]]];
 }
 
-test('o grau de Clavien-Dindo calcula-se pela resolução, sem o indicar', function () {
-    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(3)]))->assertSessionHasNoErrors();
+test('o grau escolhido à mão é ignorado: o grau calcula-se sempre pelas resoluções', function () {
+    $alta = now()->subDays(35)->format('Y-m-d');
 
-    expect($this->internamento->morbilidades()->first()->clavien_dindo_id)->toBe(3);
-});
+    guardar($this, [
+        'data_de_alta' => $alta,
+        'destino_id' => $this->destinoVivo,
+        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
+        'morbilidade' => [
+            'alta' => ['complicacoes' => [['id' => $this->complicacao, 'resolucoes' => [resolucaoComGrau(2), resolucaoComGrau(4), resolucaoComGrau(1)]]], 'clavien_dindo_id' => 7],
+            '30_dias' => ['complicacoes' => [['id' => Complicacao::SEM_COMPLICACOES, 'resolucoes' => []]], 'clavien_dindo_id' => 7, 'data_registo' => now()->subDays(2)->format('Y-m-d')],
+        ],
+    ])->assertSessionHasNoErrors();
 
-test('com várias resoluções vale o grau mais alto', function () {
-    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(2), resolucaoComGrau(4), resolucaoComGrau(1)]))->assertSessionHasNoErrors();
-
-    expect($this->internamento->morbilidades()->first()->clavien_dindo_id)->toBe(4);
-});
-
-test('o grau escolhido à mão prevalece sobre o calculado', function () {
-    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(5)], 6))->assertSessionHasNoErrors();
-
-    expect($this->internamento->morbilidades()->first()->clavien_dindo_id)->toBe(6);
-});
-
-test('sem resolução com grau associado, o grau continua obrigatório', function () {
-    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(null)]))->assertSessionHasErrors('morbilidade.alta.clavien_dindo_id');
-    guardar($this, morbilidadeInterna($this, []))->assertSessionHasErrors('morbilidade.alta.clavien_dindo_id');
-
-    guardar($this, morbilidadeInterna($this, [resolucaoComGrau(null)], 2))->assertSessionHasNoErrors();
+    expect($this->internamento->fresh()->load('morbilidades')->claviemMaisGrave())->toBe(4);
 });
 
 test('o momento antigo "durante o internamento" é recusado e não conta nos graus', function () {

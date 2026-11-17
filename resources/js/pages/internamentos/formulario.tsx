@@ -6,7 +6,6 @@ import { rotas } from '../../clinico/rotas';
 import {
     ALTA_CONCLUIDA,
     ALTA_PENDENTE,
-    DESTINO_FALECIDO,
     SEM_COMPLICACOES,
     type Opcao,
     type OpcaoAgrupada,
@@ -196,8 +195,6 @@ export function FormularioInternamento({
     const [separador, setSeparador] = useState<Separador>('dados');
     const [momentoAtivo, setMomentoAtivo] = useState<Momento>('alta');
     const [tentouAlta, setTentouAlta] = useState(false);
-    const obito = data.destino_id === DESTINO_FALECIDO;
-    const temComplicacaoReal = (m: Momento) => data.morbilidade[m].complicacoes.some((c) => c.id !== SEM_COMPLICACOES);
     const registado = (m: Momento) => data.morbilidade[m].complicacoes.length > 0;
     /** Com cirurgia, a alta fica pendente até à revisão aos 30 dias. */
     const aguardaRevisao = listaCirurgias.length > 0 && !registado('30_dias');
@@ -234,11 +231,6 @@ export function FormularioInternamento({
         ...(listaCirurgias.length > 0
             ? [{ texto: 'Morbilidade da alta registada (ou "Sem complicações")', feito: registado('alta'), separador: 'morbilidade' as Separador }]
             : []),
-        {
-            texto: 'Grau de Clavien-Dindo da alta, se houve complicações',
-            feito: !temComplicacaoReal('alta') || obito || data.morbilidade.alta.clavien_dindo_id !== '',
-            separador: 'morbilidade',
-        },
     ];
     const pendenciasDeAlta = requisitosDeAlta.filter((r) => !r.feito);
 

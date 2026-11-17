@@ -18,7 +18,7 @@ type Linha = {
     prevista: string;
     dias_de_atraso: number;
     responsavel: string | null;
-    clavien: string | null;
+    clavien?: string | null;
     bloqueado: boolean;
 };
 
@@ -151,7 +151,6 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                                 </td>
                                 <td className="max-w-xs px-4 py-2.5">
                                     <span className="line-clamp-2">{l.motivo}</span>
-                                    {l.clavien && <span className="text-xs text-rose-800">Clavien-Dindo: {l.clavien}</span>}
                                 </td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{formatarData(l.data_de_alta)}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">

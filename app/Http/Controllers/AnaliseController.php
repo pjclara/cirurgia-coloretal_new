@@ -122,7 +122,10 @@ class AnaliseController extends Controller
     private function distribuicaoClavien(callable $internamentos, ?Carbon $desde): array
     {
         $graus = $internamentos()->join('morbilidades as m', 'm.internamento_id', '=', 'i.id')
-            ->whereIn('m.momento', ['alta', '30_dias'])->whereNotNull('m.clavien_dindo_id')->where('m.clavien_dindo_id', '<>', \App\Models\Morbilidade::CLAVIEN_A_AGUARDAR)
+            // Grau definitivo: o dos 30 dias (ou o da alta, em quem faleceu).
+            ->where(fn ($q) => $q->where('m.momento', '30_dias')
+                ->orWhere(fn ($q) => $q->where('m.momento', 'alta')->where('i.destino_id', \App\Models\Internamento::DESTINO_FALECIDO)))
+            ->whereNotNull('m.clavien_dindo_id')->where('m.clavien_dindo_id', '<>', \App\Models\Morbilidade::CLAVIEN_A_AGUARDAR)
             ->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
             ->groupBy('i.id')->selectRaw('max(m.clavien_dindo_id) as grau')->pluck('grau');
 
