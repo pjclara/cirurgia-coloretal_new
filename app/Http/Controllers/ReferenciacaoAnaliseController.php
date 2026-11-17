@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Internamento;
+use App\Support\Intervalo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -31,13 +32,25 @@ class ReferenciacaoAnaliseController extends Controller
         $meses = self::PERIODOS[$periodo];
         $hoje = now()->startOfDay();
         $desde = $meses ? $hoje->copy()->subMonths($meses) : null;
+        $ate = null;
+        $anteriorDesde = $desde ? $desde->copy()->subMonths($meses) : null;
+
+        // Intervalo de datas escolhido: sobrepõe-se ao período; o período anterior tem a mesma duração.
+        [$de, $ateTexto] = Intervalo::datas($request);
+        if ($de || $ateTexto) {
+            $periodo = 'personalizado';
+            $desde = $de ? Carbon::parse($de)->startOfDay() : Carbon::parse(config('clinico.data_minima'))->startOfDay();
+            $ate = $ateTexto ? Carbon::parse($ateTexto)->endOfDay() : $hoje->copy()->endOfDay();
+            $anteriorDesde = $desde->copy()->subDays((int) $desde->diffInDays($ate->copy()->startOfDay()) + 1);
+        }
 
         $referenciacoes = fn () => DB::table('referenciacao_centro_de_referencias as r')->whereNull('r.deleted_at');
-        $noPeriodo = fn () => $referenciacoes()->when($desde, fn ($q) => $q->where('r.data_de_referenciacao', '>=', $desde));
+        $noPeriodo = fn () => $referenciacoes()->when($desde, fn ($q) => $q->where('r.data_de_referenciacao', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('r.data_de_referenciacao', '<=', $ate));
 
         $total = $noPeriodo()->count();
         $anterior = $desde
-            ? $referenciacoes()->where('r.data_de_referenciacao', '>=', $desde->copy()->subMonths($meses))->where('r.data_de_referenciacao', '<', $desde)->count()
+            ? $referenciacoes()->where('r.data_de_referenciacao', '>=', $anteriorDesde)->where('r.data_de_referenciacao', '<', $desde)->count()
             : null;
 
         $situacao = $noPeriodo()->selectRaw('
@@ -59,6 +72,7 @@ class ReferenciacaoAnaliseController extends Controller
 
         return Inertia::render('referenciacao/analise', [
             'periodo' => $periodo,
+            'intervalo' => ['de' => $de, 'ate' => $ateTexto],
             'geradoEm' => now()->format('d/m/Y H:i'),
             'indicadores' => [
                 'referenciacoes' => ['valor' => $total, 'anterior' => $anterior],
@@ -79,7 +93,7 @@ class ReferenciacaoAnaliseController extends Controller
             'modos' => $this->contagem($this->diagnosticosDoPeriodo($noPeriodo)->join('diagnostico_referenciacao_modos as m', 'm.id', '=', 'dr.modo_id'), 'm.nome'),
             'histologias' => $this->contagem($this->diagnosticosDoPeriodo($noPeriodo)->join('histologias as h', 'h.id', '=', 'dr.histologia_id'), 'h.nome', 8),
             'tempos' => $this->faixasDeEspera($diasAteEntrada),
-            'comparacao' => $this->comparacao($desde),
+            'comparacao' => $this->comparacao($desde, $ate),
         ]);
     }
 
@@ -133,10 +147,11 @@ class ReferenciacaoAnaliseController extends Controller
      * Internamentos do serviço no período: doentes já referenciados ao CR contra os restantes.
      * É uma comparação simples, sem ajuste por idade, diagnóstico ou gravidade.
      */
-    private function comparacao(?Carbon $desde): array
+    private function comparacao(?Carbon $desde, ?Carbon $ate = null): array
     {
         $linhas = DB::table('internamentos as i')->whereNull('i.deleted_at')->where('i.data_de_entrada', '>=', config('clinico.data_minima'))
             ->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('i.data_de_entrada', '<=', $ate))
             ->selectRaw('('.self::DOENTE_CR.') as cr, count(*) as n,
                 sum(i.data_de_alta is not null and i.data_de_alta >= i.data_de_entrada) as altas,
                 avg(case when i.data_de_alta is not null and i.data_de_alta >= i.data_de_entrada then datediff(i.data_de_alta, i.data_de_entrada) end) as demora,

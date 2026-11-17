@@ -165,3 +165,15 @@ test('o utente sinalizado aparece marcado no quadro e nos internamentos, até te
     $this->actingAs($leitor)->get('/internamentos')->assertInertia(fn (Assert $p) => $p
         ->where('internamentos.data', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true));
 });
+
+test('a lista de referenciações filtra pelo período da data de referenciação', function () {
+    referenciar($this, ['data_de_referenciacao' => now()->subDays(20)->format('Y-m-d')])->assertRedirect();
+    $outro = novoUtente();
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$outro->id}", corpoReferenciacao($this, ['data_de_referenciacao' => now()->subDays(100)->format('Y-m-d')]))->assertRedirect();
+
+    $ver = fn (string $consulta) => $this->actingAs($this->gestor)->get("/referenciacao$consulta");
+    $ver('')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2));
+    $ver('?de='.now()->subDays(30)->format('Y-m-d'))->assertInertia(fn (Assert $p) => $p->where('lista.total', 1)->where('filtros.de', now()->subDays(30)->format('Y-m-d')));
+    $ver('?ate='.now()->subDays(60)->format('Y-m-d'))->assertInertia(fn (Assert $p) => $p->where('lista.total', 1));
+    $ver('?de=lixo&ate=2999-99-99')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.de', ''));
+});

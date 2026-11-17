@@ -5,7 +5,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { VersaoDaApp } from '@/components/versao-da-app';
 import { type NavGroup } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BarChart3, BedDouble, CalendarDays, ClipboardList, LayoutGrid, Map, Network, ShieldCheck } from 'lucide-react';
+import { Activity, BarChart3, BedDouble, CalendarDays, ClipboardList, DatabaseZap, LayoutGrid, Map, Network, ShieldCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const footerNavItems: never[] = [];
@@ -45,7 +45,14 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        { title: 'Análise', items: [{ title: 'Painel de análise', url: '/dashboard', icon: BarChart3, alias: ['/referenciacao/analise'] }] },
+        {
+            title: 'Análise',
+            items: [
+                { title: 'Painel de análise', url: '/dashboard', icon: BarChart3, alias: ['/referenciacao/analise'] },
+                { title: 'Cancro retal', url: '/analise/cancro-retal', icon: Activity },
+                { title: 'Qualidade dos dados', url: '/analise/cancro-retal/qualidade', icon: DatabaseZap },
+            ],
+        },
         ...(clinico?.administrador ? [{ title: 'Sistema', items: [{ title: 'Administração', url: '/admin/utilizadores', icon: ShieldCheck }] }] : []),
     ];
 

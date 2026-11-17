@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
+import { FiltroDatas } from '../../components/analise/filtro-datas';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, formatar, type Ponto } from '../../components/analise/graficos';
 import { SeparadoresAnalise } from '../../components/analise/separadores';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -7,7 +8,8 @@ import ClinicoLayout from '../../layouts/clinico-layout';
 type Grupo = { internamentos: number; demora: number | null; complicacoes: number | null; mortalidade: number | null; operados: number | null };
 
 type Props = {
-    periodo: '12' | '24' | 'todos';
+    periodo: '12' | '24' | 'todos' | 'personalizado';
+    intervalo: { de: string | null; ate: string | null };
     geradoEm: string;
     indicadores: {
         referenciacoes: { valor: number; anterior: number | null };
@@ -31,7 +33,7 @@ type Props = {
     comparacao: { cr: Grupo; restantes: Grupo };
 };
 
-const PERIODOS: { valor: Props['periodo']; rotulo: string }[] = [
+const PERIODOS: { valor: Exclude<Props['periodo'], 'personalizado'>; rotulo: string }[] = [
     { valor: '12', rotulo: 'Últimos 12 meses' },
     { valor: '24', rotulo: 'Últimos 24 meses' },
     { valor: 'todos', rotulo: 'Todo o período' },
@@ -46,6 +48,7 @@ const valor = (v: number | null, sufixo = '') => (v === null ? '—' : formatar(
 
 export default function AnaliseCR({
     periodo,
+    intervalo,
     geradoEm,
     indicadores: ind,
     anual,
@@ -59,7 +62,7 @@ export default function AnaliseCR({
     comparacao,
 }: Props) {
     const [aCarregar, setACarregar] = useState(false);
-    const mudar = (novo: Props['periodo']) =>
+    const mudar = (novo: Exclude<Props['periodo'], 'personalizado'>) =>
         router.get('/referenciacao/analise', novo === '12' ? {} : { periodo: novo }, {
             preserveScroll: true,
             preserveState: true,
@@ -67,7 +70,7 @@ export default function AnaliseCR({
             onFinish: () => setACarregar(false),
         });
 
-    const nomePeriodo = PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase() ?? '';
+    const nomePeriodo = PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase() ?? 'no intervalo escolhido';
     const { referenciacoes: ref } = ind;
     const variacao = ref.anterior ? Math.round(((ref.valor - ref.anterior) / ref.anterior) * 100) : null;
 
@@ -80,7 +83,12 @@ export default function AnaliseCR({
     ];
 
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Centro de referência: doentes referenciados · gerada a ${geradoEm}`} largura="larga">
+        <ClinicoLayout
+            titulo="Análise"
+            subtitulo={`Centro de referência: doentes referenciados · gerada a ${geradoEm}`}
+            largura="larga"
+            pesquisa={null}
+        >
             <style>{ESTILO_VIZ}</style>
             <SeparadoresAnalise atual="cr" />
             <div className="viz-root space-y-5">
@@ -106,6 +114,7 @@ export default function AnaliseCR({
                             </button>
                         ))}
                     </div>
+                    <FiltroDatas url="/referenciacao/analise" de={intervalo.de} ate={intervalo.ate} aoMudar={setACarregar} />
                     <p className="text-xs text-slate-600 dark:text-slate-400">
                         O período aplica-se à data de referenciação. As séries por mês e por ano mostram sempre o histórico.
                     </p>

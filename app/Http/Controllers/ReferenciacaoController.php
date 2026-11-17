@@ -95,12 +95,16 @@ class ReferenciacaoController extends Controller
         $situacoes = ['referenciado', 'no_centro', 'saida', 'todas'];
         $situacao = in_array($request->query('situacao'), $situacoes, true) ? $request->query('situacao') : 'todas';
         $q = trim((string) $request->query('q', ''));
+        // Período da data de referenciação (valores inválidos ignoram-se).
+        [$de, $ate] = \App\Support\Intervalo::datas($request);
 
         $lista = Referenciacao::query()
             ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'diagnosticos:id,nome,abrev'])
             ->when($situacao === 'referenciado', fn ($query) => $query->whereNull('data_de_entrada')->whereNull('data_de_saida'))
             ->when($situacao === 'no_centro', fn ($query) => $query->whereNotNull('data_de_entrada')->whereNull('data_de_saida'))
             ->when($situacao === 'saida', fn ($query) => $query->whereNotNull('data_de_saida'))
+            ->when($de !== '', fn ($query) => $query->whereDate('data_de_referenciacao', '>=', $de))
+            ->when($ate !== '', fn ($query) => $query->whereDate('data_de_referenciacao', '<=', $ate))
             ->when($q !== '', fn ($query) => $query->whereHas('utente', fn ($u) => $u->pesquisar($q)))
             ->orderByDesc('data_de_referenciacao')->orderByDesc('id')
             ->paginate(25)
@@ -120,7 +124,7 @@ class ReferenciacaoController extends Controller
 
         return Inertia::render('referenciacao/index', [
             'lista' => $lista,
-            'filtros' => ['situacao' => $situacao, 'q' => $q],
+            'filtros' => ['situacao' => $situacao, 'q' => $q, 'de' => $de, 'ate' => $ate],
             'modal' => $modal,
             'origens' => $podeReferenciar ? Dominios::lista('origem_da_referenciacaos') : [],
             'responsaveis' => $podeReferenciar ? Dominios::responsaveis() : [],

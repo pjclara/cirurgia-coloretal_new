@@ -29,7 +29,7 @@ type Situacao = 'todas' | 'referenciado' | 'no_centro' | 'saida';
 
 type Props = {
     lista: Paginado<Linha>;
-    filtros: { situacao: Situacao; q: string };
+    filtros: { situacao: Situacao; q: string; de: string; ate: string };
     modal: PropsReferenciacao | null;
     origens: { id: number; nome: string }[];
     responsaveis: { id: number; nome: string; equipa: string | null }[];
@@ -63,6 +63,8 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
         const consulta: Record<string, string> = {};
         if (novos.situacao !== 'todas') consulta.situacao = novos.situacao;
         if (novos.q) consulta.q = novos.q;
+        if (novos.de) consulta.de = novos.de;
+        if (novos.ate) consulta.ate = novos.ate;
         router.get('/referenciacao', consulta, { preserveState: true, preserveScroll: true });
     };
     const fechar = () => modal && router.visit(modal.fechar_url, { preserveScroll: true });
@@ -72,6 +74,7 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
             titulo="Referenciação"
             subtitulo={`${lista.total} referenciações ao centro de referência`}
             largura="larga"
+            pesquisa={null}
             acoes={
                 <BotaoLigacao href="/referenciacao/analise" variante="secundario">
                     Análise
@@ -106,6 +109,33 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
                             {s.rotulo}
                         </button>
                     ))}
+                </div>
+                <div className="flex flex-wrap items-end gap-2" role="group" aria-label="Período da referenciação">
+                    <label className="text-xs text-slate-600">
+                        Referenciados de
+                        <input
+                            type="date"
+                            value={filtros.de}
+                            max={filtros.ate || undefined}
+                            onChange={(e) => aplicar({ de: e.target.value })}
+                            className={`${estiloEntrada} mt-0.5 block`}
+                        />
+                    </label>
+                    <label className="text-xs text-slate-600">
+                        até
+                        <input
+                            type="date"
+                            value={filtros.ate}
+                            min={filtros.de || undefined}
+                            onChange={(e) => aplicar({ ate: e.target.value })}
+                            className={`${estiloEntrada} mt-0.5 block`}
+                        />
+                    </label>
+                    {(filtros.de || filtros.ate) && (
+                        <Botao type="button" variante="secundario" onClick={() => aplicar({ de: '', ate: '' })}>
+                            Limpar período
+                        </Botao>
+                    )}
                 </div>
                 <form
                     onSubmit={(e: FormEvent) => {

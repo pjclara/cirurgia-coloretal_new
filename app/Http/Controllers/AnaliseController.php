@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Internamento;
 use App\Models\ListaDeEspera;
 use App\Support\Dominios;
+use App\Support\Intervalo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -30,28 +31,43 @@ class AnaliseController extends Controller
         $meses = self::PERIODOS[$periodo];
         $hoje = now()->startOfDay();
         $desde = $meses ? $hoje->copy()->subMonths($meses) : null;
+        $ate = null;
+        $anteriorDesde = $desde ? $desde->copy()->subMonths($meses) : null;
         $minima = config('clinico.data_minima');
+
+        // Intervalo de datas escolhido: sobrepõe-se ao período; o período anterior tem a mesma duração.
+        [$de, $ateTexto] = Intervalo::datas($request);
+        if ($de || $ateTexto) {
+            $periodo = 'personalizado';
+            $desde = $de ? Carbon::parse($de)->startOfDay() : Carbon::parse($minima)->startOfDay();
+            $ate = $ateTexto ? Carbon::parse($ateTexto)->endOfDay() : $hoje->copy()->endOfDay();
+            $anteriorDesde = $desde->copy()->subDays((int) $desde->diffInDays($ate->copy()->startOfDay()) + 1);
+        }
 
         // Internamentos válidos (sem apagados e com datas plausíveis).
         $internamentos = fn () => DB::table('internamentos as i')->whereNull('i.deleted_at')->where('i.data_de_entrada', '>=', $minima);
 
-        $entradas = $internamentos()->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))->count();
+        $entradas = $internamentos()->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('i.data_de_entrada', '<=', $ate))->count();
         $entradasAntes = $desde
-            ? $internamentos()->where('i.data_de_entrada', '>=', $desde->copy()->subMonths($meses))->where('i.data_de_entrada', '<', $desde)->count()
+            ? $internamentos()->where('i.data_de_entrada', '>=', $anteriorDesde)->where('i.data_de_entrada', '<', $desde)->count()
             : null;
 
         $altas = $internamentos()
             ->whereNotNull('i.data_de_alta')->whereColumn('i.data_de_alta', '>=', 'i.data_de_entrada')
             ->when($desde, fn ($q) => $q->where('i.data_de_alta', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('i.data_de_alta', '<=', $ate))
             ->selectRaw('count(*) as total, sum(i.destino_id = ?) as obitos, avg(datediff(i.data_de_alta, i.data_de_entrada)) as demora, sum('.self::COM_COMPLICACAO.') as com_complicacao', [Internamento::DESTINO_FALECIDO])
             ->first();
         $totalAltas = (int) $altas->total;
 
         $cirurgias = DB::table('bloco_operatorios as b')->whereNull('b.deleted_at')->where('b.data_de_inicio', '>=', $minima)->where('b.data_de_inicio', '<=', $hoje->copy()->endOfDay())
-            ->when($desde, fn ($q) => $q->where('b.data_de_inicio', '>=', $desde));
+            ->when($desde, fn ($q) => $q->where('b.data_de_inicio', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('b.data_de_inicio', '<=', $ate));
 
         return Inertia::render('dashboard', [
             'periodo' => $periodo,
+            'intervalo' => ['de' => $de, 'ate' => $ateTexto],
             'geradoEm' => now()->format('d/m/Y H:i'),
             'indicadores' => [
                 'internamentos' => ['valor' => $entradas, 'anterior' => $entradasAntes],
@@ -64,9 +80,9 @@ class AnaliseController extends Controller
             ],
             'mensal' => $this->internamentosPorMes($internamentos, $hoje),
             'anual' => $this->serieAnual($internamentos, $minima, $hoje),
-            'clavien' => $this->distribuicaoClavien($internamentos, $desde),
-            'intervencoes' => $this->topIntervencoes($desde, $minima, $hoje),
-            'diagnosticos' => $this->topDiagnosticos($internamentos, $desde),
+            'clavien' => $this->distribuicaoClavien($internamentos, $desde, $ate),
+            'intervencoes' => $this->topIntervencoes($desde, $minima, $hoje, $ate),
+            'diagnosticos' => $this->topDiagnosticos($internamentos, $desde, $ate),
             'espera' => $this->listaDeEspera($hoje),
         ]);
     }
@@ -119,7 +135,7 @@ class AnaliseController extends Controller
     }
 
     /** Internamentos por grau mais grave de Clavien-Dindo (graus 1 a 5; 3 e 4 juntam A e B). */
-    private function distribuicaoClavien(callable $internamentos, ?Carbon $desde): array
+    private function distribuicaoClavien(callable $internamentos, ?Carbon $desde, ?Carbon $ate = null): array
     {
         $graus = $internamentos()->join('morbilidades as m', 'm.internamento_id', '=', 'i.id')
             // Grau definitivo: o dos 30 dias (ou o da alta, em quem faleceu).
@@ -127,6 +143,7 @@ class AnaliseController extends Controller
                 ->orWhere(fn ($q) => $q->where('m.momento', 'alta')->where('i.destino_id', \App\Models\Internamento::DESTINO_FALECIDO)))
             ->whereNotNull('m.clavien_dindo_id')->where('m.clavien_dindo_id', '<>', \App\Models\Morbilidade::CLAVIEN_A_AGUARDAR)
             ->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('i.data_de_entrada', '<=', $ate))
             ->groupBy('i.id')->selectRaw('max(m.clavien_dindo_id) as grau')->pluck('grau');
 
         // ids 1 e 2 = graus 1 e 2; 3 e 4 = 3A e 3B; 5 e 6 = 4A e 4B; 7 = grau 5
@@ -136,24 +153,26 @@ class AnaliseController extends Controller
         return collect(['1', '2', '3', '4', '5'])->map(fn ($g) => ['rotulo' => "Grau $g", 'valor' => (int) ($contagem[$g] ?? 0)])->all();
     }
 
-    private function topIntervencoes(?Carbon $desde, string $minima, Carbon $hoje): array
+    private function topIntervencoes(?Carbon $desde, string $minima, Carbon $hoje, ?Carbon $ate = null): array
     {
         return DB::table('bloco_operatorio_intervencao as bi')
             ->join('bloco_operatorios as b', 'b.id', '=', 'bi.bloco_operatorio_id')
             ->join('intervencaos as t', 't.id', '=', 'bi.intervencao_id')
             ->whereNull('b.deleted_at')->where('b.data_de_inicio', '>=', $minima)->where('b.data_de_inicio', '<=', $hoje->copy()->endOfDay())
             ->when($desde, fn ($q) => $q->where('b.data_de_inicio', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('b.data_de_inicio', '<=', $ate))
             ->groupBy('t.id', 't.nome')->orderByRaw('count(*) desc')->orderBy('t.nome')->limit(10)
             ->get(['t.nome', DB::raw('count(*) as n')])
             ->map(fn ($r) => ['rotulo' => trim($r->nome), 'valor' => (int) $r->n])->all();
     }
 
-    private function topDiagnosticos(callable $internamentos, ?Carbon $desde): array
+    private function topDiagnosticos(callable $internamentos, ?Carbon $desde, ?Carbon $ate = null): array
     {
         return $internamentos()
             ->join('diagnostico_internamento as di', 'di.internamento_id', '=', 'i.id')
             ->join('diagnosticos as d', 'd.id', '=', 'di.diagnostico_id')
             ->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('i.data_de_entrada', '<=', $ate))
             ->groupBy('d.id', 'd.nome')->orderByRaw('count(*) desc')->orderBy('d.nome')->limit(10)
             ->get(['d.nome', DB::raw('count(*) as n')])
             ->map(fn ($r) => ['rotulo' => trim($r->nome), 'valor' => (int) $r->n])->all();

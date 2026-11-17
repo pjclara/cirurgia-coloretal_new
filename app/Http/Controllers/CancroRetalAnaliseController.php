@@ -1,0 +1,259 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Internamento;
+use App\Models\Morbilidade;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * Indicadores de qualidade da cirurgia do cancro retal nos doentes do centro de referência, por trimestre, com as metas do centro de referência.
+ *
+ * Uma cirurgia retal é uma cirurgia com ressecção anterior do reto, amputação abdomino-perineal ou ressecção
+ * reto-sigmoideia. A conservação de esfíncter exclui a ressecção reto-sigmoideia; os restantes indicadores incluem-na.
+ */
+class CancroRetalAnaliseController extends Controller
+{
+    public const RESSECCAO_ANTERIOR = 1;
+
+    public const AMPUTACAO_ABDOMINO_PERINEAL = 24;
+
+    public const RESSECCAO_RETO_SIGMOIDEIA = 88;
+
+    /** Deiscência da anastomose na tabela `complicacaos`. */
+    public const DEISCENCIA = 28;
+
+    /** Metas: 'min' = o valor deve ficar acima; 'max' = deve ficar abaixo. */
+    public const METAS = [
+        'conservacao' => ['min' => 75],
+        'deiscencia' => ['max' => 15],
+        'mortalidade' => ['max' => 3],
+        'morbilidade' => ['max' => 20],
+    ];
+
+    public function __invoke(Request $request): Response
+    {
+        $hoje = now()->startOfDay();
+        [$trimestres, $de, $ate, $cirurgias] = $this->intervalo($request, $hoje);
+
+        return Inertia::render('analise/cancro-retal', [
+            'trimestres' => $trimestres,
+            'de' => $de,
+            'ate' => $ate,
+            'geradoEm' => now()->format('d/m/Y H:i'),
+            'metas' => self::METAS,
+            'total' => $cirurgias->count(),
+            'totalConservacao' => $cirurgias->where('na_conservacao', true)->count(),
+            'indicadores' => [
+                'conservacao' => $this->indicador($cirurgias, 'conservacao', 'na_conservacao', 'conservou', 'min', $hoje, $trimestres, $de, $ate),
+                'deiscencia' => $this->indicador($cirurgias, 'deiscencia', null, 'deiscencia', 'max', $hoje, $trimestres, $de, $ate),
+                'mortalidade' => $this->indicador($cirurgias, 'mortalidade', null, 'obito', 'max', $hoje, $trimestres, $de, $ate),
+                'morbilidade' => $this->indicador($cirurgias, 'morbilidade', null, 'grave', 'max', $hoje, $trimestres, $de, $ate),
+            ],
+        ]);
+    }
+
+    /** Doentes referenciados operados com dados em falta para os indicadores. */
+    public function qualidade(Request $request): Response
+    {
+        $hoje = now()->startOfDay();
+        [$trimestres, $de, $ate, $cirurgias] = $this->intervalo($request, $hoje);
+
+        return Inertia::render('analise/qualidade-dados', [
+            'trimestres' => $trimestres,
+            'de' => $de,
+            'ate' => $ate,
+            'geradoEm' => now()->format('d/m/Y H:i'),
+            'qualidade' => $this->dadosEmFalta($cirurgias, $hoje),
+        ]);
+    }
+
+    /**
+     * Trimestres disponíveis (da primeira cirurgia ao trimestre em curso), intervalo escolhido e cirurgias nele.
+     * Por omissão, o último trimestre completo (o em curso só se for o único).
+     *
+     * @return array{0: list<string>, 1: ?string, 2: ?string, 3: \Illuminate\Support\Collection}
+     */
+    private function intervalo(Request $request, Carbon $hoje): array
+    {
+        $todas = $this->cirurgias($hoje);
+        $trimestres = $this->trimestresDesde($todas->first()['trimestre'] ?? null, $hoje);
+        $ultimo = count($trimestres) > 1 ? $trimestres[count($trimestres) - 2] : ($trimestres[0] ?? null);
+        $de = in_array($request->query('de'), $trimestres, true) ? $request->query('de') : $ultimo;
+        $ate = in_array($request->query('ate'), $trimestres, true) ? $request->query('ate') : $ultimo;
+        if ($de !== null && $de > $ate) {
+            [$de, $ate] = [$ate, $de];
+        }
+
+        return [$trimestres, $de, $ate, $todas->filter(fn ($c) => $c['trimestre'] >= $de && $c['trimestre'] <= $ate)->values()];
+    }
+
+    /** @return list<string> "2023 T1", "2023 T2"... da primeira cirurgia ao trimestre em curso. */
+    private function trimestresDesde(?string $primeiro, Carbon $hoje): array
+    {
+        if (! $primeiro) {
+            return [];
+        }
+        [$ano, $t] = [(int) substr($primeiro, 0, 4), (int) substr($primeiro, -1)];
+        $atual = $hoje->format('Y').' T'.$hoje->quarter;
+        $lista = [];
+        while ("$ano T$t" <= $atual) {
+            $lista[] = "$ano T$t";
+            [$ano, $t] = $t === 4 ? [$ano + 1, 1] : [$ano, $t + 1];
+        }
+
+        return $lista;
+    }
+
+    /** Uma linha por cirurgia retal de doente referenciado ao CR até à data da cirurgia, com os indicadores já avaliados. */
+    private function cirurgias(Carbon $hoje)
+    {
+        $tem = fn (string $ids) => "exists (select 1 from bloco_operatorio_intervencao bi where bi.bloco_operatorio_id = b.id and bi.intervencao_id in ($ids))";
+        $resseccao = self::RESSECCAO_ANTERIOR;
+        $amputacao = self::AMPUTACAO_ABDOMINO_PERINEAL;
+        $retoSigmoideia = self::RESSECCAO_RETO_SIGMOIDEIA;
+        $falecido = Internamento::DESTINO_FALECIDO;
+        $deiscencia = self::DEISCENCIA;
+        // Morbilidade grave: grau definitivo de Clavien-Dindo 3 ou superior (3A a 5), como no resto da aplicação.
+        $grau = '(m.momento = \''.Morbilidade::AOS_30_DIAS."' or (m.momento = '".Morbilidade::NA_ALTA."' and i.destino_id = $falecido))";
+
+        return DB::table('bloco_operatorios as b')
+            ->join('internamentos as i', fn ($j) => $j->on('i.id', '=', 'b.internamento_id')->whereNull('i.deleted_at'))
+            ->whereNull('b.deleted_at')
+            ->where('b.data_de_inicio', '>=', config('clinico.data_minima'))
+            ->where('b.data_de_inicio', '<=', $hoje->copy()->endOfDay())
+            ->whereRaw($tem("$resseccao, $amputacao, $retoSigmoideia"))
+            ->whereRaw('exists (select 1 from referenciacao_centro_de_referencias r
+                where r.utente_id = i.utente_id and r.deleted_at is null and r.data_de_referenciacao <= b.data_de_inicio)')
+            ->join('utentes as u', 'u.id', '=', 'i.utente_id')
+            ->selectRaw("b.data_de_inicio as data, b.id as bloco_id, i.id as internamento_id, u.id as utente_id, u.nome as utente_nome,
+                u.numero_processo, i.data_de_entrada, i.data_de_alta, i.destino_id,
+                ({$tem((string) $amputacao)}) as tem_amputacao, ({$tem((string) $retoSigmoideia)}) as tem_reto_sigmoideia,
+                exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = 'alta') as morb_alta,
+                exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias') as morb_30,
+                exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias'
+                    and (m.clavien_dindo_id is null or m.clavien_dindo_id = ".Morbilidade::CLAVIEN_A_AGUARDAR.")) as clavien_em_falta,
+                ({$tem("$resseccao, $amputacao")}) as na_conservacao,
+                ({$tem((string) $resseccao)} and not {$tem((string) $amputacao)}) as conservou,
+                (i.destino_id = $falecido) as obito,
+                exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
+                    where m.internamento_id = i.id and m.momento in ('alta', '30_dias') and c.complicacao_id = $deiscencia) as deiscencia,
+                exists (select 1 from morbilidades m where m.internamento_id = i.id and $grau
+                    and m.clavien_dindo_id between 3 and 7) as grave")
+            ->orderBy('b.data_de_inicio')
+            ->get()
+            ->map(fn ($c) => [
+                'linha' => $c,
+                'trimestre' => Carbon::parse($c->data)->format('Y').' T'.Carbon::parse($c->data)->quarter,
+                'na_conservacao' => (bool) $c->na_conservacao,
+                'conservou' => (bool) $c->conservou,
+                'obito' => (bool) $c->obito,
+                'deiscencia' => (bool) $c->deiscencia,
+                'grave' => (bool) $c->grave,
+            ]);
+    }
+
+    /** Colunas da tabela de qualidade dos dados, por ordem. */
+    public const CAMPOS = ['alta', 'destino', 'morbilidade_alta', 'seguimento_30', 'clavien_30', 'datas'];
+
+    /**
+     * Cirurgias do período a que falta algum dado necessário aos indicadores. `falta` lista os campos em falta;
+     * o seguimento aos 30 dias só falta nos doentes vivos cuja alta foi há mais de 30 dias.
+     *
+     * @return array{linhas: list<array<string, mixed>>, totais: array<string, int>, cirurgias: int}
+     */
+    private function dadosEmFalta($cirurgias, Carbon $hoje): array
+    {
+        $limite = $hoje->copy()->subDays(30)->format('Y-m-d');
+        $linhas = $cirurgias->map(function ($c) use ($limite) {
+            $l = $c['linha'];
+            $falecido = (int) $l->destino_id === Internamento::DESTINO_FALECIDO;
+            $falta = [];
+            if ($l->data_de_alta === null) {
+                $falta[] = 'alta';
+            }
+            if ($l->destino_id === null) {
+                $falta[] = 'destino';
+            }
+            if (! $l->morb_alta) {
+                $falta[] = 'morbilidade_alta';
+            }
+            if (! $falecido && ! $l->morb_30 && $l->data_de_alta !== null && substr($l->data_de_alta, 0, 10) <= $limite) {
+                $falta[] = 'seguimento_30';
+            }
+            if ($l->clavien_em_falta) {
+                $falta[] = 'clavien_30';
+            }
+            $dia = substr($l->data, 0, 10);
+            if ($dia < substr($l->data_de_entrada, 0, 10) || ($l->data_de_alta !== null && $dia > substr($l->data_de_alta, 0, 10))) {
+                $falta[] = 'datas';
+            }
+
+            return $falta === [] ? null : [
+                'bloco' => $l->bloco_id,
+                'internamento' => $l->internamento_id,
+                'utente' => ['id' => $l->utente_id, 'nome' => $l->utente_nome, 'numero_processo' => $l->numero_processo],
+                'data' => substr($l->data, 0, 10),
+                'intervencao' => $l->tem_amputacao ? 'Amputação abdomino-perineal' : ($l->tem_reto_sigmoideia ? 'Resseção reto-sigmoideia' : 'Ressecção anterior do reto'),
+                'falta' => $falta,
+            ];
+        })->filter()->values();
+
+        return [
+            'cirurgias' => $cirurgias->count(),
+            'totais' => collect(self::CAMPOS)->mapWithKeys(fn ($campo) => [$campo => $linhas->filter(fn ($l) => in_array($campo, $l['falta'], true))->count()])->all(),
+            'linhas' => $linhas->sortByDesc('data')->values()->all(),
+        ];
+    }
+
+    /**
+     * Série trimestral de um indicador. `$denominador` é a marca que escolhe as cirurgias contadas
+     * (todas, se `null`); `$evento` é a marca do que se conta.
+     */
+    private function indicador($cirurgias, string $chave, ?string $denominador, string $evento, string $sentido, Carbon $hoje, array $todosTrimestres, ?string $de, ?string $ate): array
+    {
+        $meta = self::METAS[$chave][$sentido];
+        $universo = $denominador ? $cirurgias->where($denominador, true) : $cirurgias;
+        $porTrimestre = $universo->groupBy('trimestre');
+        $trimestreAtual = $hoje->format('Y').' T'.$hoje->quarter;
+
+        // Todos os trimestres do intervalo, incluindo os sem cirurgias.
+        $trimestres = array_values(array_filter($todosTrimestres, fn ($t) => $t >= $de && $t <= $ate));
+
+        $serie = collect($trimestres)->mapWithKeys(fn ($t) => [$t => $porTrimestre->get($t, collect())])->map(function ($linhas, $trimestre) use ($evento, $sentido, $meta, $trimestreAtual) {
+            $n = $linhas->count();
+            $eventos = $linhas->where($evento, true)->count();
+            $taxa = $n > 0 ? round(100 * $eventos / $n, 1) : null;
+
+            return [
+                'trimestre' => $trimestre,
+                'n' => $n,
+                'eventos' => $eventos,
+                'taxa' => $taxa,
+                'cumpre' => $taxa === null ? null : ($sentido === 'min' ? $taxa >= $meta : $taxa <= $meta),
+                'incompleto' => $trimestre === $trimestreAtual,
+            ];
+        })->values();
+
+        $n = $universo->count();
+        $eventos = $universo->where($evento, true)->count();
+        $taxa = $n > 0 ? round(100 * $eventos / $n, 1) : null;
+        $completos = $serie->where('incompleto', false)->whereNotNull('taxa');
+        $melhor = $completos->sortBy(fn ($t) => $sentido === 'min' ? -$t['taxa'] : $t['taxa'])->first();
+        $pior = $completos->sortBy(fn ($t) => $sentido === 'min' ? $t['taxa'] : -$t['taxa'])->first();
+
+        return [
+            'n' => $n,
+            'eventos' => $eventos,
+            'taxa' => $taxa,
+            'cumpre' => $taxa === null ? null : ($sentido === 'min' ? $taxa >= $meta : $taxa <= $meta),
+            'melhor' => $melhor,
+            'pior' => $pior,
+            'serie' => $serie->all(),
+        ];
+    }
+}

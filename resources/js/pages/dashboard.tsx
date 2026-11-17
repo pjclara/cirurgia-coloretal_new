@@ -1,11 +1,13 @@
 import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { FiltroDatas } from '../components/analise/filtro-datas';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, Linha, formatar, type Ponto } from '../components/analise/graficos';
 import { SeparadoresAnalise } from '../components/analise/separadores';
 import ClinicoLayout from '../layouts/clinico-layout';
 
 type Props = {
-    periodo: '12' | '24' | 'todos';
+    periodo: '12' | '24' | 'todos' | 'personalizado';
+    intervalo: { de: string | null; ate: string | null };
     geradoEm: string;
     indicadores: {
         internamentos: { valor: number; anterior: number | null };
@@ -24,7 +26,7 @@ type Props = {
     espera: { total: number; mediana_dias: number | null; por_prioridade: Ponto[]; por_espera: Ponto[] };
 };
 
-const PERIODOS: { valor: Props['periodo']; rotulo: string }[] = [
+const PERIODOS: { valor: Exclude<Props['periodo'], 'personalizado'>; rotulo: string }[] = [
     { valor: '12', rotulo: 'Últimos 12 meses' },
     { valor: '24', rotulo: 'Últimos 24 meses' },
     { valor: 'todos', rotulo: 'Todo o período' },
@@ -33,9 +35,9 @@ const PERIODOS: { valor: Props['periodo']; rotulo: string }[] = [
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const nomeMes = (ym: string) => `${MESES[Number(ym.slice(5)) - 1]} ${ym.slice(2, 4)}`;
 
-export default function Analise({ periodo, geradoEm, indicadores, mensal, anual, clavien, intervencoes, diagnosticos, espera }: Props) {
+export default function Analise({ periodo, intervalo, geradoEm, indicadores, mensal, anual, clavien, intervencoes, diagnosticos, espera }: Props) {
     const [aCarregar, setACarregar] = useState(false);
-    const mudar = (valor: Props['periodo']) =>
+    const mudar = (valor: Exclude<Props['periodo'], 'personalizado'>) =>
         router.get('/dashboard', valor === '12' ? {} : { periodo: valor }, {
             preserveScroll: true,
             preserveState: true,
@@ -45,12 +47,12 @@ export default function Analise({ periodo, geradoEm, indicadores, mensal, anual,
 
     const { internamentos: ent } = indicadores;
     const variacao = ent.anterior ? Math.round(((ent.valor - ent.anterior) / ent.anterior) * 100) : null;
-    const nomePeriodo = PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase() ?? '';
+    const nomePeriodo = PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase() ?? 'no intervalo escolhido';
     const anos: Ponto[] = anual.map((a) => ({ rotulo: String(a.ano), valor: a.internamentos }));
     const tabela = (pontos: Ponto[], sufixo = '') => pontos.map((p) => [p.rotulo, p.valor === null ? '—' : `${formatar(p.valor)}${sufixo}`]);
 
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga">
+        <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga" pesquisa={null}>
             <style>{ESTILO_VIZ}</style>
             <SeparadoresAnalise atual="geral" />
             <div className="viz-root space-y-5">
@@ -76,6 +78,7 @@ export default function Analise({ periodo, geradoEm, indicadores, mensal, anual,
                             </button>
                         ))}
                     </div>
+                    <FiltroDatas url="/dashboard" de={intervalo.de} ate={intervalo.ate} aoMudar={setACarregar} />
                     <p className="text-xs text-slate-600 dark:text-slate-400">
                         O período aplica-se aos indicadores, ao grau de Clavien-Dindo e aos mais frequentes. As séries por mês e por ano mostram
                         sempre o histórico.
