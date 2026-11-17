@@ -41,22 +41,20 @@ test('a análise do CR conta as referenciações, as situações e a espera até
     referenciarUtente($this, 60, 30, 5);   // entrou ao fim de 30 dias, já saiu
     referenciarUtente($this, 1500, 1490);  // fora dos 12 meses
 
-    $this->actingAs($this->gestor)->get('/referenciacao/analise')->assertInertia(fn (Assert $p) => $p
+    $this->actingAs($this->gestor)->get('/referenciacao/analise'.trimestresDesde(60))->assertInertia(fn (Assert $p) => $p
         ->component('referenciacao/analise')
-        ->where('periodo', '12')
         ->where('indicadores.referenciacoes.valor', 3)
         ->where('indicadores.referenciados', 1)
         ->where('indicadores.no_centro', 1)
         ->where('indicadores.saidas', 1)
         ->where('indicadores.ate_entrada', fn ($v) => (float) $v === 19.0)   // mediana de 8 e 30
         ->where('indicadores.diagnostico_ate_referenciacao', fn ($v) => (float) $v === 5.0)
-        ->has('mensal', 24)
+        ->where('mensal', fn ($m) => count($m) >= 3)
         ->where('origens.0.valor', 3));
 
-    // Todo o período inclui a mais antiga.
-    $this->actingAs($this->gestor)->get('/referenciacao/analise?periodo=todos')->assertInertia(fn (Assert $p) => $p
-        ->where('indicadores.referenciacoes.valor', 4)
-        ->where('indicadores.referenciacoes.anterior', null));
+    // Desde o trimestre da mais antiga inclui-a.
+    $this->actingAs($this->gestor)->get('/referenciacao/analise'.trimestresDesde(1500))->assertInertia(fn (Assert $p) => $p
+        ->where('indicadores.referenciacoes.valor', 4));
 });
 
 test('a análise do CR compara os internamentos dos doentes do CR com os restantes', function () {
@@ -64,7 +62,7 @@ test('a análise do CR compara os internamentos dos doentes do CR com os restant
     $internamentoCr = novoInternamento($doente, $this->gestor, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d'), 'data_de_alta' => now()->subDays(2)->format('Y-m-d')]);
     $internamentoOutro = novoInternamento(novoUtente(), $this->gestor, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d'), 'data_de_alta' => now()->subDays(4)->format('Y-m-d')]);
 
-    $this->actingAs($this->gestor)->get('/referenciacao/analise')->assertInertia(fn (Assert $p) => $p
+    $this->actingAs($this->gestor)->get('/referenciacao/analise'.trimestresDesde(30))->assertInertia(fn (Assert $p) => $p
         ->where('indicadores.internados', 1)
         ->where('comparacao.cr.internamentos', 1)
         ->where('comparacao.cr.demora', fn ($v) => (float) $v === 8.0)

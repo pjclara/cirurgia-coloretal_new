@@ -17,8 +17,6 @@ use Inertia\Response;
  */
 class ReferenciacaoAnaliseController extends Controller
 {
-    private const PERIODOS = ['12' => 12, '24' => 24, 'todos' => null];
-
     /** Primeiro ano mostrado na série anual (antes disto há muito poucos registos). */
     private const ANO_INICIAL = 2017;
 
@@ -28,21 +26,11 @@ class ReferenciacaoAnaliseController extends Controller
 
     public function __invoke(Request $request): Response
     {
-        $periodo = array_key_exists($request->query('periodo'), self::PERIODOS) ? $request->query('periodo') : '12';
-        $meses = self::PERIODOS[$periodo];
         $hoje = now()->startOfDay();
-        $desde = $meses ? $hoje->copy()->subMonths($meses) : null;
-        $ate = null;
-        $anteriorDesde = $desde ? $desde->copy()->subMonths($meses) : null;
 
-        // Intervalo de datas escolhido: sobrepõe-se ao período; o período anterior tem a mesma duração.
-        [$de, $ateTexto] = Intervalo::datas($request);
-        if ($de || $ateTexto) {
-            $periodo = 'personalizado';
-            $desde = $de ? Carbon::parse($de)->startOfDay() : Carbon::parse(config('clinico.data_minima'))->startOfDay();
-            $ate = $ateTexto ? Carbon::parse($ateTexto)->endOfDay() : $hoje->copy()->endOfDay();
-            $anteriorDesde = $desde->copy()->subDays((int) $desde->diffInDays($ate->copy()->startOfDay()) + 1);
-        }
+        // Período por trimestres (por omissão, o último completo); o anterior tem o mesmo número de trimestres.
+        $primeira = DB::table('referenciacao_centro_de_referencias')->whereNull('deleted_at')->min('data_de_referenciacao');
+        ['trimestres' => $trimestres, 'de' => $de, 'ate' => $ateTrimestre, 'desde' => $desde, 'fim' => $ate, 'anteriorDesde' => $anteriorDesde] = Intervalo::trimestres($request, $primeira, $hoje);
 
         $referenciacoes = fn () => DB::table('referenciacao_centro_de_referencias as r')->whereNull('r.deleted_at');
         $noPeriodo = fn () => $referenciacoes()->when($desde, fn ($q) => $q->where('r.data_de_referenciacao', '>=', $desde))
@@ -71,8 +59,9 @@ class ReferenciacaoAnaliseController extends Controller
                 where i.utente_id = r.utente_id and i.deleted_at is null and b.deleted_at is null and b.data_de_inicio >= r.data_de_referenciacao)) as operados')->first();
 
         return Inertia::render('referenciacao/analise', [
-            'periodo' => $periodo,
-            'intervalo' => ['de' => $de, 'ate' => $ateTexto],
+            'trimestres' => $trimestres,
+            'de' => $de,
+            'ate' => $ateTrimestre,
             'geradoEm' => now()->format('d/m/Y H:i'),
             'indicadores' => [
                 'referenciacoes' => ['valor' => $total, 'anterior' => $anterior],
@@ -86,7 +75,7 @@ class ReferenciacaoAnaliseController extends Controller
                 'operados' => (int) $noServico->operados,
             ],
             'anual' => $this->porAno($referenciacoes),
-            'mensal' => $this->porMes($referenciacoes, $hoje),
+            'mensal' => $this->porMes($referenciacoes, $hoje, $desde, $ate),
             'origens' => $this->contagem($noPeriodo()->join('origem_da_referenciacaos as o', 'o.id', '=', 'r.origem_id'), 'o.nome'),
             'responsaveis' => $this->contagem($noPeriodo()->join('users as u', 'u.id', '=', 'r.responsavel_id'), 'u.name', 10),
             'diagnosticos' => $this->contagem($this->diagnosticosDoPeriodo($noPeriodo)->join('diagnosticos as d', 'd.id', '=', 'dr.diagnostico_id'), 'd.nome', 10),
@@ -120,18 +109,20 @@ class ReferenciacaoAnaliseController extends Controller
         return collect(range(self::ANO_INICIAL, $atual))->map(fn ($ano) => ['rotulo' => (string) $ano, 'valor' => (int) ($porAno[$ano] ?? 0)])->all();
     }
 
-    /** Referenciações nos últimos 24 meses, com os meses sem registos a zero. */
-    private function porMes(callable $referenciacoes, Carbon $hoje): array
+    /** Referenciações por mês nos trimestres escolhidos (24 meses sem período), com os meses sem registos a zero. */
+    private function porMes(callable $referenciacoes, Carbon $hoje, ?Carbon $desde, ?Carbon $ate): array
     {
-        $inicio = $hoje->copy()->startOfMonth()->subMonths(23);
-        $contagens = $referenciacoes()->where('r.data_de_referenciacao', '>=', $inicio)
+        $inicio = $desde ? $desde->copy()->startOfMonth() : $hoje->copy()->startOfMonth()->subMonths(23);
+        $fim = $ate ?? $hoje;
+        $contagens = $referenciacoes()->where('r.data_de_referenciacao', '>=', $inicio)->where('r.data_de_referenciacao', '<=', $fim)
             ->selectRaw("date_format(r.data_de_referenciacao, '%Y-%m') as ym, count(*) as n")->groupBy('ym')->pluck('n', 'ym');
 
-        return collect(range(0, 23))->map(function ($n) use ($inicio, $contagens) {
-            $mes = $inicio->copy()->addMonths($n);
+        $meses = [];
+        for ($mes = $inicio->copy(); $mes->lte($fim); $mes->addMonthNoOverflow()) {
+            $meses[] = ['rotulo' => $mes->format('Y-m'), 'valor' => (int) ($contagens[$mes->format('Y-m')] ?? 0)];
+        }
 
-            return ['rotulo' => $mes->format('Y-m'), 'valor' => (int) ($contagens[$mes->format('Y-m')] ?? 0)];
-        })->all();
+        return $meses;
     }
 
     /** Dias entre a referenciação e a entrada no centro, por faixas. */

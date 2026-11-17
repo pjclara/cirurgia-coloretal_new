@@ -166,3 +166,11 @@ function internamentoOperado(object $teste, Internamento $internamento): Interna
 
     return $internamento->refresh();
 }
+
+/** Consulta de análise por trimestres: do trimestre de há `$dias` dias ao trimestre em curso. */
+function trimestresDesde(int $dias): string
+{
+    $rotulo = fn ($d) => $d->format('Y').' T'.$d->quarter;
+
+    return '?'.http_build_query(['de' => $rotulo(now()->subDays($dias)), 'ate' => $rotulo(now())]);
+}

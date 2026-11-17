@@ -74,7 +74,6 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
             titulo="Referenciação"
             subtitulo={`${lista.total} referenciações ao centro de referência`}
             largura="larga"
-            pesquisa={null}
             acoes={
                 <BotaoLigacao href="/referenciacao/analise" variante="secundario">
                     Análise

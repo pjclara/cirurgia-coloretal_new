@@ -19,17 +19,23 @@ test('a análise calcula os indicadores a partir dos registos', function () {
         $i->forceFill(['data_de_alta' => now()->subDays($entrada - $demora)->format('Y-m-d'), 'destino_id' => $destino])->save();
     }
 
-    $this->actingAs($utilizador)->get('/dashboard')->assertInertia(fn (Assert $p) => $p
+    $this->actingAs($utilizador)->get('/dashboard'.trimestresDesde(30))->assertInertia(fn (Assert $p) => $p
         ->component('dashboard')
         ->where('indicadores.internamentos.valor', 2)
         ->where('indicadores.altas', 2)
         ->where('indicadores.demora', 10)
         ->where('indicadores.mortalidade', 50)
-        ->has('mensal', 24));
+        ->where('mensal', fn ($m) => count($m) >= 1 && count($m) <= 3 * 4 + 2));
 });
 
-test('o período inválido cai no padrão de 12 meses', function () {
-    $this->actingAs(utilizadorClinico())->get('/dashboard?periodo=lixo')->assertInertia(fn (Assert $p) => $p->where('periodo', '12'));
+test('a análise abre por omissão no último trimestre completo e ignora trimestres inválidos', function () {
+    $utilizador = utilizadorClinico();
+    novoInternamento(novoUtente(), $utilizador, ['data_de_entrada' => now()->subMonths(5)->format('Y-m-d')]);
+    $anterior = now()->subMonths(3);
+    $esperado = $anterior->format('Y').' T'.$anterior->quarter;
+
+    $this->actingAs($utilizador)->get('/dashboard?de=lixo&ate=2999%20T9')
+        ->assertInertia(fn (Assert $p) => $p->where('de', $esperado)->where('ate', $esperado)->has('trimestres'));
 });
 
 test('a análise do cancro retal calcula os indicadores por trimestre', function () {
@@ -93,17 +99,24 @@ test('a qualidade dos dados lista as cirurgias de doentes do CR com dados em fal
         ->component('analise/qualidade-dados')
         ->where('qualidade.cirurgias', 1)
         ->where('qualidade.totais.morbilidade_alta', 1)
-        ->where('qualidade.linhas.0.utente.id', $utente->id));
+        ->where('qualidade.linhas.0.utente.id', $utente->id)
+        ->where('qualidade.responsaveis.0.com_falta', 1)
+        ->where('qualidade.linhas.0.prioridade', 'alta')
+        ->where('qualidade.prioridades.alta', 1)
+        ->where('qualidade.linhas.0.responsavel.id', fn ($id) => $id === (int) $i->responsavel_id));
+
+    $this->actingAs($utilizador)->get('/analise/cancro-retal/qualidade?responsavel=999999')->assertInertia(fn (Assert $p) => $p->where('qualidade.cirurgias', 0)->where('qualidade.linhas', []));
 });
 
-test('a análise geral filtra por intervalo de datas', function () {
+test('a análise geral filtra por trimestre', function () {
     $utilizador = utilizadorClinico();
-    novoInternamento(novoUtente(), $utilizador, ['data_de_entrada' => now()->subDays(100)->format('Y-m-d')]);
+    novoInternamento(novoUtente(), $utilizador, ['data_de_entrada' => now()->subDays(200)->format('Y-m-d')]);
     novoInternamento(novoUtente(), $utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
-    $de = now()->subDays(120)->format('Y-m-d');
-    $ate = now()->subDays(60)->format('Y-m-d');
+    $antigo = now()->subDays(200);
+    $rotulo = $antigo->format('Y').' T'.$antigo->quarter;
 
-    $this->actingAs($utilizador)->get("/dashboard?de=$de&ate=$ate")->assertInertia(fn (Assert $p) => $p
-        ->where('periodo', 'personalizado')->where('intervalo.de', $de)->where('indicadores.internamentos.valor', 1));
-    $this->actingAs($utilizador)->get('/dashboard?de=lixo')->assertInertia(fn (Assert $p) => $p->where('periodo', '12')->where('intervalo.de', ''));
+    $this->actingAs($utilizador)->get('/dashboard?'.http_build_query(['de' => $rotulo, 'ate' => $rotulo]))
+        ->assertInertia(fn (Assert $p) => $p->where('de', $rotulo)->where('indicadores.internamentos.valor', 1));
+    $this->actingAs($utilizador)->get('/dashboard'.trimestresDesde(200))
+        ->assertInertia(fn (Assert $p) => $p->where('indicadores.internamentos.valor', 2));
 });

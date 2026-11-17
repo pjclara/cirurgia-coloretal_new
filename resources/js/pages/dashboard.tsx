@@ -1,13 +1,14 @@
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { useState } from 'react';
-import { FiltroDatas } from '../components/analise/filtro-datas';
+import { FiltroTrimestres } from '../components/analise/filtro-trimestres';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, Linha, formatar, type Ponto } from '../components/analise/graficos';
 import { SeparadoresAnalise } from '../components/analise/separadores';
 import ClinicoLayout from '../layouts/clinico-layout';
 
 type Props = {
-    periodo: '12' | '24' | 'todos' | 'personalizado';
-    intervalo: { de: string | null; ate: string | null };
+    trimestres: string[];
+    de: string | null;
+    ate: string | null;
     geradoEm: string;
     indicadores: {
         internamentos: { valor: number; anterior: number | null };
@@ -26,62 +27,27 @@ type Props = {
     espera: { total: number; mediana_dias: number | null; por_prioridade: Ponto[]; por_espera: Ponto[] };
 };
 
-const PERIODOS: { valor: Exclude<Props['periodo'], 'personalizado'>; rotulo: string }[] = [
-    { valor: '12', rotulo: 'Últimos 12 meses' },
-    { valor: '24', rotulo: 'Últimos 24 meses' },
-    { valor: 'todos', rotulo: 'Todo o período' },
-];
-
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const nomeMes = (ym: string) => `${MESES[Number(ym.slice(5)) - 1]} ${ym.slice(2, 4)}`;
 
-export default function Analise({ periodo, intervalo, geradoEm, indicadores, mensal, anual, clavien, intervencoes, diagnosticos, espera }: Props) {
+export default function Analise({ trimestres, de, ate, geradoEm, indicadores, mensal, anual, clavien, intervencoes, diagnosticos, espera }: Props) {
     const [aCarregar, setACarregar] = useState(false);
-    const mudar = (valor: Exclude<Props['periodo'], 'personalizado'>) =>
-        router.get('/dashboard', valor === '12' ? {} : { periodo: valor }, {
-            preserveScroll: true,
-            preserveState: true,
-            onStart: () => setACarregar(true),
-            onFinish: () => setACarregar(false),
-        });
-
     const { internamentos: ent } = indicadores;
     const variacao = ent.anterior ? Math.round(((ent.valor - ent.anterior) / ent.anterior) * 100) : null;
-    const nomePeriodo = PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase() ?? 'no intervalo escolhido';
+    const nomePeriodo = de === ate ? (de ?? '') : `${de} a ${ate}`;
     const anos: Ponto[] = anual.map((a) => ({ rotulo: String(a.ano), valor: a.internamentos }));
     const tabela = (pontos: Ponto[], sufixo = '') => pontos.map((p) => [p.rotulo, p.valor === null ? '—' : `${formatar(p.valor)}${sufixo}`]);
 
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga" pesquisa={null}>
+        <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga">
             <style>{ESTILO_VIZ}</style>
             <SeparadoresAnalise atual="geral" />
             <div className="viz-root space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
-                    <div
-                        className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 dark:border-slate-600 dark:bg-transparent"
-                        role="group"
-                        aria-label="Período"
-                    >
-                        {PERIODOS.map((p) => (
-                            <button
-                                key={p.valor}
-                                type="button"
-                                aria-pressed={periodo === p.valor}
-                                onClick={() => mudar(p.valor)}
-                                className={`rounded px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-teal-700 ${
-                                    periodo === p.valor
-                                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
-                                }`}
-                            >
-                                {p.rotulo}
-                            </button>
-                        ))}
-                    </div>
-                    <FiltroDatas url="/dashboard" de={intervalo.de} ate={intervalo.ate} aoMudar={setACarregar} />
+                    <FiltroTrimestres url="/dashboard" trimestres={trimestres} de={de} ate={ate} aoMudar={setACarregar} />
                     <p className="text-xs text-slate-600 dark:text-slate-400">
-                        O período aplica-se aos indicadores, ao grau de Clavien-Dindo e aos mais frequentes. As séries por mês e por ano mostram
-                        sempre o histórico.
+                        O trimestre escolhido aplica-se aos indicadores, ao grau de Clavien-Dindo, aos mais frequentes e à série por mês. As séries
+                        por ano mostram sempre o histórico.
                     </p>
                 </div>
 
@@ -131,7 +97,7 @@ export default function Analise({ periodo, intervalo, geradoEm, indicadores, men
 
                     <Cartao
                         titulo="Internamentos por mês"
-                        nota="Entradas nos últimos 24 meses; o mês em curso está incompleto"
+                        nota={`Entradas por mês (${nomePeriodo}); o mês em curso está incompleto`}
                         colunas={['Mês', 'Entradas']}
                         linhas={tabela(mensal.map((m) => ({ ...m, rotulo: nomeMes(m.rotulo) })))}
                     >

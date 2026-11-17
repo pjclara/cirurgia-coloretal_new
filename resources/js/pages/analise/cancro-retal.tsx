@@ -224,7 +224,7 @@ function GraficoTrimestral({
 export default function CancroRetal({ trimestres, de, ate, geradoEm, total, totalConservacao, indicadores }: Props) {
     const [aCarregar, setACarregar] = useState(false);
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Cancro retal · doentes do CR · gerada a ${geradoEm}`} largura="larga" pesquisa={null}>
+        <ClinicoLayout titulo="Análise" subtitulo={`Cancro retal · doentes do CR · gerada a ${geradoEm}`} largura="larga">
             <style>{ESTILO_VIZ}</style>
             <div className="viz-root space-y-5">
                 <FiltroTrimestres url="/analise/cancro-retal" trimestres={trimestres} de={de} ate={ate} aoMudar={setACarregar} />

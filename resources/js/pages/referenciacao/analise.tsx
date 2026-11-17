@@ -1,6 +1,5 @@
-import { router } from '@inertiajs/react';
 import { useState } from 'react';
-import { FiltroDatas } from '../../components/analise/filtro-datas';
+import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, formatar, type Ponto } from '../../components/analise/graficos';
 import { SeparadoresAnalise } from '../../components/analise/separadores';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -8,8 +7,9 @@ import ClinicoLayout from '../../layouts/clinico-layout';
 type Grupo = { internamentos: number; demora: number | null; complicacoes: number | null; mortalidade: number | null; operados: number | null };
 
 type Props = {
-    periodo: '12' | '24' | 'todos' | 'personalizado';
-    intervalo: { de: string | null; ate: string | null };
+    trimestres: string[];
+    de: string | null;
+    ate: string | null;
     geradoEm: string;
     indicadores: {
         referenciacoes: { valor: number; anterior: number | null };
@@ -33,12 +33,6 @@ type Props = {
     comparacao: { cr: Grupo; restantes: Grupo };
 };
 
-const PERIODOS: { valor: Exclude<Props['periodo'], 'personalizado'>; rotulo: string }[] = [
-    { valor: '12', rotulo: 'Últimos 12 meses' },
-    { valor: '24', rotulo: 'Últimos 24 meses' },
-    { valor: 'todos', rotulo: 'Todo o período' },
-];
-
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const nomeMes = (ym: string) => `${MESES[Number(ym.slice(5)) - 1]} ${ym.slice(2, 4)}`;
 
@@ -47,8 +41,9 @@ const pc = (parte: number, todo: number) => (todo > 0 ? `${formatar(Math.round((
 const valor = (v: number | null, sufixo = '') => (v === null ? '—' : formatar(v, sufixo));
 
 export default function AnaliseCR({
-    periodo,
-    intervalo,
+    trimestres,
+    de,
+    ate,
     geradoEm,
     indicadores: ind,
     anual,
@@ -62,15 +57,7 @@ export default function AnaliseCR({
     comparacao,
 }: Props) {
     const [aCarregar, setACarregar] = useState(false);
-    const mudar = (novo: Exclude<Props['periodo'], 'personalizado'>) =>
-        router.get('/referenciacao/analise', novo === '12' ? {} : { periodo: novo }, {
-            preserveScroll: true,
-            preserveState: true,
-            onStart: () => setACarregar(true),
-            onFinish: () => setACarregar(false),
-        });
-
-    const nomePeriodo = PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase() ?? 'no intervalo escolhido';
+    const nomePeriodo = de === ate ? (de ?? '') : `${de} a ${ate}`;
     const { referenciacoes: ref } = ind;
     const variacao = ref.anterior ? Math.round(((ref.valor - ref.anterior) / ref.anterior) * 100) : null;
 
@@ -87,36 +74,14 @@ export default function AnaliseCR({
             titulo="Análise"
             subtitulo={`Centro de referência: doentes referenciados · gerada a ${geradoEm}`}
             largura="larga"
-            pesquisa={null}
         >
             <style>{ESTILO_VIZ}</style>
             <SeparadoresAnalise atual="cr" />
             <div className="viz-root space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
-                    <div
-                        className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 dark:border-slate-600 dark:bg-transparent"
-                        role="group"
-                        aria-label="Período"
-                    >
-                        {PERIODOS.map((p) => (
-                            <button
-                                key={p.valor}
-                                type="button"
-                                aria-pressed={periodo === p.valor}
-                                onClick={() => mudar(p.valor)}
-                                className={`rounded px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-teal-700 ${
-                                    periodo === p.valor
-                                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
-                                }`}
-                            >
-                                {p.rotulo}
-                            </button>
-                        ))}
-                    </div>
-                    <FiltroDatas url="/referenciacao/analise" de={intervalo.de} ate={intervalo.ate} aoMudar={setACarregar} />
+                    <FiltroTrimestres url="/referenciacao/analise" trimestres={trimestres} de={de} ate={ate} aoMudar={setACarregar} />
                     <p className="text-xs text-slate-600 dark:text-slate-400">
-                        O período aplica-se à data de referenciação. As séries por mês e por ano mostram sempre o histórico.
+                        Os trimestres aplicam-se à data de referenciação. Só a série por ano mostra sempre o histórico.
                     </p>
                 </div>
 
@@ -159,7 +124,7 @@ export default function AnaliseCR({
 
                     <Cartao
                         titulo="Referenciações por mês"
-                        nota="Últimos 24 meses, por data de referenciação; o mês em curso está incompleto"
+                        nota={`Por data de referenciação (${nomePeriodo}); o mês em curso está incompleto`}
                         colunas={['Mês', 'Referenciações']}
                         linhas={tabela(mensal.map((m) => ({ ...m, rotulo: nomeMes(m.rotulo) })))}
                     >

@@ -68,7 +68,7 @@ class CancroRetalAnaliseController extends Controller
             'de' => $de,
             'ate' => $ate,
             'geradoEm' => now()->format('d/m/Y H:i'),
-            'qualidade' => $this->dadosEmFalta($cirurgias, $hoje),
+            'qualidade' => $this->dadosEmFalta($cirurgias, $hoje, ctype_digit((string) $request->query('responsavel')) ? (int) $request->query('responsavel') : null),
         ]);
     }
 
@@ -118,6 +118,7 @@ class CancroRetalAnaliseController extends Controller
         $retoSigmoideia = self::RESSECCAO_RETO_SIGMOIDEIA;
         $falecido = Internamento::DESTINO_FALECIDO;
         $deiscencia = self::DEISCENCIA;
+        $semComplicacoes = \App\Models\Complicacao::SEM_COMPLICACOES;
         // Morbilidade grave: grau definitivo de Clavien-Dindo 3 ou superior (3A a 5), como no resto da aplicação.
         $grau = '(m.momento = \''.Morbilidade::AOS_30_DIAS."' or (m.momento = '".Morbilidade::NA_ALTA."' and i.destino_id = $falecido))";
 
@@ -130,10 +131,13 @@ class CancroRetalAnaliseController extends Controller
             ->whereRaw('exists (select 1 from referenciacao_centro_de_referencias r
                 where r.utente_id = i.utente_id and r.deleted_at is null and r.data_de_referenciacao <= b.data_de_inicio)')
             ->join('utentes as u', 'u.id', '=', 'i.utente_id')
+            ->leftJoin('users as ur', 'ur.id', '=', 'i.responsavel_id')
             ->selectRaw("b.data_de_inicio as data, b.id as bloco_id, i.id as internamento_id, u.id as utente_id, u.nome as utente_nome,
-                u.numero_processo, i.data_de_entrada, i.data_de_alta, i.destino_id,
+                u.numero_processo, i.responsavel_id, coalesce(nullif(ur.abrev, ''), ur.name) as responsavel_nome, i.data_de_entrada, i.data_de_alta, i.destino_id,
                 ({$tem((string) $amputacao)}) as tem_amputacao, ({$tem((string) $retoSigmoideia)}) as tem_reto_sigmoideia,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = 'alta') as morb_alta,
+                exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
+                    where m.internamento_id = i.id and m.momento = 'alta' and c.complicacao_id <> $semComplicacoes) as complicacao_alta,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias') as morb_30,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias'
                     and (m.clavien_dindo_id is null or m.clavien_dindo_id = ".Morbilidade::CLAVIEN_A_AGUARDAR.")) as clavien_em_falta,
@@ -162,14 +166,15 @@ class CancroRetalAnaliseController extends Controller
 
     /**
      * Cirurgias do período a que falta algum dado necessário aos indicadores. `falta` lista os campos em falta;
-     * o seguimento aos 30 dias só falta nos doentes vivos cuja alta foi há mais de 30 dias.
+     * o seguimento aos 30 dias só falta nos doentes vivos cuja alta foi há mais de 30 dias. `responsaveis` resume
+     * por responsável do internamento (sempre sobre todo o período) e `$responsavel` restringe a lista (0 = sem responsável).
      *
-     * @return array{linhas: list<array<string, mixed>>, totais: array<string, int>, cirurgias: int}
+     * @return array<string, mixed>
      */
-    private function dadosEmFalta($cirurgias, Carbon $hoje): array
+    private function dadosEmFalta($cirurgias, Carbon $hoje, ?int $responsavel = null): array
     {
         $limite = $hoje->copy()->subDays(30)->format('Y-m-d');
-        $linhas = $cirurgias->map(function ($c) use ($limite) {
+        $todas = $cirurgias->map(function ($c) use ($limite, $hoje) {
             $l = $c['linha'];
             $falecido = (int) $l->destino_id === Internamento::DESTINO_FALECIDO;
             $falta = [];
@@ -193,20 +198,55 @@ class CancroRetalAnaliseController extends Controller
                 $falta[] = 'datas';
             }
 
-            return $falta === [] ? null : [
+            // Prioridade do seguimento: onde a falta pode esconder uma complicação ou um óbito vem primeiro.
+            $diasDesdeAlta = $l->data_de_alta === null ? null : (int) Carbon::parse(substr($l->data_de_alta, 0, 10))->diffInDays($hoje, false);
+            if (array_intersect($falta, ['alta', 'destino']) !== []) {
+                [$prioridade, $motivo] = ['alta', 'Sem alta ou destino: a mortalidade não é calculada'];
+            } elseif ($l->complicacao_alta && array_intersect($falta, ['seguimento_30', 'clavien_30']) !== []) {
+                [$prioridade, $motivo] = ['alta', 'Complicação na alta sem seguimento aos 30 dias completo'];
+            } elseif (in_array('seguimento_30', $falta, true) && $diasDesdeAlta !== null && $diasDesdeAlta <= 90) {
+                [$prioridade, $motivo] = ['media', 'Seguimento em atraso, ainda dentro dos 90 dias da alta'];
+            } elseif ($falta !== []) {
+                [$prioridade, $motivo] = ['baixa', in_array('seguimento_30', $falta, true) ? 'Seguimento em atraso há mais de 90 dias' : 'Registo incompleto'];
+            } else {
+                [$prioridade, $motivo] = [null, null];
+            }
+
+            return [
+                'prioridade' => $prioridade,
+                'motivo' => $motivo,
                 'bloco' => $l->bloco_id,
                 'internamento' => $l->internamento_id,
                 'utente' => ['id' => $l->utente_id, 'nome' => $l->utente_nome, 'numero_processo' => $l->numero_processo],
+                'responsavel' => ['id' => (int) $l->responsavel_id, 'nome' => $l->responsavel_nome ?: 'Sem responsável'],
                 'data' => substr($l->data, 0, 10),
                 'intervencao' => $l->tem_amputacao ? 'Amputação abdomino-perineal' : ($l->tem_reto_sigmoideia ? 'Resseção reto-sigmoideia' : 'Ressecção anterior do reto'),
                 'falta' => $falta,
             ];
-        })->filter()->values();
+        });
+
+        $contar = fn ($linhas) => collect(self::CAMPOS)->mapWithKeys(fn ($campo) => [$campo => $linhas->filter(fn ($l) => in_array($campo, $l['falta'], true))->count()])->all();
+        $comFalta = fn ($linhas) => $linhas->filter(fn ($l) => $l['falta'] !== []);
+
+        $responsaveis = $todas->groupBy(fn ($l) => $l['responsavel']['id'])->map(fn ($linhas) => [
+            'id' => $linhas->first()['responsavel']['id'],
+            'nome' => $linhas->first()['responsavel']['nome'],
+            'cirurgias' => $linhas->count(),
+            'com_falta' => $comFalta($linhas)->count(),
+            'totais' => $contar($linhas),
+        ])->sortBy([['com_falta', 'desc'], ['nome', 'asc']])->values()->all();
+
+        $visiveis = $responsavel === null ? $todas : $todas->filter(fn ($l) => $l['responsavel']['id'] === $responsavel);
+        $ordem = ['alta' => 0, 'media' => 1, 'baixa' => 2];
+        $linhas = $comFalta($visiveis)->sortBy([fn ($a, $b) => $ordem[$a['prioridade']] <=> $ordem[$b['prioridade']], fn ($a, $b) => strcmp($b['data'], $a['data'])])->values();
 
         return [
-            'cirurgias' => $cirurgias->count(),
-            'totais' => collect(self::CAMPOS)->mapWithKeys(fn ($campo) => [$campo => $linhas->filter(fn ($l) => in_array($campo, $l['falta'], true))->count()])->all(),
-            'linhas' => $linhas->sortByDesc('data')->values()->all(),
+            'prioridades' => collect($ordem)->map(fn ($n, $p) => $linhas->where('prioridade', $p)->count())->all(),
+            'cirurgias' => $visiveis->count(),
+            'totais' => $contar($linhas),
+            'linhas' => $linhas->all(),
+            'responsaveis' => $responsaveis,
+            'responsavel' => $responsavel,
         ];
     }
 

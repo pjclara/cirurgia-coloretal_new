@@ -19,30 +19,18 @@ use Inertia\Response;
  */
 class AnaliseController extends Controller
 {
-    private const PERIODOS = ['12' => 12, '24' => 24, 'todos' => null];
-
     /** "Complicação real": qualquer complicação que não seja "Sem complicações". */
     public const COM_COMPLICACAO = 'exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
         where m.internamento_id = i.id and m.momento in (\'alta\', \'30_dias\') and c.complicacao_id <> '.\App\Models\Complicacao::SEM_COMPLICACOES.')';
 
     public function __invoke(Request $request): Response
     {
-        $periodo = array_key_exists($request->query('periodo'), self::PERIODOS) ? $request->query('periodo') : '12';
-        $meses = self::PERIODOS[$periodo];
         $hoje = now()->startOfDay();
-        $desde = $meses ? $hoje->copy()->subMonths($meses) : null;
-        $ate = null;
-        $anteriorDesde = $desde ? $desde->copy()->subMonths($meses) : null;
         $minima = config('clinico.data_minima');
 
-        // Intervalo de datas escolhido: sobrepõe-se ao período; o período anterior tem a mesma duração.
-        [$de, $ateTexto] = Intervalo::datas($request);
-        if ($de || $ateTexto) {
-            $periodo = 'personalizado';
-            $desde = $de ? Carbon::parse($de)->startOfDay() : Carbon::parse($minima)->startOfDay();
-            $ate = $ateTexto ? Carbon::parse($ateTexto)->endOfDay() : $hoje->copy()->endOfDay();
-            $anteriorDesde = $desde->copy()->subDays((int) $desde->diffInDays($ate->copy()->startOfDay()) + 1);
-        }
+        // Período por trimestres (por omissão, o último completo); o anterior tem o mesmo número de trimestres.
+        $primeira = DB::table('internamentos')->whereNull('deleted_at')->where('data_de_entrada', '>=', $minima)->min('data_de_entrada');
+        ['trimestres' => $trimestres, 'de' => $de, 'ate' => $ateTrimestre, 'desde' => $desde, 'fim' => $ate, 'anteriorDesde' => $anteriorDesde] = Intervalo::trimestres($request, $primeira, $hoje);
 
         // Internamentos válidos (sem apagados e com datas plausíveis).
         $internamentos = fn () => DB::table('internamentos as i')->whereNull('i.deleted_at')->where('i.data_de_entrada', '>=', $minima);
@@ -66,8 +54,9 @@ class AnaliseController extends Controller
             ->when($ate, fn ($q) => $q->where('b.data_de_inicio', '<=', $ate));
 
         return Inertia::render('dashboard', [
-            'periodo' => $periodo,
-            'intervalo' => ['de' => $de, 'ate' => $ateTexto],
+            'trimestres' => $trimestres,
+            'de' => $de,
+            'ate' => $ateTrimestre,
             'geradoEm' => now()->format('d/m/Y H:i'),
             'indicadores' => [
                 'internamentos' => ['valor' => $entradas, 'anterior' => $entradasAntes],
@@ -78,7 +67,7 @@ class AnaliseController extends Controller
                 'cirurgias' => (clone $cirurgias)->count(),
                 'seguimentos_em_atraso' => $this->seguimentosEmAtraso($hoje),
             ],
-            'mensal' => $this->internamentosPorMes($internamentos, $hoje),
+            'mensal' => $this->internamentosPorMes($internamentos, $hoje, $desde, $ate),
             'anual' => $this->serieAnual($internamentos, $minima, $hoje),
             'clavien' => $this->distribuicaoClavien($internamentos, $desde, $ate),
             'intervencoes' => $this->topIntervencoes($desde, $minima, $hoje, $ate),
@@ -98,18 +87,20 @@ class AnaliseController extends Controller
             ->count();
     }
 
-    /** Entradas nos últimos 24 meses, com os meses sem entradas a zero. */
-    private function internamentosPorMes(callable $internamentos, Carbon $hoje): array
+    /** Entradas por mês nos trimestres escolhidos (24 meses sem período), com os meses sem entradas a zero. */
+    private function internamentosPorMes(callable $internamentos, Carbon $hoje, ?Carbon $desde, ?Carbon $ate): array
     {
-        $inicio = $hoje->copy()->startOfMonth()->subMonths(23);
-        $contagens = $internamentos()->where('i.data_de_entrada', '>=', $inicio)
+        $inicio = $desde ? $desde->copy()->startOfMonth() : $hoje->copy()->startOfMonth()->subMonths(23);
+        $fim = $ate ?? $hoje;
+        $contagens = $internamentos()->where('i.data_de_entrada', '>=', $inicio)->where('i.data_de_entrada', '<=', $fim)
             ->selectRaw("date_format(i.data_de_entrada, '%Y-%m') as ym, count(*) as n")->groupBy('ym')->pluck('n', 'ym');
 
-        return collect(range(0, 23))->map(function ($n) use ($inicio, $contagens) {
-            $mes = $inicio->copy()->addMonths($n);
+        $meses = [];
+        for ($mes = $inicio->copy(); $mes->lte($fim); $mes->addMonthNoOverflow()) {
+            $meses[] = ['rotulo' => $mes->format('Y-m'), 'valor' => (int) ($contagens[$mes->format('Y-m')] ?? 0)];
+        }
 
-            return ['rotulo' => $mes->format('Y-m'), 'valor' => (int) ($contagens[$mes->format('Y-m')] ?? 0)];
-        })->all();
+        return $meses;
     }
 
     /** Por ano: internamentos, cirurgias, demora média e % de altas com complicações. */

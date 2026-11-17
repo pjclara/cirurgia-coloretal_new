@@ -2,7 +2,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import type { PropsPartilhadas } from '../clinico/tipos';
-import { PesquisaUtente } from '../components/clinico/pesquisa-utente';
 
 type Props = {
     titulo: string;
@@ -11,15 +10,14 @@ type Props = {
     /** Linha de contexto por baixo do título. */
     subtitulo?: ReactNode;
     largura?: 'normal' | 'larga';
-    /** Substitui a pesquisa de utentes por omissão (ex.: o quadro filtra os internados). */
+    /** Pesquisa ou filtro mostrado no topo (ex.: o quadro filtra os internados). */
     pesquisa?: ReactNode;
     children: ReactNode;
 };
 
 export default function ClinicoLayout({ titulo, acoes, subtitulo, largura = 'normal', pesquisa, children }: Props) {
     const pagina = usePage<PropsPartilhadas>();
-    const { permissoes, flash } = pagina.props.clinico;
-    const pode = (permissao: string) => permissoes.includes(permissao);
+    const { flash } = pagina.props.clinico;
     const contentor = largura === 'larga' ? 'max-w-[96rem]' : 'max-w-6xl';
 
     return (
@@ -27,13 +25,7 @@ export default function ClinicoLayout({ titulo, acoes, subtitulo, largura = 'nor
             <Head title={titulo} />
 
             <main id="conteudo" className={`mx-auto w-full ${contentor} px-4 py-6 font-sans text-slate-900 dark:text-slate-100`}>
-                {pesquisa !== undefined
-                    ? pesquisa
-                    : pode('show internamento') && (
-                          <div className="mb-5 max-w-sm">
-                              <PesquisaUtente podeCriar={pode('create internamento')} />
-                          </div>
-                      )}
+                {pesquisa}
 
                 {flash.sucesso && (
                     <p role="status" className="mb-4 rounded-md border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm text-teal-900">

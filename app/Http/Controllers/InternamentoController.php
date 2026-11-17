@@ -76,12 +76,18 @@ class InternamentoController extends Controller
     }
 
     /** Altas cujo seguimento aos 30 dias (morbilidade) ainda não foi registado. */
+    /** O doente está referenciado ao centro de referência até à data da alta do internamento. */
+    private const DOENTE_CR = 'exists (select 1 from referenciacao_centro_de_referencias rr
+        where rr.utente_id = internamentos.utente_id and rr.deleted_at is null and rr.data_de_referenciacao <= internamentos.data_de_alta)';
+
     public function seguimentos(Request $request): Response
     {
         $periodos = ['90' => 90, '365' => 365, 'todos' => null];
         $periodo = array_key_exists($request->query('periodo'), $periodos) ? $request->query('periodo') : '90';
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
         $responsavelId = ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null;
+        $soCr = $request->boolean('cr');
+        $q = trim((string) $request->query('q', ''));
         $administrador = $request->user()->eAdministrador();
         $hoje = now()->startOfDay();
         $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
@@ -94,15 +100,20 @@ class InternamentoController extends Controller
             ->whereExists(fn ($q) => $q->selectRaw('1')->from('bloco_operatorios as b')
                 ->whereColumn('b.internamento_id', 'internamentos.id')->whereNull('b.deleted_at'))
             ->when($responsavelId, fn ($q, $id) => $q->where('responsavel_id', $id))
+            ->when($soCr, fn ($q) => $q->whereRaw(self::DOENTE_CR))
+            ->when($q !== '', fn ($consulta) => $consulta->whereHas('utente', fn ($u) => $u->pesquisar($q)))
             ->when($periodos[$periodo], fn ($q, $dias) => $q->whereDate('data_de_alta', '>=', $hoje->copy()->subDays($dias)));
 
         $emAtraso = (clone $base)->whereDate('data_de_alta', '<', $limiteAtraso)->count();
         $aDecorrer = (clone $base)->whereDate('data_de_alta', '>=', $limiteAtraso)->count();
 
         $lista = (clone $base)
+            ->selectRaw('internamentos.*, ('.self::DOENTE_CR.') as doente_cr')
             ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->when($estado === 'em_atraso', fn ($q) => $q->whereDate('data_de_alta', '<', $limiteAtraso))
             ->when($estado === 'a_decorrer', fn ($q) => $q->whereDate('data_de_alta', '>=', $limiteAtraso))
+            // Os doentes do CR vêm sempre primeiro.
+            ->orderByDesc('doente_cr')
             ->orderBy('data_de_alta')
             ->orderBy('id')
             ->paginate(25)
@@ -119,6 +130,7 @@ class InternamentoController extends Controller
                     // positivo = dias de atraso; negativo = dias que faltam
                     'dias_de_atraso' => (int) $prevista->startOfDay()->diffInDays($hoje, false),
                     'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
+                    'cr' => (bool) $i->doente_cr,
                     'bloqueado' => $i->bloquear_tabela && ! $administrador,
                 ];
             });
@@ -131,9 +143,9 @@ class InternamentoController extends Controller
                 'clavien' => Dominios::lista('clavien_dindos'),
             ],
             'seguimentos' => $lista,
-            'filtros' => ['estado' => $estado, 'periodo' => $periodo, 'responsavel_id' => $responsavelId],
+            'filtros' => ['estado' => $estado, 'periodo' => $periodo, 'responsavel_id' => $responsavelId, 'cr' => $soCr, 'q' => $q],
             'responsaveis' => Dominios::responsaveis($responsavelId),
-            'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer],
+            'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer, 'cr' => (clone $base)->when(! $soCr, fn ($q) => $q->whereRaw(self::DOENTE_CR))->count()],
         ]);
     }
 

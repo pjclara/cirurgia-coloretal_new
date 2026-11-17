@@ -1,10 +1,10 @@
 import { Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao, OpcaoAgrupada, Paginado, Responsavel } from '../../clinico/tipos';
 import type { ResolucaoComGrau } from '../../components/clinico/bloco-morbilidade';
-import { Botao, BotaoLigacao, SelecaoResponsavel } from '../../components/clinico/campos';
+import { Botao, BotaoLigacao, SelecaoResponsavel, estiloEntrada } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { ModalSeguimento } from '../../components/internamentos/modal-seguimento';
@@ -18,6 +18,7 @@ type Linha = {
     prevista: string;
     dias_de_atraso: number;
     responsavel: string | null;
+    cr: boolean;
     clavien?: string | null;
     bloqueado: boolean;
 };
@@ -27,9 +28,9 @@ type Periodo = '90' | '365' | 'todos';
 
 type Props = {
     seguimentos: Paginado<Linha>;
-    filtros: { estado: Estado; periodo: Periodo; responsavel_id: number | null };
+    filtros: { estado: Estado; periodo: Periodo; responsavel_id: number | null; cr: boolean; q: string };
     responsaveis: Responsavel[];
-    contagens: { em_atraso: number; a_decorrer: number };
+    contagens: { em_atraso: number; a_decorrer: number; cr: number };
     podeRegistar: boolean;
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
@@ -41,16 +42,19 @@ const PERIODOS: { valor: Periodo; rotulo: string }[] = [
 ];
 
 export default function Seguimentos({ seguimentos, filtros, responsaveis, contagens, podeRegistar, dominios }: Props) {
+    const [termo, setTermo] = useState(filtros.q);
     const [abertoId, setAbertoId] = useState<number | null>(null);
     const indice = seguimentos.data.findIndex((l) => l.id === abertoId);
     const aberto = indice >= 0 ? seguimentos.data[indice] : null;
     const seguinte = indice >= 0 ? (seguimentos.data[indice + 1] ?? null) : null;
     const aplicar = (alteracoes: Partial<Props['filtros']>) => {
-        const novos = { ...filtros, ...alteracoes };
+        const novos = { ...filtros, q: termo.trim(), ...alteracoes };
         const consulta: Record<string, string> = {};
         if (novos.estado !== 'todos') consulta.estado = novos.estado;
         if (novos.periodo !== '90') consulta.periodo = novos.periodo;
         if (novos.responsavel_id) consulta.responsavel_id = String(novos.responsavel_id);
+        if (novos.cr) consulta.cr = '1';
+        if (novos.q) consulta.q = novos.q;
         router.get(rotas.internamentos.seguimentos, consulta, { preserveState: true, preserveScroll: true });
     };
 
@@ -63,7 +67,7 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
     return (
         <ClinicoLayout
             titulo="Seguimentos aos 30 dias"
-            subtitulo="Altas sem morbilidade registada aos 30 dias. Não inclui doentes falecidos."
+            subtitulo="Altas sem morbilidade registada aos 30 dias. Não inclui doentes falecidos. Os doentes do CR (centro de referência) aparecem primeiro."
             largura="larga"
             acoes={
                 <BotaoLigacao href={rotas.internamentos.lista} variante="secundario">
@@ -86,6 +90,18 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                         <span className="text-sm text-slate-600">{c.rotulo}</span>
                     </button>
                 ))}
+
+                <button
+                    type="button"
+                    aria-pressed={filtros.cr}
+                    onClick={() => aplicar({ cr: !filtros.cr })}
+                    className={`min-w-36 rounded-lg border bg-white px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-teal-700 ${
+                        filtros.cr ? 'border-violet-700 ring-1 ring-violet-700' : 'border-slate-200 hover:border-slate-400'
+                    }`}
+                >
+                    <span className="block text-2xl font-semibold text-violet-800 tabular-nums">{contagens.cr}</span>
+                    <span className="text-sm text-slate-600">{filtros.cr ? 'Só doentes do CR' : 'Doentes do CR'}</span>
+                </button>
 
                 <div className="ml-auto flex flex-wrap items-end gap-2">
                     <label className="text-sm">
@@ -114,6 +130,30 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                     </label>
                 </div>
             </div>
+
+            <form
+                onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    aplicar({});
+                }}
+                className="mb-4 flex max-w-md gap-2"
+                role="search"
+            >
+                <label htmlFor="q" className="sr-only">
+                    Procurar por nome ou processo
+                </label>
+                <input
+                    id="q"
+                    type="search"
+                    value={termo}
+                    onChange={(e) => setTermo(e.target.value)}
+                    placeholder="Nome ou processo"
+                    className={estiloEntrada}
+                />
+                <Botao type="submit" variante="secundario">
+                    Procurar
+                </Botao>
+            </form>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                 <table className="w-full text-left text-sm">
@@ -144,6 +184,14 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                                         </Link>
                                     ) : (
                                         '—'
+                                    )}
+                                    {l.cr && (
+                                        <span
+                                            className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-900"
+                                            title="Doente referenciado ao centro de referência"
+                                        >
+                                            CR
+                                        </span>
                                     )}
                                     <p className="text-xs text-slate-500 tabular-nums">
                                         <NumeroProcesso valor={l.utente.numero_processo} />

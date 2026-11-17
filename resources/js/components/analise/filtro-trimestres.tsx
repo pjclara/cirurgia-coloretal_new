@@ -1,13 +1,20 @@
 import { router } from '@inertiajs/react';
 
-type Props = { url: string; trimestres: string[]; de: string | null; ate: string | null; aoMudar?: (aCarregar: boolean) => void };
+type Props = {
+    url: string;
+    trimestres: string[];
+    de: string | null;
+    ate: string | null;
+    aoMudar?: (aCarregar: boolean) => void;
+    extra?: Record<string, string>;
+};
 
 /** Seletores De / até por trimestre, partilhados pelas páginas de análise do cancro retal. */
-export function FiltroTrimestres({ url, trimestres, de, ate, aoMudar }: Props) {
+export function FiltroTrimestres({ url, trimestres, de, ate, aoMudar, extra }: Props) {
     const mudar = (novo: { de?: string; ate?: string }) =>
         router.get(
             url,
-            { de: de ?? '', ate: ate ?? '', ...novo },
+            { ...extra, de: de ?? '', ate: ate ?? '', ...novo },
             {
                 preserveScroll: true,
                 preserveState: true,

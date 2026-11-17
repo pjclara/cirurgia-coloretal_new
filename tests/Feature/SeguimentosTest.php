@@ -58,3 +58,30 @@ test('a lista não mostra o grau da alta: o grau definitivo só existe depois do
         ->missing('seguimentos.data.0.clavien'));
     expect($i->fresh()->load('morbilidades')->claviemMaisGrave())->toBeNull();
 });
+
+test('os doentes do CR vêm primeiro, estão identificados e podem filtrar-se', function () {
+    $antiga = internamentoComAlta($this, 60);       // sem CR, mais antiga
+    $recente = internamentoComAlta($this, 10);      // doente do CR, mais recente
+    DB::table('referenciacao_centro_de_referencias')->insert([
+        'utente_id' => $recente->utente_id, 'data_de_referenciacao' => now()->subDays(30)->format('Y-m-d'),
+        'origem_id' => 1, 'responsavel_id' => $this->utilizador->id, 'created_by_id' => $this->utilizador->id, 'uuid' => (string) \Illuminate\Support\Str::uuid(),
+    ]);
+
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p
+        ->where('seguimentos.data.0.id', $recente->id)->where('seguimentos.data.0.cr', true)
+        ->where('seguimentos.data.1.id', $antiga->id)->where('seguimentos.data.1.cr', false)
+        ->where('contagens.cr', 1));
+
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?cr=1')->assertInertia(fn (Assert $p) => $p
+        ->where('seguimentos.total', 1)->where('filtros.cr', true)->where('contagens.cr', 1));
+});
+
+test('os seguimentos podem procurar-se por nome ou processo', function () {
+    $um = internamentoComAlta($this, 40);
+    internamentoComAlta($this, 41);
+    $um->utente->update(['nome' => 'Zacarias Teste']);
+
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?q=Zacarias')->assertInertia(fn (Assert $p) => $p
+        ->where('seguimentos.total', 1)->where('seguimentos.data.0.id', $um->id)->where('filtros.q', 'Zacarias'));
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?q='.$um->utente->numero_processo)->assertInertia(fn (Assert $p) => $p->where('seguimentos.data.0.id', $um->id));
+});
