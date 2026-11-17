@@ -17,6 +17,7 @@ import { type BlocoMorbilidade, type Momento } from '../../components/clinico/bl
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../../components/clinico/campos';
 import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
 import { MomentoMorbilidade } from '../../components/clinico/momento-morbilidade';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -229,7 +230,10 @@ export function FormularioInternamento({
         { texto: 'Destino do doente escolhido', feito: data.destino_id !== '', separador: 'alta' },
         { texto: 'Pelo menos um diagnóstico', feito: data.diagnosticos.length > 0, separador: 'dados' },
         { texto: 'Motivo de internamento preenchido', feito: data.motivo_internamento.trim() !== '', separador: 'dados' },
-        { texto: 'Morbilidade da alta registada (ou "Sem complicações")', feito: registado('alta'), separador: 'morbilidade' },
+        // Sem cirurgia não é preciso registar complicações.
+        ...(listaCirurgias.length > 0
+            ? [{ texto: 'Morbilidade da alta registada (ou "Sem complicações")', feito: registado('alta'), separador: 'morbilidade' as Separador }]
+            : []),
         {
             texto: 'Grau de Clavien-Dindo da alta, se houve complicações',
             feito: !temComplicacaoReal('alta') || obito || data.morbilidade.alta.clavien_dindo_id !== '',
@@ -339,7 +343,9 @@ export function FormularioInternamento({
             {utente && (internamento || separador !== 'dados') && (
                 <p className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 tabular-nums">
                     <span className="font-semibold text-slate-900">{utente.nome}</span>
-                    <span>Processo {utente.numero_processo}</span>
+                    <span>
+                        <NumeroProcesso valor={utente.numero_processo} />
+                    </span>
                     <span>
                         {anos !== null && `${anos} anos`}
                         {utente.sexo && `${anos !== null ? ', ' : ''}${utente.sexo.toLowerCase()}`}
@@ -437,7 +443,7 @@ export function FormularioInternamento({
                                                 <div>
                                                     <p className="text-base font-semibold text-slate-900">{utente.nome}</p>
                                                     <p className="text-sm text-slate-600 tabular-nums">
-                                                        Processo {utente.numero_processo}
+                                                        <NumeroProcesso valor={utente.numero_processo} />
                                                         {anos !== null && `, ${anos} anos`}
                                                         {utente.sexo && `, ${utente.sexo.toLowerCase()}`}
                                                     </p>

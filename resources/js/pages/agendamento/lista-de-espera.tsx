@@ -5,6 +5,7 @@ import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Linha = {
@@ -125,7 +126,9 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                                     ) : (
                                         '—'
                                     )}
-                                    <span className="ml-2 text-xs text-slate-500 tabular-nums">{l.utente.numero_processo}</span>
+                                    <span className="ml-2 text-xs text-slate-500 tabular-nums">
+                                        <NumeroProcesso semRotulo valor={l.utente.numero_processo} />
+                                    </span>
                                 </td>
                                 <td className="px-4 py-2 tabular-nums">{formatarData(l.data)}</td>
                                 <td className="px-4 py-2">

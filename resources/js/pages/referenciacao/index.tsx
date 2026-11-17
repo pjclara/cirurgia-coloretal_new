@@ -5,6 +5,7 @@ import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Paginado, PropsPartilhadas } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import { FormularioReferenciacao, type PropsReferenciacao } from '../../components/referenciacao/formulario-referenciacao';
@@ -162,7 +163,9 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
                                     ) : (
                                         '—'
                                     )}
-                                    <p className="text-xs text-slate-500 tabular-nums">Processo {l.utente.numero_processo ?? '—'}</p>
+                                    <p className="text-xs text-slate-500 tabular-nums">
+                                        <NumeroProcesso valor={l.utente.numero_processo} />
+                                    </p>
                                 </td>
                                 <td className="max-w-xs px-4 py-2.5">
                                     <span className="line-clamp-2">{l.diagnosticos.length > 0 ? l.diagnosticos.join(', ') : '—'}</span>

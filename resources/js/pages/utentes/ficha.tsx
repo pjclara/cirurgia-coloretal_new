@@ -4,6 +4,7 @@ import { diasEntre, formatarData, hojeIso, idade, plural } from '../../clinico/f
 import { rotas } from '../../clinico/rotas';
 import type { PropsPartilhadas } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Seccao } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { SinalizarCentro } from '../../components/referenciacao/sinalizar-centro';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -78,7 +79,7 @@ export default function FichaUtente({
             titulo={utente.nome}
             subtitulo={
                 <span className="tabular-nums">
-                    Processo {utente.numero_processo}
+                    <NumeroProcesso valor={utente.numero_processo} />
                     {sinalizado && (
                         <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900">Centro de referência</span>
                     )}

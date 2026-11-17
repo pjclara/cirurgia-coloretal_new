@@ -2,9 +2,10 @@ import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
-import type { Opcao, OpcaoAgrupada, Paginado } from '../../clinico/tipos';
+import type { Opcao, OpcaoAgrupada, Paginado, Responsavel } from '../../clinico/tipos';
 import type { ResolucaoComGrau } from '../../components/clinico/bloco-morbilidade';
-import { Botao, BotaoLigacao } from '../../components/clinico/campos';
+import { Botao, BotaoLigacao, SelecaoResponsavel } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { ModalSeguimento } from '../../components/internamentos/modal-seguimento';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -26,7 +27,8 @@ type Periodo = '90' | '365' | 'todos';
 
 type Props = {
     seguimentos: Paginado<Linha>;
-    filtros: { estado: Estado; periodo: Periodo };
+    filtros: { estado: Estado; periodo: Periodo; responsavel_id: number | null };
+    responsaveis: Responsavel[];
     contagens: { em_atraso: number; a_decorrer: number };
     podeRegistar: boolean;
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
@@ -38,7 +40,7 @@ const PERIODOS: { valor: Periodo; rotulo: string }[] = [
     { valor: 'todos', rotulo: 'Todas as altas' },
 ];
 
-export default function Seguimentos({ seguimentos, filtros, contagens, podeRegistar, dominios }: Props) {
+export default function Seguimentos({ seguimentos, filtros, responsaveis, contagens, podeRegistar, dominios }: Props) {
     const [abertoId, setAbertoId] = useState<number | null>(null);
     const indice = seguimentos.data.findIndex((l) => l.id === abertoId);
     const aberto = indice >= 0 ? seguimentos.data[indice] : null;
@@ -48,6 +50,7 @@ export default function Seguimentos({ seguimentos, filtros, contagens, podeRegis
         const consulta: Record<string, string> = {};
         if (novos.estado !== 'todos') consulta.estado = novos.estado;
         if (novos.periodo !== '90') consulta.periodo = novos.periodo;
+        if (novos.responsavel_id) consulta.responsavel_id = String(novos.responsavel_id);
         router.get(rotas.internamentos.seguimentos, consulta, { preserveState: true, preserveScroll: true });
     };
 
@@ -84,7 +87,17 @@ export default function Seguimentos({ seguimentos, filtros, contagens, podeRegis
                     </button>
                 ))}
 
-                <div className="ml-auto flex items-end">
+                <div className="ml-auto flex flex-wrap items-end gap-2">
+                    <label className="text-sm">
+                        <span className="sr-only">Médico responsável</span>
+                        <SelecaoResponsavel
+                            responsaveis={responsaveis}
+                            valor={filtros.responsavel_id ?? ''}
+                            aoMudar={(v) => aplicar({ responsavel_id: v === '' ? null : v })}
+                            vazio="Todos os médicos"
+                            className="w-56"
+                        />
+                    </label>
                     <label className="text-sm">
                         <span className="sr-only">Período</span>
                         <select
@@ -132,7 +145,9 @@ export default function Seguimentos({ seguimentos, filtros, contagens, podeRegis
                                     ) : (
                                         '—'
                                     )}
-                                    <p className="text-xs text-slate-500 tabular-nums">Processo {l.utente.numero_processo ?? '—'}</p>
+                                    <p className="text-xs text-slate-500 tabular-nums">
+                                        <NumeroProcesso valor={l.utente.numero_processo} />
+                                    </p>
                                 </td>
                                 <td className="max-w-xs px-4 py-2.5">
                                     <span className="line-clamp-2">{l.motivo}</span>
@@ -154,7 +169,14 @@ export default function Seguimentos({ seguimentos, filtros, contagens, podeRegis
                                 <td className="px-4 py-2.5">{l.responsavel ?? '—'}</td>
                                 <td className="px-4 py-2.5 text-right whitespace-nowrap">
                                     {podeRegistar && !l.bloqueado ? (
-                                        <Botao variante="secundario" onClick={() => setAbertoId(l.id)}>
+                                        <Botao
+                                            variante="secundario"
+                                            onClick={() => setAbertoId(l.id)}
+                                            disabled={l.dias_de_atraso < 0}
+                                            title={
+                                                l.dias_de_atraso < 0 ? `Só a partir de ${formatarData(l.prevista)} (30 dias após a alta)` : undefined
+                                            }
+                                        >
                                             Registar
                                         </Botao>
                                     ) : (

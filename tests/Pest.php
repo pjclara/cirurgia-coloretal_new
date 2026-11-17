@@ -152,3 +152,17 @@ function novoAgendamento(ListaDeEspera $espera, User $responsavel, string $data,
 
     return $agendamento;
 }
+
+/** Regista uma cirurgia no dia de entrada (quem foi operado tem seguimento aos 30 dias). */
+function internamentoOperado(object $teste, Internamento $internamento): Internamento
+{
+    $teste->actingAs($teste->utilizador)->post("/internamentos/{$internamento->id}/cirurgias", [
+        'data_de_inicio' => $internamento->data_de_entrada->format('Y-m-d'),
+        'tipo_de_cirurgia_id' => DB::table('tipo_de_cirurgias')->value('id'),
+        'tipo_de_abordagem_id' => DB::table('tipo_de_abordagems')->value('id'),
+        're_intervencao_nao_programada_id' => 1,
+        'intervencoes' => [DB::table('intervencaos')->value('id')],
+    ])->assertSessionHasNoErrors();
+
+    return $internamento->refresh();
+}

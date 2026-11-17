@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { router } from '@inertiajs/react';
 import { formatarData } from '../../clinico/formato';
 import { CorpoFormularioCirurgia, type PropsCirurgia } from '../../pages/cirurgias/formulario';
+import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type ModalCirurgiaDados = PropsCirurgia & { fechar_url: string; origem?: 'quadro' };
 
@@ -21,7 +22,7 @@ export function ModalCirurgia({ modal }: { modal: ModalCirurgiaDados | null }) {
                         <DialogHeader>
                             <DialogTitle>{modal.cirurgia ? 'Cirurgia' : 'Nova cirurgia'}</DialogTitle>
                             <p className="text-sm text-slate-600 tabular-nums">
-                                {modal.utente.nome} · Processo {modal.utente.numero_processo} · Internamento de{' '}
+                                {modal.utente.nome} · <NumeroProcesso valor={modal.utente.numero_processo} /> · Internamento de{' '}
                                 {formatarData(modal.internamento.entrada)}
                             </p>
                         </DialogHeader>

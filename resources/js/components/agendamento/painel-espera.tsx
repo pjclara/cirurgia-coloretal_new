@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { PRIORIDADE } from '../../clinico/agendamento';
 import { diasEntre, formatarData } from '../../clinico/formato';
 import { estiloEntrada } from '../clinico/campos';
+import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type ItemEspera = {
     id: number;
@@ -121,7 +122,7 @@ export function PainelEspera({
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-medium text-slate-900">{e.utente.nome ?? 'Utente sem ficha'}</p>
                                         <p className="text-xs text-slate-600 tabular-nums">
-                                            Processo {e.utente.numero_processo ?? '—'}
+                                            <NumeroProcesso valor={e.utente.numero_processo} />
                                             {dias !== null && dias < 3650 && ` · há ${dias} d`}
                                         </p>
                                     </div>

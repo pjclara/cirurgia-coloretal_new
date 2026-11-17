@@ -193,7 +193,9 @@ class InternamentoRequest extends FormRequest
             }
         }
 
-        if ($this->data_de_alta && collect($this->input('morbilidade.'.Morbilidade::NA_ALTA.'.complicacoes', []))->isEmpty()) {
+        // Sem cirurgia não é preciso registar complicações: só se exige a morbilidade da alta a quem foi operado.
+        $operado = $this->route('internamento')?->temCirurgias() ?? false;
+        if ($operado && $this->data_de_alta && collect($this->input('morbilidade.'.Morbilidade::NA_ALTA.'.complicacoes', []))->isEmpty()) {
             $validator->errors()->add('morbilidade.alta.complicacoes', 'Para dar alta, registe as complicações da alta ou escolha "Sem complicações".');
         }
     }

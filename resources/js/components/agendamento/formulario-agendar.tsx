@@ -3,6 +3,7 @@ import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import type { Opcao, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
+import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type PropsAgendar = {
     agendamento: {
@@ -67,7 +68,8 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
             <DialogHeader>
                 <DialogTitle>{agendamento ? 'Agendamento' : 'Agendar cirurgia'}</DialogTitle>
                 <DialogDescription>
-                    {espera.utente.nome} · Processo {espera.utente.numero_processo} · {espera.intervencoes.join(', ') || 'sem intervenção indicada'}
+                    {espera.utente.nome} · <NumeroProcesso valor={espera.utente.numero_processo} /> ·{' '}
+                    {espera.intervencoes.join(', ') || 'sem intervenção indicada'}
                 </DialogDescription>
             </DialogHeader>
             <form onSubmit={guardar} noValidate className="space-y-5">

@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { NOMES_DIA, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao } from '../../clinico/tipos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 
 type Item = {
     id: number;
@@ -113,7 +114,9 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, estados,
                                                     {a.utente.nome ?? 'Utente sem ficha'}
                                                     {a.idade !== null && <span className="font-normal text-slate-600"> ({a.idade} anos)</span>}
                                                 </td>
-                                                <td className="py-1.5 pr-2 tabular-nums">{a.utente.numero_processo ?? '—'}</td>
+                                                <td className="py-1.5 pr-2 tabular-nums">
+                                                    <NumeroProcesso semRotulo valor={a.utente.numero_processo} />
+                                                </td>
                                                 <td className="py-1.5 pr-2">{a.intervencoes.join(', ') || '—'}</td>
                                                 <td className="py-1.5 pr-2">{[a.tipo, a.local].filter(Boolean).join(' · ') || '—'}</td>
                                                 <td className="py-1.5 pr-2">{a.responsavel ?? '—'}</td>

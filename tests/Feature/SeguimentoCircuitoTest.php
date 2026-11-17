@@ -9,6 +9,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 function altaParaSeguimento(object $t, int $dias = 40, array $extra = []): Internamento
 {
     $i = novoInternamento(novoUtente(), $t->utilizador, ['data_de_entrada' => now()->subDays($dias + 5)->format('Y-m-d')]);
+    internamentoOperado($t, $i);
     $i->forceFill($extra + [
         'data_de_alta' => now()->subDays($dias)->format('Y-m-d'),
         'destino_id' => DB::table('destinos')->where('id', '<>', Internamento::DESTINO_FALECIDO)->value('id'),

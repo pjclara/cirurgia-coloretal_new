@@ -3,6 +3,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
 import { Botao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
+import { NumeroProcesso } from '../clinico/numero-processo';
 
 type Linha = { diagnostico_id: number | ''; modo_id: number | ''; histologia_id: number | ''; data_diagnostico: string };
 
@@ -123,7 +124,7 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
             <DialogHeader>
                 <DialogTitle>{referenciacao ? 'Referenciação ao centro de referência' : 'Referenciar ao centro de referência'}</DialogTitle>
                 <DialogDescription className="tabular-nums">
-                    {utente.nome} · Processo {utente.numero_processo}
+                    {utente.nome} · <NumeroProcesso valor={utente.numero_processo} />
                 </DialogDescription>
             </DialogHeader>
 

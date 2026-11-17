@@ -4,6 +4,7 @@ import { diasEntre, formatarData, hojeIso } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao, Paginado, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Selecao, estiloEntrada } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -164,7 +165,9 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                                         <Link href={rotas.internamentos.registo(i.id)} className="font-medium text-teal-800 hover:underline">
                                             {i.utente.nome ?? 'Utente sem ficha'}
                                         </Link>
-                                        <span className="block text-xs text-slate-600 tabular-nums">Processo {i.utente.numero_processo ?? '—'}</span>
+                                        <span className="block text-xs text-slate-600 tabular-nums">
+                                            <NumeroProcesso valor={i.utente.numero_processo} />
+                                        </span>
                                         {i.centro_referencia && (
                                             <span className="mt-1 inline-block">
                                                 <span

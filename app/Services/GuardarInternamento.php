@@ -28,6 +28,11 @@ class GuardarInternamento
                 $internamento->estado_da_alta_id = Internamento::ALTA_PENDENTE;
             }
 
+            // Sem cirurgia não há revisão aos 30 dias: com data de alta, a alta fica logo concluída.
+            if ($internamento->data_de_alta && ! $internamento->temCirurgias()) {
+                $internamento->estado_da_alta_id = Internamento::ALTA_CONCLUIDA;
+            }
+
             $internamento->save();
 
             $diagnosticos = collect($dados['diagnosticos'] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values();

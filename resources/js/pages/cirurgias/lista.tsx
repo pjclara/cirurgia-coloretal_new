@@ -2,6 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { formatarData, plural } from '../../clinico/formato';
 import type { PropsPartilhadas } from '../../clinico/tipos';
 import { BotaoLigacao, Seccao } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Cirurgia = {
@@ -35,12 +36,13 @@ export default function ListaCirurgias({ utente, cirurgias, internamentos }: Pro
                     <Link href={`/utentes/${utente.id}`} className="font-medium text-[#7d1830] hover:underline">
                         {utente.nome}
                     </Link>
-                    <span className="tabular-nums"> · Processo {utente.numero_processo}</span>
+                    <span className="tabular-nums">
+                        {' '}
+                        · <NumeroProcesso valor={utente.numero_processo} />
+                    </span>
                 </span>
             }
-            acoes={
-                podeCriar && alvo ? <BotaoLigacao href={`/internamentos/${alvo.id}/cirurgias/nova`}>Nova cirurgia</BotaoLigacao> : undefined
-            }
+            acoes={podeCriar && alvo ? <BotaoLigacao href={`/internamentos/${alvo.id}/cirurgias/nova`}>Nova cirurgia</BotaoLigacao> : undefined}
         >
             <Seccao titulo="Cirurgias do utente" descricao={cirurgias.length > 0 ? plural(cirurgias.length, 'registo', 'registos') : undefined}>
                 {cirurgias.length === 0 ? (
@@ -57,9 +59,7 @@ export default function ListaCirurgias({ utente, cirurgias, internamentos }: Pro
                                     <Link href={`/cirurgias/${c.id}`} className="text-sm font-medium text-[#7d1830] hover:underline">
                                         {c.intervencoes.length > 0 ? c.intervencoes.join(', ') : 'Sem intervenção indicada'}
                                     </Link>
-                                    <p className="text-sm text-slate-600">
-                                        {[c.tipo, c.abordagem].filter(Boolean).join(' · ')}
-                                    </p>
+                                    <p className="text-sm text-slate-600">{[c.tipo, c.abordagem].filter(Boolean).join(' · ')}</p>
                                 </div>
                                 <Link href={`/internamentos/${c.internamento.id}`} className="text-sm text-slate-600 hover:underline">
                                     Internamento de {formatarData(c.internamento.entrada)}

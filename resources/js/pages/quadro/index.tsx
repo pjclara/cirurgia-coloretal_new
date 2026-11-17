@@ -6,6 +6,7 @@ import { rotas } from '../../clinico/rotas';
 import type { PropsPartilhadas } from '../../clinico/tipos';
 import { ModalCirurgia, type ModalCirurgiaDados } from '../../components/cirurgias/modal-cirurgia';
 import { BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import { ModalUtente, type ModalUtenteDados } from '../../components/utentes/modal-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -73,7 +74,9 @@ function Cama({ internado, hoje, equipa, podeCriar }: { internado: Internado; ho
                             {internado.utente.sexo ? `, ${internado.utente.sexo.toLowerCase()}` : ''}
                         </p>
                         {internado.utente.numero_processo && (
-                            <p className="text-xs text-slate-600 tabular-nums">Processo {internado.utente.numero_processo}</p>
+                            <p className="text-xs text-slate-600 tabular-nums">
+                                <NumeroProcesso valor={internado.utente.numero_processo} />
+                            </p>
                         )}
                     </div>
                     {internado.responsavel && (
@@ -184,7 +187,9 @@ function Tabela({ lista, hoje, equipa, podeCriar }: { lista: Internado[]; hoje: 
                                         {i.cama}
                                     </span>
                                 </td>
-                                <td className="px-3 py-2 whitespace-nowrap text-slate-700 tabular-nums">{i.utente.numero_processo ?? '–'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap text-slate-700 tabular-nums">
+                                    <NumeroProcesso semRotulo valor={i.utente.numero_processo} />
+                                </td>
                                 <td className="px-3 py-2 font-medium text-slate-900">
                                     <Link
                                         href={ligacao(i.id)}

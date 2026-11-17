@@ -81,6 +81,7 @@ class InternamentoController extends Controller
         $periodos = ['90' => 90, '365' => 365, 'todos' => null];
         $periodo = array_key_exists($request->query('periodo'), $periodos) ? $request->query('periodo') : '90';
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
+        $responsavelId = ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null;
         $administrador = $request->user()->eAdministrador();
         $hoje = now()->startOfDay();
         $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
@@ -89,6 +90,10 @@ class InternamentoController extends Controller
             ->comAlta()
             ->where(fn ($q) => $q->whereNull('destino_id')->orWhere('destino_id', '<>', Internamento::DESTINO_FALECIDO))
             ->whereDoesntHave('morbilidades', fn ($q) => $q->where('momento', Morbilidade::AOS_30_DIAS))
+            // Só quem foi operado tem seguimento aos 30 dias.
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('bloco_operatorios as b')
+                ->whereColumn('b.internamento_id', 'internamentos.id')->whereNull('b.deleted_at'))
+            ->when($responsavelId, fn ($q, $id) => $q->where('responsavel_id', $id))
             ->when($periodos[$periodo], fn ($q, $dias) => $q->whereDate('data_de_alta', '>=', $hoje->copy()->subDays($dias)));
 
         $emAtraso = (clone $base)->whereDate('data_de_alta', '<', $limiteAtraso)->count();
@@ -127,7 +132,8 @@ class InternamentoController extends Controller
                 'clavien' => Dominios::lista('clavien_dindos'),
             ],
             'seguimentos' => $lista,
-            'filtros' => ['estado' => $estado, 'periodo' => $periodo],
+            'filtros' => ['estado' => $estado, 'periodo' => $periodo, 'responsavel_id' => $responsavelId],
+            'responsaveis' => Dominios::responsaveis($responsavelId),
             'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer],
         ]);
     }

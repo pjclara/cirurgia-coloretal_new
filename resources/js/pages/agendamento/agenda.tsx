@@ -6,6 +6,7 @@ import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
 import { PainelEspera, type Espera } from '../../components/agendamento/painel-espera';
 import { Botao, BotaoLigacao } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Item = {
@@ -300,7 +301,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                                 <span className="text-sm font-semibold">Utente sem ficha</span>
                                                             )}
                                                             <span className="ml-2 text-sm text-slate-600 tabular-nums">
-                                                                Processo {a.utente.numero_processo ?? '—'}
+                                                                <NumeroProcesso valor={a.utente.numero_processo} />
                                                             </span>
                                                             <p className="text-sm text-slate-700">
                                                                 {a.intervencoes.length > 0 ? a.intervencoes.join(', ') : 'Sem intervenção indicada'}

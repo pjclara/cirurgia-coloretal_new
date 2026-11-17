@@ -5,6 +5,7 @@ import { formatarData, hojeIso } from '../../clinico/formato';
 import { SEM_COMPLICACOES, type Opcao, type OpcaoAgrupada } from '../../clinico/tipos';
 import { BlocoMorbilidadeCampos, type BlocoMorbilidade, type ResolucaoComGrau } from '../clinico/bloco-morbilidade';
 import { Botao, Campo, estiloEntrada } from '../clinico/campos';
+import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type LinhaSeguimento = {
     id: number;
@@ -70,7 +71,7 @@ export function ModalSeguimento({ linha, dominios, temSeguinte, aoFechar, aoGuar
                     <DialogDescription asChild>
                         <div className="tabular-nums">
                             <p>
-                                {linha.utente.nome} · Processo {linha.utente.numero_processo ?? '—'}
+                                {linha.utente.nome} · <NumeroProcesso valor={linha.utente.numero_processo} />
                             </p>
                             <p>
                                 Alta a {formatarData(linha.data_de_alta)} · seguimento previsto a {formatarData(linha.prevista)}

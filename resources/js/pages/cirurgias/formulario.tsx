@@ -4,6 +4,7 @@ import { formatarData } from '../../clinico/formato';
 import type { Opcao, OpcaoAgrupada } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Selecao, estiloEntrada } from '../../components/clinico/campos';
 import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Cirurgia = {
@@ -223,7 +224,7 @@ export default function FormularioCirurgia(props: Props) {
             titulo={cirurgia ? 'Cirurgia' : 'Nova cirurgia'}
             subtitulo={
                 <span className="tabular-nums">
-                    {utente.nome} · Processo {utente.numero_processo} · Internamento de {formatarData(internamento.entrada)}
+                    {utente.nome} · <NumeroProcesso valor={utente.numero_processo} /> · Internamento de {formatarData(internamento.entrada)}
                 </span>
             }
         >

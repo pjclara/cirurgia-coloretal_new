@@ -6,6 +6,7 @@ import { formatarData } from '../../clinico/formato';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { EscolhaMultipla } from '../clinico/escolha-multipla';
+import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type PropsInscricao = {
     espera: {
@@ -55,7 +56,7 @@ export function FormularioInscricao({ espera, utente, dominios, hoje, estados, f
             <DialogHeader>
                 <DialogTitle>{espera ? 'Inscrição em lista de espera' : 'Inscrever em lista de espera'}</DialogTitle>
                 <DialogDescription className="tabular-nums">
-                    {utente.nome} · Processo {utente.numero_processo}
+                    {utente.nome} · <NumeroProcesso valor={utente.numero_processo} />
                 </DialogDescription>
             </DialogHeader>
             <form onSubmit={guardar} noValidate className="space-y-5">

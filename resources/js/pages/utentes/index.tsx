@@ -4,6 +4,7 @@ import { formatarData, idade } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Paginado, PropsPartilhadas } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -53,12 +54,24 @@ export default function Utentes({ utentes, q }: { utentes: Paginado<Linha>; q: s
                 <table className="w-full text-left text-sm">
                     <thead className="border-b border-slate-200 bg-slate-50 text-slate-700">
                         <tr>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Nome</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Processo</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">N.º utente</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Nascimento</th>
-                            <th scope="col" className="px-4 py-2.5 font-semibold">Concelho</th>
-                            <th scope="col" className="px-4 py-2.5 text-right font-semibold">Internamentos</th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Nome
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Processo
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                N.º utente
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Nascimento
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 font-semibold">
+                                Concelho
+                            </th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-semibold">
+                                Internamentos
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -71,9 +84,11 @@ export default function Utentes({ utentes, q }: { utentes: Paginado<Linha>; q: s
                                             {u.nome}
                                         </Link>
                                     </td>
-                                    <td className="px-4 py-2.5 tabular-nums">{u.numero_processo}</td>
-                                    <td className="px-4 py-2.5 tabular-nums text-slate-700">{u.numero_utente ?? '—'}</td>
-                                    <td className="px-4 py-2.5 tabular-nums text-slate-700">
+                                    <td className="px-4 py-2.5 tabular-nums">
+                                        <NumeroProcesso semRotulo valor={u.numero_processo} />
+                                    </td>
+                                    <td className="px-4 py-2.5 text-slate-700 tabular-nums">{u.numero_utente ?? '—'}</td>
+                                    <td className="px-4 py-2.5 text-slate-700 tabular-nums">
                                         {formatarData(u.data_nascimento)}
                                         {anos !== null && <span className="text-slate-500"> ({anos} anos)</span>}
                                     </td>

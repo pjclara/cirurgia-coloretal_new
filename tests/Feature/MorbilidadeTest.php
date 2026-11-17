@@ -7,6 +7,7 @@ use App\Models\Morbilidade;
 beforeEach(function () {
     $this->utilizador = utilizadorClinico();
     $this->internamento = novoInternamento(novoUtente(), $this->utilizador, ['data_de_entrada' => now()->subDays(60)->format('Y-m-d')]);
+    internamentoOperado($this, $this->internamento);
     $this->destinoVivo = DB::table('destinos')->where('id', '<>', Internamento::DESTINO_FALECIDO)->value('id');
     $this->complicacao = DB::table('complicacaos')->where('id', '<>', Complicacao::SEM_COMPLICACOES)->value('id');
 });
@@ -194,17 +195,6 @@ test('com cirurgia a alta fica pendente até à revisão aos 30 dias', function 
     expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_CONCLUIDA);
 });
 
-test('sem cirurgia a alta pode ficar concluída logo', function () {
-    guardar($this, [
-        'data_de_alta' => now()->format('Y-m-d'),
-        'destino_id' => $this->destinoVivo,
-        'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA,
-        'morbilidade' => ['alta' => semComplicacoes()],
-    ])->assertSessionHasNoErrors();
-
-    expect($this->internamento->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_CONCLUIDA);
-});
-
 test('registar o seguimento aos 30 dias conclui a alta de quem teve cirurgia', function () {
     comCirurgia($this);
     guardar($this, [
@@ -236,4 +226,16 @@ test('o formulário já não tem o bloqueio: gravar não bloqueia nem desbloquei
     $this->internamento->forceFill(['bloquear_tabela' => false])->save();
     guardar($this, ['bloquear_tabela' => true])->assertSessionHasNoErrors();
     expect($this->internamento->fresh()->bloquear_tabela)->toBeFalse();
+});
+
+test('sem cirurgia a alta não exige morbilidade e fica concluída', function () {
+    $semCirurgia = novoInternamento(novoUtente(), $this->utilizador, ['data_de_entrada' => now()->subDays(60)->format('Y-m-d')]);
+
+    $this->actingAs($this->utilizador)->put("/internamentos/{$semCirurgia->id}", payloadInternamento($semCirurgia, [
+        'data_de_alta' => now()->format('Y-m-d'),
+        'destino_id' => $this->destinoVivo,
+        'morbilidade' => [],
+    ]))->assertSessionHasNoErrors();
+
+    expect($semCirurgia->fresh()->estado_da_alta_id)->toBe(Internamento::ALTA_CONCLUIDA);
 });
