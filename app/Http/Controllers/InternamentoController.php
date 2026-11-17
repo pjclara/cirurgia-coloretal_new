@@ -160,6 +160,8 @@ class InternamentoController extends Controller
             'podeDesbloquear' => $request->user()->eAdministrador(),
             'podeApagar' => false,
             'limites' => $this->limites(),
+            // Ao registar, pergunta-se se o utente ainda não sinalizado deve ser sinalizado para o centro de referência.
+            'referenciacao' => Dominios::sinalizacao($request->user()),
         ];
     }
 
@@ -349,6 +351,7 @@ class InternamentoController extends Controller
             'numero_processo' => $utente->numero_processo,
             'data_nascimento' => $utente->data_nascimento?->format('Y-m-d'),
             'sexo' => Dominios::nome('sexos', $utente->sexo_id),
+            'sinalizado' => $utente->referenciacoesAtivas()->exists(),
         ];
     }
 

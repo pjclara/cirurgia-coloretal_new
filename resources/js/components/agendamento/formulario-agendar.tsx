@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import type { Opcao, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
+import { PerguntaCentroReferencia, type DadosSinalizacao } from '../referenciacao/pergunta-centro';
 
 export type PropsAgendar = {
     agendamento: {
@@ -21,10 +22,11 @@ export type PropsAgendar = {
     } | null;
     espera: {
         id: number;
-        utente: { id: number | null; nome: string | null; numero_processo: number | null };
+        utente: { id: number | null; nome: string | null; numero_processo: number | null; sinalizado?: boolean };
         intervencoes: string[];
         responsavel_id: number | null;
     };
+    sinalizacao?: DadosSinalizacao | null;
     dominios: { periodos: Opcao[]; locais: Opcao[]; salas: Opcao[]; tipos: Opcao[]; estados: Opcao[]; responsaveis: Responsavel[] };
     hoje: string;
     dataSugerida: string | null;
@@ -32,7 +34,7 @@ export type PropsAgendar = {
 
 type Props = PropsAgendar & { fechar: () => void };
 
-export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSugerida, fechar }: Props) {
+export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, hoje, dataSugerida, fechar }: Props) {
     const form = useForm({
         data: agendamento?.data ?? dataSugerida ?? '',
         hora: agendamento?.hora ?? '',
@@ -72,6 +74,12 @@ export function FormularioAgendar({ agendamento, espera, dominios, hoje, dataSug
                     {espera.intervencoes.join(', ') || 'sem intervenção indicada'}
                 </DialogDescription>
             </DialogHeader>
+            {!agendamento && espera.utente.id !== null && (
+                <PerguntaCentroReferencia
+                    utente={{ id: espera.utente.id, nome: espera.utente.nome ?? '', sinalizado: espera.utente.sinalizado }}
+                    sinalizacao={sinalizacao}
+                />
+            )}
             <form onSubmit={guardar} noValidate className="space-y-5">
                 {erros.conflito && (
                     <div

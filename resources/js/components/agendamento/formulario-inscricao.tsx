@@ -7,6 +7,7 @@ import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { EscolhaMultipla } from '../clinico/escolha-multipla';
 import { NumeroProcesso } from '../clinico/numero-processo';
+import { PerguntaCentroReferencia, type DadosSinalizacao } from '../referenciacao/pergunta-centro';
 
 export type PropsInscricao = {
     espera: {
@@ -20,7 +21,8 @@ export type PropsInscricao = {
         estado: number;
         agendamentos: { id: number; data: string | null; estado: number | null }[];
     } | null;
-    utente: { id: number; nome: string; numero_processo: number };
+    utente: { id: number; nome: string; numero_processo: number; sinalizado?: boolean };
+    sinalizacao?: DadosSinalizacao | null;
     dominios: { prioridades: Opcao[]; responsaveis: Responsavel[]; diagnosticos: OpcaoAgrupada[]; intervencoes: OpcaoAgrupada[] };
     hoje: string;
     estados: Opcao[];
@@ -28,7 +30,7 @@ export type PropsInscricao = {
 
 type Props = PropsInscricao & { fechar: () => void };
 
-export function FormularioInscricao({ espera, utente, dominios, hoje, estados, fechar }: Props) {
+export function FormularioInscricao({ espera, utente, sinalizacao, dominios, hoje, estados, fechar }: Props) {
     const form = useForm({
         prioridade_id: (espera?.prioridade_id ?? 1) as number | '',
         data_de_lista: espera?.data_de_lista ?? hoje,
@@ -59,6 +61,7 @@ export function FormularioInscricao({ espera, utente, dominios, hoje, estados, f
                     {utente.nome} · <NumeroProcesso valor={utente.numero_processo} />
                 </DialogDescription>
             </DialogHeader>
+            {!espera && <PerguntaCentroReferencia utente={utente} sinalizacao={sinalizacao} />}
             <form onSubmit={guardar} noValidate className="space-y-5">
                 <Seccao titulo="Inscrição">
                     <div className="grid gap-4 sm:grid-cols-3">

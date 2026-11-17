@@ -19,6 +19,7 @@ import { EscolhaMultipla } from '../../components/clinico/escolha-multipla';
 import { MomentoMorbilidade } from '../../components/clinico/momento-morbilidade';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
+import { PerguntaCentroReferencia } from '../../components/referenciacao/pergunta-centro';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type RegistoMorbilidade = Record<
@@ -109,6 +110,8 @@ export type PropsFormulario = {
     podeDesbloquear: boolean;
     podeApagar: boolean;
     limites: { data_minima: string; hoje: string };
+    /** Só ao registar e com permissão: dados para sinalizar o utente para o centro de referência. */
+    referenciacao?: { origens: { id: number; nome: string }[]; responsaveis: Responsavel[] } | null;
 };
 
 type Props = PropsFormulario & { aoFechar?: () => void; origem?: 'quadro' | 'lista' };
@@ -156,6 +159,7 @@ export function FormularioInternamento({
     dominios,
     cirurgias,
     listaCirurgias,
+    referenciacao,
     podeEditar,
     podeNovaCirurgia,
     podeApagar,
@@ -363,6 +367,8 @@ export function FormularioInternamento({
                     </span>
                 </p>
             )}
+
+            {!internamento && <PerguntaCentroReferencia utente={utente} sinalizacao={referenciacao} />}
 
             <div role="tablist" aria-label="Secções do internamento" className="mb-5 flex flex-wrap gap-1 border-b border-slate-200">
                 {(

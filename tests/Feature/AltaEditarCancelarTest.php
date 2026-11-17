@@ -62,3 +62,25 @@ test('a alta edita-se numa modal sobre a lista e, ao guardar, volta à lista', f
     guardarAlta($this, ['origem' => 'lista', 'data_de_alta' => now()->subDays(4)->format('Y-m-d'), 'destino_id' => $this->destinos[0], 'estado_da_alta_id' => Internamento::ALTA_CONCLUIDA, 'morbilidade' => ['alta' => $this->sem]])
         ->assertRedirect(route('internamentos.index'));
 });
+
+test('ao registar internamento ou agendar, diz-se se o utente ainda não está sinalizado para o centro de referência', function () {
+    $utente = novoUtente();
+    $u = utilizadorClinico();
+    $u->givePermissionTo('create referenciacao');
+
+    $this->actingAs($u)->get('/quadro/novo?utente='.$utente->id)->assertInertia(fn ($p) => $p
+        ->where('modal.utente.sinalizado', false)
+        ->has('modal.referenciacao.origens'));
+
+    $semPermissao = utilizadorClinico();
+    $this->actingAs($semPermissao)->get('/quadro/novo?utente='.$utente->id)->assertInertia(fn ($p) => $p->where('modal.referenciacao', null));
+});
+
+test('na lista de espera abre-se a inscrição de um utente escolhido na pesquisa', function () {
+    $utente = novoUtente();
+
+    $this->actingAs($this->utilizador)->get("/agendamento/utentes/{$utente->id}/inscrever")->assertInertia(fn ($p) => $p
+        ->component('agendamento/lista-de-espera')
+        ->where('modal.tipo', 'inscricao')
+        ->where('modal.utente.id', $utente->id));
+});

@@ -4,6 +4,7 @@ import { COR_ESTADO, PRIORIDADE, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
+import { NovaInscricao } from '../../components/agendamento/nova-inscricao';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -50,11 +51,7 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
     return (
         <ClinicoLayout
             titulo="Lista de espera"
-            subtitulo={
-                dataAlvo
-                    ? `Escolha o utente a agendar para ${formatarData(dataAlvo)}`
-                    : `${lista.total} inscrições · para inscrever um utente, abra a sua ficha`
-            }
+            subtitulo={dataAlvo ? `Escolha o utente a agendar para ${formatarData(dataAlvo)}` : `${lista.total} inscrições`}
             largura="larga"
             acoes={
                 <BotaoLigacao href="/agendamento" variante="secundario">
@@ -62,6 +59,8 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                 </BotaoLigacao>
             }
         >
+            {!dataAlvo && <NovaInscricao />}
+
             <div className="mb-4 flex flex-wrap items-center gap-2">
                 <form
                     className="flex gap-2"

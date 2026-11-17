@@ -30,6 +30,8 @@ export type ResumoUtente = {
     numero_processo: number;
     data_nascimento: string | null;
     sexo?: string | null;
+    /** Já sinalizado para o centro de referência. */
+    sinalizado?: boolean;
 };
 
 export type ResultadoPesquisa = ResumoUtente & { internamento_aberto_id: number | null; referenciado?: boolean };

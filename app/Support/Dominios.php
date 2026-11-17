@@ -113,6 +113,15 @@ class Dominios
             ->all();
     }
 
+    /** Dados para a pergunta "sinalizar para o centro de referência?"; null sem permissão para sinalizar. */
+    public static function sinalizacao(\App\Models\User $utilizador): ?array
+    {
+        return $utilizador->can('create referenciacao') ? [
+            'origens' => self::lista('origem_da_referenciacaos'),
+            'responsaveis' => self::responsaveis(),
+        ] : null;
+    }
+
     /** Utilizadores que podem ser responsáveis: ativos, mais o responsável atual do registo. */
     public static function responsaveis(?int $incluirId = null): array
     {

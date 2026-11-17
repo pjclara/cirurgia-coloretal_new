@@ -4,6 +4,7 @@ import { CATEGORIAS, COR_ESTADO, NOMES_DIA, nomeEstado, type Categoria } from '.
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
+import { NovaInscricao } from '../../components/agendamento/nova-inscricao';
 import { PainelEspera, type Espera } from '../../components/agendamento/painel-espera';
 import { Botao, BotaoLigacao } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
@@ -123,6 +124,8 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                 </>
             }
         >
+            <NovaInscricao />
+
             <div className="mb-4 flex flex-wrap items-center gap-2">
                 <div className="mr-2 inline-flex overflow-hidden rounded-md border border-slate-300">
                     {(['mes', 'semana'] as const).map((v) => (

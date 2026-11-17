@@ -385,7 +385,8 @@ class AgendamentoController extends Controller
                     'estado' => $a->estado(),
                 ])->values(),
             ] : null,
-            'utente' => ['id' => $utente->id, 'nome' => $utente->nome, 'numero_processo' => $utente->numero_processo],
+            'utente' => ['id' => $utente->id, 'nome' => $utente->nome, 'numero_processo' => $utente->numero_processo, 'sinalizado' => $utente->referenciacoesAtivas()->exists()],
+            'sinalizacao' => Dominios::sinalizacao(request()->user()),
             'dominios' => [
                 'prioridades' => $this->opcoesPrioridade(),
                 'responsaveis' => Dominios::responsaveis($espera?->responsavel_id),
@@ -417,7 +418,7 @@ class AgendamentoController extends Controller
             ] : null,
             'espera' => [
                 'id' => $espera->id,
-                'utente' => ['id' => $espera->utente?->id, 'nome' => $espera->utente?->nome, 'numero_processo' => $espera->utente?->numero_processo],
+                'utente' => ['id' => $espera->utente?->id, 'nome' => $espera->utente?->nome, 'numero_processo' => $espera->utente?->numero_processo, 'sinalizado' => (bool) $espera->utente?->referenciacoesAtivas()->exists()],
                 'intervencoes' => $espera->intervencoes->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),
                 'responsavel_id' => $espera->responsavel_id,
             ],
@@ -429,6 +430,7 @@ class AgendamentoController extends Controller
                 'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
                 'responsaveis' => Dominios::responsaveis($agendamento?->responsavel_id ?? $espera->responsavel_id),
             ],
+            'sinalizacao' => Dominios::sinalizacao(request()->user()),
             'hoje' => now()->format('Y-m-d'),
             'dataSugerida' => $dataSugerida,
         ];
