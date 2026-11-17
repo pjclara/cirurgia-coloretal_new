@@ -82,7 +82,9 @@ export function FormularioInscricao({ espera, utente, dominios, hoje, estados, f
                         </Campo>
                         <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
                             <SelecaoResponsavel
-                                id="responsavel" responsaveis={dominios.responsaveis} valor={data.responsavel_id}
+                                id="responsavel"
+                                responsaveis={dominios.responsaveis}
+                                valor={data.responsavel_id}
                                 aoMudar={(v) => setData('responsavel_id', v)}
                                 invalido={!!erros.responsavel_id}
                             />

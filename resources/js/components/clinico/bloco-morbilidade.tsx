@@ -1,5 +1,5 @@
-import { CLAVIEN_GRAU_5, SEM_COMPLICACOES, type Opcao, type OpcaoAgrupada } from '../../clinico/tipos';
-import { Campo, Selecao, estiloEntrada } from './campos';
+import { SEM_COMPLICACOES, type Opcao, type OpcaoAgrupada } from '../../clinico/tipos';
+import { Campo, estiloEntrada } from './campos';
 import { EscolhaMultipla } from './escolha-multipla';
 
 export type ComplicacaoEscolhida = { id: number; resolucoes: number[] };
@@ -14,7 +14,7 @@ type Props = {
     aoMudar: (bloco: BlocoMorbilidade) => void;
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
     desativado: boolean;
-    /** Óbito com complicação na alta: o grau fica fixo em 5. */
+    /** Óbito com complicação na alta: o grau fica fixo em 5 (calculado no servidor). */
     clavienFixo?: boolean;
     /** Pede a data do registo (seguimento aos 30 dias). */
     dataDoRegisto?: { rotulo: string; min: string; max: string };
@@ -22,8 +22,8 @@ type Props = {
     id: string;
 };
 
-/** Complicações, resolução e grau de Clavien-Dindo de um dos momentos de registo da morbilidade. */
-export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, clavienFixo = false, dataDoRegisto, erros, id }: Props) {
+/** Complicações e resolução de um dos momentos de registo da morbilidade. O grau de Clavien-Dindo é calculado automaticamente. */
+export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, dataDoRegisto, erros, id }: Props) {
     const ids = bloco.complicacoes.map((c) => c.id);
     const semComplicacoes = ids.includes(SEM_COMPLICACOES);
     const temReal = ids.some((i) => i !== SEM_COMPLICACOES);
@@ -39,7 +39,6 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
         return graus.length > 0 ? Math.max(...graus) : null;
     };
     const nomeGrau = (id: number | '' | null) => dominios.clavien.find((g) => g.id === id)?.nome;
-    const sugerido = grauAutomatico(bloco.complicacoes);
 
     /** "Sem complicações" substitui tudo; escolher outra complicação retira-a. */
     const mudarComplicacoes = (novosIds: number[]) => {
@@ -50,7 +49,7 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
         aoMudar({ ...bloco, complicacoes, clavien_dindo_id: !continuaReal ? '' : (grauAutomatico(complicacoes) ?? bloco.clavien_dindo_id) });
     };
 
-    /** Escolher ou retirar uma resolução recalcula o grau de Clavien-Dindo (pode ser ajustado à mão a seguir). */
+    /** Escolher ou retirar uma resolução recalcula o grau de Clavien-Dindo. */
     const alternarResolucao = (complicacaoId: number, resolucaoId: number) => {
         const complicacoes = bloco.complicacoes.map((c) =>
             c.id !== complicacaoId
@@ -95,6 +94,11 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
                             {erros.complicacoes}
                         </p>
                     )}
+                    {erros.clavien && (
+                        <p className="mt-2 text-sm text-rose-700" role="alert">
+                            {erros.clavien}
+                        </p>
+                    )}
                 </div>
 
                 {temReal && (
@@ -123,29 +127,6 @@ export function BlocoMorbilidadeCampos({ bloco, aoMudar, dominios, desativado, c
                                     </div>
                                 </fieldset>
                             ))}
-
-                        <Campo
-                            rotulo="Grau de Clavien-Dindo"
-                            para={`${id}-clavien`}
-                            erro={erros.clavien}
-                            ajuda={
-                                clavienFixo
-                                    ? 'Óbito com complicação: fica registado como grau 5.'
-                                    : sugerido !== null
-                                      ? `Calculado pelas resoluções (${nomeGrau(sugerido)}, o mais alto). Pode ajustar.`
-                                      : 'Sem resolução com grau associado: escolha o grau mais alto entre as complicações.'
-                            }
-                            className="max-w-xs"
-                        >
-                            <Selecao
-                                id={`${id}-clavien`}
-                                opcoes={dominios.clavien}
-                                valor={clavienFixo ? CLAVIEN_GRAU_5 : bloco.clavien_dindo_id}
-                                aoMudar={(v) => aoMudar({ ...bloco, clavien_dindo_id: v })}
-                                disabled={clavienFixo || desativado}
-                                invalido={!!erros.clavien}
-                            />
-                        </Campo>
                     </div>
                 )}
             </div>

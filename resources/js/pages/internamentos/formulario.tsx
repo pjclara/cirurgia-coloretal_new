@@ -591,10 +591,7 @@ export function FormularioInternamento({
                     )}
 
                     {internamento && separador === 'morbilidade' && (
-                        <Seccao
-                            titulo="Morbilidade"
-                            descricao="Escolha “Sem complicações” ou “Com complicações”. O grau de Clavien-Dindo calcula-se pelas resoluções."
-                        >
+                        <Seccao titulo="Morbilidade" descricao="Escolha “Sem complicações” ou “Com complicações”.">
                             <div role="tablist" aria-label="Momento da morbilidade" className="mb-3 flex gap-1 border-b border-slate-200">
                                 {MOMENTOS.map((m) => {
                                     const bloco = data.morbilidade[m.id];
@@ -645,7 +642,6 @@ export function FormularioInternamento({
                                         aoMudar={(bloco) => setData('morbilidade', { ...data.morbilidade, [m.id]: bloco })}
                                         dominios={dominios}
                                         desativado={!podeEditar}
-                                        clavienFixo={m.id === 'alta' && obito && temComplicacaoReal('alta')}
                                         dataDoRegisto={
                                             m.id === '30_dias' && data.data_de_alta
                                                 ? { rotulo: 'Data do seguimento', min: data.data_de_alta, max: limites.hoje }

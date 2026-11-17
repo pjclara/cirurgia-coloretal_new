@@ -57,7 +57,9 @@ export function SinalizarCentro({
                     </Campo>
                     <Campo rotulo="Médico responsável" para="sin-medico" erro={erros.responsavel_id}>
                         <SelecaoResponsavel
-                            id="sin-medico" responsaveis={responsaveis} valor={form.data.responsavel_id}
+                            id="sin-medico"
+                            responsaveis={responsaveis}
+                            valor={form.data.responsavel_id}
                             aoMudar={(v) => form.setData('responsavel_id', v)}
                             vazio="Eu (quem está a registar)"
                             invalido={!!erros.responsavel_id}

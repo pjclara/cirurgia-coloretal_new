@@ -188,7 +188,9 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
                                 </Campo>
                                 <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id} className="sm:col-span-3">
                                     <SelecaoResponsavel
-                                        id="responsavel" responsaveis={dominios.responsaveis} valor={data.responsavel_id}
+                                        id="responsavel"
+                                        responsaveis={dominios.responsaveis}
+                                        valor={data.responsavel_id}
                                         aoMudar={(v) => setData('responsavel_id', v)}
                                         invalido={!!erros.responsavel_id}
                                     />
