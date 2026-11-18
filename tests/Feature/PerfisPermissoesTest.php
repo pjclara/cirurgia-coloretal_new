@@ -57,3 +57,29 @@ test('os perfis de administração e permissões inexistentes não se alteram', 
     $this->actingAs($super)->put('/admin/perfis', ['perfis' => ['perfil de teste' => ['permissao que nao existe']]])->assertSessionHasErrors();
     $this->actingAs(utilizadorComPerfil('admin'))->put('/admin/perfis', ['perfis' => ['perfil de teste' => ['show agendamento']]])->assertForbidden();
 });
+
+test('a migration remove as permissões sem uso, com as ligações, e guarda o que apagou', function () {
+    $migration = require database_path('migrations/2026_11_18_000001_remover_permissoes_sem_uso.php');
+    $sem = Permission::findOrCreate('edit internamento', 'web');
+    $util = Permission::findOrCreate('show internamento', 'web');
+    $this->perfil->syncPermissions([$sem, $util]);
+    $dono = utilizadorClinico([]);
+    $dono->givePermissionTo($sem);
+
+    $migration->up();
+    $migration->up(); // idempotente
+
+    expect(Permission::where('name', 'edit internamento')->exists())->toBeFalse()
+        ->and(Permission::where('name', 'show internamento')->exists())->toBeTrue()
+        ->and($this->perfil->fresh()->permissions->pluck('name')->all())->toBe(['show internamento'])
+        ->and(DB::table('model_has_permissions')->where('permission_id', $sem->id)->count())->toBe(0)
+        ->and(DB::table('permissoes_removidas')->where('permissao_id', $sem->id)->value('nome'))->toBe('edit internamento');
+});
+
+test('o comando de verificação da estrutura corre sem alterar nada', function () {
+    $antes = DB::table('permissions')->count();
+
+    $this->artisan('bd:verificar-estrutura')->expectsOutputToContain('Verificação')->assertSuccessful();
+
+    expect(DB::table('permissions')->count())->toBe($antes);
+});

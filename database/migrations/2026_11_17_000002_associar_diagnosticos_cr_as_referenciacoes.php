@@ -24,6 +24,11 @@ return new class extends Migration
 
     public function up(): void
     {
+        // Base de dados sem as tabelas ou a coluna que isto cruza: nada a fazer.
+        if (! Schema::hasTable('diagnostico_referenciacao') || ! Schema::hasTable('referenciacao_centro_de_referencias') || ! Schema::hasColumn('diagnosticos', 'centro_de_referencia')) {
+            return;
+        }
+
         if (! Schema::hasTable('diagnostico_referenciacao_associados')) {
             Schema::create('diagnostico_referenciacao_associados', function (Blueprint $tabela) {
                 $tabela->unsignedBigInteger('diagnostico_referenciacao_id')->primary();

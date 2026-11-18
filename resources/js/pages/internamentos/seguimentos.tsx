@@ -1,10 +1,11 @@
 import { Link, router } from '@inertiajs/react';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao, OpcaoAgrupada, Paginado, Responsavel } from '../../clinico/tipos';
 import type { ResolucaoComGrau } from '../../components/clinico/bloco-morbilidade';
-import { Botao, BotaoLigacao, SelecaoResponsavel, estiloEntrada } from '../../components/clinico/campos';
+import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
+import { Botao, BotaoLigacao, SelecaoResponsavel } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { ModalSeguimento } from '../../components/internamentos/modal-seguimento';
@@ -134,29 +135,15 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                 </div>
             </div>
 
-            <form
-                onSubmit={(e: FormEvent) => {
-                    e.preventDefault();
-                    aplicar({});
-                }}
-                className="mb-4 flex max-w-md gap-2"
-                role="search"
-            >
-                <label htmlFor="q" className="sr-only">
-                    Procurar por nome ou processo
-                </label>
-                <input
-                    id="q"
-                    type="search"
-                    value={termo}
-                    onChange={(e) => setTermo(e.target.value)}
-                    placeholder="Nome ou processo"
-                    className={estiloEntrada}
-                />
-                <Botao type="submit" variante="secundario">
-                    Procurar
-                </Botao>
-            </form>
+            <CaixaPesquisa
+                id="q"
+                termo={termo}
+                aoEscrever={setTermo}
+                aoPesquisar={() => aplicar({})}
+                rotulo="Procurar por nome ou processo"
+                placeholder="Nome ou processo"
+                className="mb-4 max-w-md"
+            />
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                 <table className="w-full text-left text-sm">

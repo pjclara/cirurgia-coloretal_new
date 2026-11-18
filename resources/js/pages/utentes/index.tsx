@@ -1,9 +1,10 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { formatarData, idade } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Paginado, PropsPartilhadas } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
+import { BotaoLigacao } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -23,8 +24,7 @@ export default function Utentes({ utentes, q }: { utentes: Paginado<Linha>; q: s
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(q);
 
-    const procurar = (evento: FormEvent) => {
-        evento.preventDefault();
+    const procurar = () => {
         router.get(rotas.utentes.lista, termo.trim() ? { q: termo.trim() } : {}, { preserveState: true });
     };
 
@@ -33,22 +33,15 @@ export default function Utentes({ utentes, q }: { utentes: Paginado<Linha>; q: s
             titulo="Utentes"
             acoes={permissoes.includes('create internamento') && <BotaoLigacao href={rotas.utentes.novo}>Criar utente</BotaoLigacao>}
         >
-            <form onSubmit={procurar} className="mb-4 flex max-w-xl gap-2" role="search">
-                <label htmlFor="q" className="sr-only">
-                    Procurar por nome, processo ou número de utente
-                </label>
-                <input
-                    id="q"
-                    type="search"
-                    value={termo}
-                    onChange={(e) => setTermo(e.target.value)}
-                    placeholder="Nome, processo ou número de utente"
-                    className={estiloEntrada}
-                />
-                <Botao type="submit" variante="secundario">
-                    Procurar
-                </Botao>
-            </form>
+            <CaixaPesquisa
+                id="q"
+                termo={termo}
+                aoEscrever={setTermo}
+                aoPesquisar={procurar}
+                rotulo="Procurar por nome, processo ou número de utente"
+                placeholder="Nome, processo ou número de utente"
+                className="mb-4 max-w-xl"
+            />
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                 <table className="w-full text-left text-sm">

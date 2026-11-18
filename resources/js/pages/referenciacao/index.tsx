@@ -1,10 +1,11 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Paginado, PropsPartilhadas } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
+import { BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
@@ -143,29 +144,15 @@ export default function Referenciacao({ lista, filtros, anos, modal, origens, re
                         </select>
                     </label>
                 </div>
-                <form
-                    onSubmit={(e: FormEvent) => {
-                        e.preventDefault();
-                        aplicar({});
-                    }}
-                    className="flex min-w-64 flex-1 gap-2 sm:max-w-md"
-                    role="search"
-                >
-                    <label htmlFor="q" className="sr-only">
-                        Procurar por utente ou processo
-                    </label>
-                    <input
-                        id="q"
-                        type="search"
-                        value={termo}
-                        onChange={(e) => setTermo(e.target.value)}
-                        placeholder="Utente ou processo"
-                        className={estiloEntrada}
-                    />
-                    <Botao type="submit" variante="secundario">
-                        Procurar
-                    </Botao>
-                </form>
+                <CaixaPesquisa
+                    id="q"
+                    termo={termo}
+                    aoEscrever={setTermo}
+                    aoPesquisar={() => aplicar({})}
+                    rotulo="Procurar por utente ou processo"
+                    placeholder="Utente ou processo"
+                    className="min-w-64 flex-1 sm:max-w-md"
+                />
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">

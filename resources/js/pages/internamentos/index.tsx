@@ -1,9 +1,10 @@
 import { Link, router } from '@inertiajs/react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { diasEntre, formatarData, hojeIso } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao, Paginado, Responsavel } from '../../clinico/tipos';
-import { Botao, BotaoLigacao, Selecao, estiloEntrada } from '../../components/clinico/campos';
+import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
+import { BotaoLigacao, Selecao } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
@@ -53,11 +54,6 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
         router.get(rotas.internamentos.lista, consulta, { preserveState: true, preserveScroll: true });
     };
 
-    const procurar = (evento: FormEvent) => {
-        evento.preventDefault();
-        aplicar({});
-    };
-
     const comFiltros = !!filtros.q || !!filtros.ano || !!filtros.localizacao_id || !!filtros.responsavel_id;
 
     return (
@@ -73,22 +69,15 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
             }
         >
             <div className="mb-4 flex flex-wrap items-end gap-3">
-                <form onSubmit={procurar} className="flex min-w-64 flex-1 gap-2 sm:max-w-md" role="search">
-                    <label htmlFor="q" className="sr-only">
-                        Procurar por utente, processo ou motivo
-                    </label>
-                    <input
-                        id="q"
-                        type="search"
-                        value={termo}
-                        onChange={(e) => setTermo(e.target.value)}
-                        placeholder="Utente, processo ou motivo"
-                        className={estiloEntrada}
-                    />
-                    <Botao type="submit" variante="secundario">
-                        Procurar
-                    </Botao>
-                </form>
+                <CaixaPesquisa
+                    id="q"
+                    termo={termo}
+                    aoEscrever={setTermo}
+                    aoPesquisar={() => aplicar({})}
+                    rotulo="Procurar por utente, processo ou motivo"
+                    placeholder="Utente, processo ou motivo"
+                    className="min-w-64 flex-1 sm:max-w-md"
+                />
 
                 <div className="w-28">
                     <Selecao

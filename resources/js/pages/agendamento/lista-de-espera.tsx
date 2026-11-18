@@ -5,6 +5,7 @@ import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
 import { NovaInscricao } from '../../components/agendamento/nova-inscricao';
+import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -62,24 +63,15 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
             {!dataAlvo && <NovaInscricao />}
 
             <div className="mb-4 flex flex-wrap items-center gap-2">
-                <form
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        filtrar({ q });
-                    }}
-                >
-                    <input
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        placeholder="Nome ou processo"
-                        className={`${estiloEntrada} w-56`}
-                        aria-label="Procurar utente"
-                    />
-                    <Botao type="submit" variante="secundario">
-                        Procurar
-                    </Botao>
-                </form>
+                <CaixaPesquisa
+                    id="q"
+                    termo={q}
+                    aoEscrever={setQ}
+                    aoPesquisar={() => filtrar({ q })}
+                    rotulo="Procurar utente"
+                    placeholder="Nome ou processo"
+                    className="w-72"
+                />
                 {ESTADOS.map(([valor, rotulo]) => (
                     <Botao key={valor} variante={filtros.estado === valor ? 'primario' : 'secundario'} onClick={() => filtrar({ estado: valor })}>
                         {rotulo}

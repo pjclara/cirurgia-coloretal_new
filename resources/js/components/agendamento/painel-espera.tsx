@@ -1,8 +1,8 @@
 import { Link, router } from '@inertiajs/react';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { PRIORIDADE } from '../../clinico/agendamento';
 import { diasEntre, formatarData } from '../../clinico/formato';
-import { estiloEntrada } from '../clinico/campos';
+import { CaixaPesquisa } from '../clinico/caixa-pesquisa';
 import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type ItemEspera = {
@@ -41,10 +41,6 @@ export function PainelEspera({
     const [termo, setTermo] = useState(espera.q);
     const ir = (extra: Record<string, string>) =>
         router.get('/agendamento', { ...parametros, ...extra }, { preserveScroll: true, preserveState: true });
-    const procurar = (e: FormEvent) => {
-        e.preventDefault();
-        ir({ espera_q: termo.trim() });
-    };
 
     return (
         <aside
@@ -74,19 +70,16 @@ export function PainelEspera({
                         </button>
                     ))}
                 </div>
-                <form onSubmit={procurar} role="search" className="mt-2">
-                    <label htmlFor="espera-q" className="sr-only">
-                        Procurar na lista de espera
-                    </label>
-                    <input
-                        id="espera-q"
-                        type="search"
-                        value={termo}
-                        onChange={(e) => setTermo(e.target.value)}
-                        placeholder="Nome ou processo"
-                        className={`${estiloEntrada} py-1.5 text-xs`}
-                    />
-                </form>
+                <CaixaPesquisa
+                    id="espera-q"
+                    termo={termo}
+                    aoEscrever={setTermo}
+                    aoPesquisar={() => ir({ espera_q: termo.trim() })}
+                    rotulo="Procurar na lista de espera"
+                    placeholder="Nome ou processo"
+                    compacto
+                    className="mt-2"
+                />
             </header>
 
             {espera.itens.length === 0 ? (

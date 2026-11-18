@@ -13,6 +13,32 @@ Notas para não me esquecer. Mais detalhe em `DOCKER.md`.
   - `docker-compose.override.yml` → sub-rede própria (`172.241.110.0/24`), por causa do erro "all predefined address pools have been fully subnetted"
 - Os dados ficam nos volumes do Docker (`db_data`, `app_storage`), por isso sobrevivem às atualizações.
 
+## Pôr a base de dados original em uso
+
+Antes de apontar a aplicação à base de dados original (ou de repor uma cópia dela):
+
+```bash
+# 1) backup (ver acima) e, de preferência, ensaiar numa cópia
+# 2) conferir que a estrutura e os registos de referência de que a app depende existem (só leitura)
+docker compose exec app php artisan bd:verificar-estrutura
+# 3) ver o que vai correr e correr
+docker compose exec app php artisan migrate:status | grep Pending
+docker compose exec app php artisan migrate --force
+# 4) listar registos que precisam de correção manual (só leitura)
+docker compose exec app php artisan dados:verificar
+```
+
+O que as migrações recentes fazem à base de dados (todas reversíveis e repetíveis; correm em ordem):
+
+| Migração | Efeito |
+|---|---|
+| `…_clavien_da_alta_passa_a_definitivo` | O grau de Clavien-Dindo passa a ser o definitivo aos 30 dias |
+| `…_associar_diagnosticos_cr_as_referenciacoes` | Copia os diagnósticos «centro de referência» dos internamentos para a referenciação ativa de cada utente (modo «Outro», histologia por preencher) |
+| `…_remover_permissoes_sem_uso` | Apaga as permissões que a app já não verifica (as `edit …` e as de diagnóstico, intervenção, complicação, resolução e reunião) |
+
+Depois de migrar, em **Administração > Perfis e permissões** (superAdmin) conferir o que cada perfil pode fazer.
+Com `AUTO_MIGRAR=true` o `atualizar.sh` já faz o backup e corre as migrações a cada versão publicada.
+
 ## Atualizar a app (manual)
 
 No servidor, na pasta do projeto:
