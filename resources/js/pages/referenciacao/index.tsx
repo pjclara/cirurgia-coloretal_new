@@ -29,7 +29,8 @@ type Situacao = 'todas' | 'referenciado' | 'no_centro' | 'saida';
 
 type Props = {
     lista: Paginado<Linha>;
-    filtros: { situacao: Situacao; q: string; de: string; ate: string };
+    filtros: { situacao: Situacao; q: string; ano: string; trimestre: string };
+    anos: string[];
     modal: PropsReferenciacao | null;
     origens: { id: number; nome: string }[];
     responsaveis: { id: number; nome: string; equipa: string | null }[];
@@ -47,7 +48,7 @@ const SITUACOES: { valor: Situacao; rotulo: string }[] = [
 const COR = { referenciado: 'bg-sky-100 text-sky-900', no_centro: 'bg-amber-100 text-amber-900', saida: 'bg-teal-100 text-teal-900' } as const;
 const ROTULO = { referenciado: 'Referenciado', no_centro: 'No centro', saida: 'Saída registada' } as const;
 
-export default function Referenciacao({ lista, filtros, modal, origens, responsaveis, referenciar }: Props) {
+export default function Referenciacao({ lista, filtros, anos, modal, origens, responsaveis, referenciar }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(filtros.q);
     const podeReferenciar = permissoes.includes('create referenciacao');
@@ -63,8 +64,8 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
         const consulta: Record<string, string> = {};
         if (novos.situacao !== 'todas') consulta.situacao = novos.situacao;
         if (novos.q) consulta.q = novos.q;
-        if (novos.de) consulta.de = novos.de;
-        if (novos.ate) consulta.ate = novos.ate;
+        if (novos.ano) consulta.ano = novos.ano;
+        if (novos.ano && novos.trimestre) consulta.trimestre = novos.trimestre;
         router.get('/referenciacao', consulta, { preserveState: true, preserveScroll: true });
     };
     const fechar = () => modal && router.visit(modal.fechar_url, { preserveScroll: true });
@@ -111,30 +112,36 @@ export default function Referenciacao({ lista, filtros, modal, origens, responsa
                 </div>
                 <div className="flex flex-wrap items-end gap-2" role="group" aria-label="Período da referenciação">
                     <label className="text-xs text-slate-600">
-                        Referenciados de
-                        <input
-                            type="date"
-                            value={filtros.de}
-                            max={filtros.ate || undefined}
-                            onChange={(e) => aplicar({ de: e.target.value })}
+                        Ano
+                        <select
+                            value={filtros.ano}
+                            onChange={(e) => aplicar({ ano: e.target.value, trimestre: e.target.value ? filtros.trimestre : '' })}
                             className={`${estiloEntrada} mt-0.5 block`}
-                        />
+                        >
+                            <option value="">Todos</option>
+                            {anos.map((a) => (
+                                <option key={a} value={a}>
+                                    {a}
+                                </option>
+                            ))}
+                        </select>
                     </label>
                     <label className="text-xs text-slate-600">
-                        até
-                        <input
-                            type="date"
-                            value={filtros.ate}
-                            min={filtros.de || undefined}
-                            onChange={(e) => aplicar({ ate: e.target.value })}
+                        Trimestre
+                        <select
+                            value={filtros.trimestre}
+                            disabled={!filtros.ano}
+                            onChange={(e) => aplicar({ trimestre: e.target.value })}
                             className={`${estiloEntrada} mt-0.5 block`}
-                        />
+                        >
+                            <option value="">Todos</option>
+                            {['1', '2', '3', '4'].map((t) => (
+                                <option key={t} value={t}>
+                                    T{t}
+                                </option>
+                            ))}
+                        </select>
                     </label>
-                    {(filtros.de || filtros.ate) && (
-                        <Botao type="button" variante="secundario" onClick={() => aplicar({ de: '', ate: '' })}>
-                            Limpar período
-                        </Botao>
-                    )}
                 </div>
                 <form
                     onSubmit={(e: FormEvent) => {

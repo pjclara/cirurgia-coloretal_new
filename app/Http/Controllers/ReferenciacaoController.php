@@ -95,8 +95,16 @@ class ReferenciacaoController extends Controller
         $situacoes = ['referenciado', 'no_centro', 'saida', 'todas'];
         $situacao = in_array($request->query('situacao'), $situacoes, true) ? $request->query('situacao') : 'todas';
         $q = trim((string) $request->query('q', ''));
-        // Período da data de referenciação (valores inválidos ignoram-se).
-        [$de, $ate] = \App\Support\Intervalo::datas($request);
+        // Ano e trimestre da data de referenciação (valores inválidos ignoram-se; o trimestre só conta com ano).
+        $anos = DB::table('referenciacao_centro_de_referencias')->whereNull('deleted_at')->selectRaw('distinct year(data_de_referenciacao) as ano')
+            ->orderByDesc('ano')->pluck('ano')->map(fn ($a) => (string) $a)->all();
+        $ano = in_array($request->query('ano'), $anos, true) ? $request->query('ano') : '';
+        $trimestre = $ano !== '' && in_array($request->query('trimestre'), ['1', '2', '3', '4'], true) ? $request->query('trimestre') : '';
+        $de = $ate = '';
+        if ($ano !== '') {
+            $inicio = \Illuminate\Support\Carbon::create((int) $ano, $trimestre !== '' ? ((int) $trimestre - 1) * 3 + 1 : 1, 1);
+            [$de, $ate] = [$inicio->format('Y-m-d'), $inicio->copy()->addMonthsNoOverflow($trimestre !== '' ? 3 : 12)->subDay()->format('Y-m-d')];
+        }
 
         $lista = Referenciacao::query()
             ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'diagnosticos:id,nome,abrev'])
@@ -124,7 +132,8 @@ class ReferenciacaoController extends Controller
 
         return Inertia::render('referenciacao/index', [
             'lista' => $lista,
-            'filtros' => ['situacao' => $situacao, 'q' => $q, 'de' => $de, 'ate' => $ate],
+            'filtros' => ['situacao' => $situacao, 'q' => $q, 'ano' => $ano, 'trimestre' => $trimestre],
+            'anos' => $anos,
             'modal' => $modal,
             'origens' => $podeReferenciar ? Dominios::lista('origem_da_referenciacaos') : [],
             'responsaveis' => $podeReferenciar ? Dominios::responsaveis() : [],

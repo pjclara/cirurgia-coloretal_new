@@ -166,14 +166,21 @@ test('o utente sinalizado aparece marcado no quadro e nos internamentos, até te
         ->where('internamentos.data', fn ($lista) => collect($lista)->firstWhere('id', $internamento->id)['centro_referencia'] === true));
 });
 
-test('a lista de referenciações filtra pelo período da data de referenciação', function () {
-    referenciar($this, ['data_de_referenciacao' => now()->subDays(20)->format('Y-m-d')])->assertRedirect();
+test('a lista de referenciações filtra por ano e trimestre da data de referenciação', function () {
+    $dia = now()->subDays(20);
+    $antigo = now()->subYears(2);
+    referenciar($this, ['data_de_referenciacao' => $dia->format('Y-m-d')])->assertRedirect();
     $outro = novoUtente();
-    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$outro->id}", corpoReferenciacao($this, ['data_de_referenciacao' => now()->subDays(100)->format('Y-m-d')]))->assertRedirect();
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$outro->id}", corpoReferenciacao($this, ['data_de_referenciacao' => $antigo->format('Y-m-d')]))->assertRedirect();
 
     $ver = fn (string $consulta) => $this->actingAs($this->gestor)->get("/referenciacao$consulta");
-    $ver('')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2));
-    $ver('?de='.now()->subDays(30)->format('Y-m-d'))->assertInertia(fn (Assert $p) => $p->where('lista.total', 1)->where('filtros.de', now()->subDays(30)->format('Y-m-d')));
-    $ver('?ate='.now()->subDays(60)->format('Y-m-d'))->assertInertia(fn (Assert $p) => $p->where('lista.total', 1));
-    $ver('?de=lixo&ate=2999-99-99')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.de', ''));
+    $ver('')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.ano', '')->has('anos', 2));
+    $ver('?ano='.$dia->year)->assertInertia(fn (Assert $p) => $p->where('lista.total', 1)->where('filtros.ano', (string) $dia->year));
+    $ver('?ano='.$dia->year.'&trimestre='.$dia->quarter)->assertInertia(fn (Assert $p) => $p->where('lista.total', 1)->where('filtros.trimestre', (string) $dia->quarter));
+    $outroTrimestre = $dia->quarter === 1 ? 2 : 1;
+    $ver('?ano='.$dia->year.'&trimestre='.$outroTrimestre)->assertInertia(fn (Assert $p) => $p->where('lista.total', 0));
+    $ver('?ano='.$antigo->year)->assertInertia(fn (Assert $p) => $p->where('lista.total', 1));
+    // Inválidos ignoram-se; o trimestre sem ano também.
+    $ver('?ano=lixo&trimestre=9')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.ano', ''));
+    $ver('?trimestre=1')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.trimestre', ''));
 });
