@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Complicacao;
 use App\Models\Internamento;
 use App\Models\Morbilidade;
+use App\Models\Referenciacao;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -37,6 +38,7 @@ class GuardarInternamento
 
             $diagnosticos = collect($dados['diagnosticos'] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values();
             $internamento->diagnosticos()->sync($diagnosticos->all());
+            $this->associarDiagnosticosAoCentro($internamento, $diagnosticos->all());
 
             $this->gravarMorbilidade($internamento, $dados['morbilidade'] ?? [], (int) ($dados['destino_id'] ?? 0) === Internamento::DESTINO_FALECIDO);
 
@@ -58,6 +60,38 @@ class GuardarInternamento
 
             return $internamento;
         });
+    }
+
+    /**
+     * Os diagnósticos do internamento marcados como «centro de referência» passam também para a referenciação ativa
+     * do utente (a mais recente, sem saída), se ainda lá não estiverem. O modo fica «Outro» e a histologia por
+     * preencher, para completar na referenciação; nada se remove.
+     *
+     * @param  list<int>  $diagnosticos
+     */
+    private function associarDiagnosticosAoCentro(Internamento $internamento, array $diagnosticos): void
+    {
+        if ($diagnosticos === []) {
+            return;
+        }
+
+        $referenciacao = Referenciacao::where('utente_id', $internamento->utente_id)->whereNull('data_de_saida')
+            ->orderByDesc('data_de_referenciacao')->orderByDesc('id')->first();
+        if (! $referenciacao) {
+            return;
+        }
+
+        $jaAssociados = $referenciacao->diagnosticos()->pluck('diagnosticos.id')->all();
+        $novos = DB::table('diagnosticos')->whereIn('id', $diagnosticos)->where('centro_de_referencia', 1)
+            ->whereNotIn('id', $jaAssociados)->pluck('id');
+        if ($novos->isEmpty()) {
+            return;
+        }
+
+        $referenciacao->diagnosticos()->attach($novos->mapWithKeys(fn ($id) => [
+            (int) $id => ['modo_id' => Referenciacao::MODO_OUTRO, 'histologia_id' => null, 'data_diagnostico' => null],
+        ])->all());
+        $referenciacao->auditar('updated', ['diagnosticos' => $jaAssociados], ['diagnosticos' => array_merge($jaAssociados, $novos->map(fn ($id) => (int) $id)->all())]);
     }
 
     /**

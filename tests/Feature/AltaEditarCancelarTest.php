@@ -84,3 +84,40 @@ test('na lista de espera abre-se a inscrição de um utente escolhido na pesquis
         ->where('modal.tipo', 'inscricao')
         ->where('modal.utente.id', $utente->id));
 });
+
+test('os diagnósticos do centro de referência do internamento passam para a referenciação ativa do utente', function () {
+    $utente = $this->internamento->utente;
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $normal = DB::table('diagnosticos')->where('centro_de_referencia', 0)->value('id');
+    $referenciacao = new \App\Models\Referenciacao(['data_de_referenciacao' => now()->subDays(10)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $this->utilizador->id]);
+    $referenciacao->utente_id = $utente->id;
+    $referenciacao->created_by_id = $this->utilizador->id;
+    $referenciacao->save();
+
+    $this->actingAs($this->utilizador)->put("/internamentos/{$this->internamento->id}", payloadInternamento($this->internamento, ['diagnosticos' => [$cr, $normal]]))->assertSessionHasNoErrors();
+
+    $ids = $referenciacao->diagnosticos()->pluck('diagnosticos.id')->all();
+    expect($ids)->toBe([$cr])
+        ->and($referenciacao->diagnosticos()->first()->pivot->modo_id)->toBe(\App\Models\Referenciacao::MODO_OUTRO);
+
+    // Voltar a gravar não duplica.
+    $this->actingAs($this->utilizador)->put("/internamentos/{$this->internamento->id}", payloadInternamento($this->internamento, ['diagnosticos' => [$cr]]))->assertSessionHasNoErrors();
+    expect($referenciacao->diagnosticos()->count())->toBe(1);
+});
+
+test('a migration associa às referenciações ativas os diagnósticos CR já registados nos internamentos', function () {
+    $migration = require database_path('migrations/2026_11_17_000002_associar_diagnosticos_cr_as_referenciacoes.php');
+    $utente = $this->internamento->utente;
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $this->internamento->diagnosticos()->sync([$cr]);
+    $ativa = new \App\Models\Referenciacao(['data_de_referenciacao' => now()->subDays(10)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $this->utilizador->id]);
+    $ativa->utente_id = $utente->id;
+    $ativa->created_by_id = $this->utilizador->id;
+    $ativa->save();
+
+    $migration->up();
+    $migration->up(); // idempotente
+
+    expect($ativa->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr])
+        ->and($ativa->diagnosticos()->first()->pivot->modo_id)->toBe(99);
+});

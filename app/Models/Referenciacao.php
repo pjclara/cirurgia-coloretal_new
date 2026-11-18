@@ -15,6 +15,9 @@ class Referenciacao extends Model
 {
     use RegistaAuditoria, RegistaAutor, SoftDeletes;
 
+    /** Modo de diagnóstico «Outro»: usado quando o diagnóstico vem do internamento e o modo ainda não se sabe. */
+    public const MODO_OUTRO = 99;
+
     protected $table = 'referenciacao_centro_de_referencias';
 
     protected $fillable = [

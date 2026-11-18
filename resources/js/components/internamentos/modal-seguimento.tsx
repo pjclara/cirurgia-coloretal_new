@@ -62,7 +62,7 @@ export function ModalSeguimento({ linha, dominios, temSeguinte, aoFechar, aoGuar
     return (
         <Dialog open onOpenChange={(aberto) => !aberto && aoFechar()}>
             <DialogContent
-                className="max-h-[90vh] max-w-2xl overflow-y-auto bg-white text-slate-900"
+                className="max-h-[90vh] w-[90vw] max-w-[90vw] overflow-y-auto bg-white text-slate-900"
                 onInteractOutside={(e) => e.preventDefault()}
                 aria-describedby={undefined}
             >
