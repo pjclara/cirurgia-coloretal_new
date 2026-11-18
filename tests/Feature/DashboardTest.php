@@ -39,7 +39,7 @@ test('a análise abre por omissão no último trimestre completo e ignora trimes
 });
 
 test('a análise do cancro retal calcula os indicadores por trimestre', function () {
-    $utilizador = utilizadorClinico();
+    $utilizador = utilizadorClinico(permissoesComReferenciacao());
     $vivo = DB::table('destinos')->where('id', '<>', 6)->value('id');
     $data = now()->subDays(10)->format('Y-m-d');
 
@@ -68,12 +68,12 @@ test('a análise do cancro retal calcula os indicadores por trimestre', function
 });
 
 test('o filtro por trimestre do cancro retal ignora valores inválidos e funciona sem cirurgias', function () {
-    $this->actingAs(utilizadorClinico())->get('/analise/cancro-retal?de=lixo&ate=lixo')
+    $this->actingAs(utilizadorClinico(permissoesComReferenciacao()))->get('/analise/cancro-retal?de=lixo&ate=lixo')
         ->assertOk()->assertInertia(fn (Assert $p) => $p->where('trimestres', [])->where('total', 0));
 });
 
 test('o cancro retal abre por omissão no último trimestre completo', function () {
-    $utilizador = utilizadorClinico();
+    $utilizador = utilizadorClinico(permissoesComReferenciacao());
     $data = now()->subMonths(5)->format('Y-m-d');
     $utente = novoUtente();
     DB::table('referenciacao_centro_de_referencias')->insert(['utente_id' => $utente->id, 'data_de_referenciacao' => $data, 'origem_id' => 1, 'responsavel_id' => $utilizador->id, 'created_by_id' => $utilizador->id, 'uuid' => (string) \Illuminate\Support\Str::uuid()]);
@@ -87,7 +87,7 @@ test('o cancro retal abre por omissão no último trimestre completo', function 
 });
 
 test('a qualidade dos dados lista as cirurgias de doentes do CR com dados em falta', function () {
-    $utilizador = utilizadorClinico();
+    $utilizador = utilizadorClinico(permissoesComReferenciacao());
     $data = now()->subDays(10)->format('Y-m-d');
     $utente = novoUtente();
     DB::table('referenciacao_centro_de_referencias')->insert(['utente_id' => $utente->id, 'data_de_referenciacao' => $data, 'origem_id' => 1, 'responsavel_id' => $utilizador->id, 'created_by_id' => $utilizador->id, 'uuid' => (string) \Illuminate\Support\Str::uuid()]);
@@ -119,4 +119,11 @@ test('a análise geral filtra por trimestre', function () {
         ->assertInertia(fn (Assert $p) => $p->where('de', $rotulo)->where('indicadores.internamentos.valor', 1));
     $this->actingAs($utilizador)->get('/dashboard'.trimestresDesde(200))
         ->assertInertia(fn (Assert $p) => $p->where('indicadores.internamentos.valor', 2));
+});
+
+test('o cancro retal e a qualidade dos dados exigem poder ver referenciações', function () {
+    $semReferenciacao = utilizadorClinico();
+    $this->actingAs($semReferenciacao)->get('/analise/cancro-retal')->assertForbidden();
+    $this->actingAs($semReferenciacao)->get('/analise/cancro-retal/qualidade')->assertForbidden();
+    $this->actingAs(utilizadorClinico(permissoesComReferenciacao()))->get('/analise/cancro-retal')->assertOk();
 });

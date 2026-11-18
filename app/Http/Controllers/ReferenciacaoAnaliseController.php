@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Internamento;
 use App\Support\Intervalo;
+use App\Support\ReferenciadoAoCentro;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -19,10 +20,6 @@ class ReferenciacaoAnaliseController extends Controller
 {
     /** Primeiro ano mostrado na série anual (antes disto há muito poucos registos). */
     private const ANO_INICIAL = 2017;
-
-    /** O internamento é de um doente já referenciado ao CR na data da entrada. */
-    private const DOENTE_CR = 'exists (select 1 from referenciacao_centro_de_referencias rr
-        where rr.utente_id = i.utente_id and rr.deleted_at is null and rr.data_de_referenciacao <= i.data_de_entrada)';
 
     public function __invoke(Request $request): Response
     {
@@ -143,7 +140,7 @@ class ReferenciacaoAnaliseController extends Controller
         $linhas = DB::table('internamentos as i')->whereNull('i.deleted_at')->where('i.data_de_entrada', '>=', config('clinico.data_minima'))
             ->when($desde, fn ($q) => $q->where('i.data_de_entrada', '>=', $desde))
             ->when($ate, fn ($q) => $q->where('i.data_de_entrada', '<=', $ate))
-            ->selectRaw('('.self::DOENTE_CR.') as cr, count(*) as n,
+            ->selectRaw('('.ReferenciadoAoCentro::existe('i.utente_id', 'i.data_de_entrada').') as cr, count(*) as n,
                 sum(i.data_de_alta is not null and i.data_de_alta >= i.data_de_entrada) as altas,
                 avg(case when i.data_de_alta is not null and i.data_de_alta >= i.data_de_entrada then datediff(i.data_de_alta, i.data_de_entrada) end) as demora,
                 sum(i.data_de_alta is not null and i.data_de_alta >= i.data_de_entrada and i.destino_id = ?) as obitos,

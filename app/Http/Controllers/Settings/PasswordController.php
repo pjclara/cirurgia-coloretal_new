@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Support\RegrasPassword;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -31,12 +30,11 @@ class PasswordController extends Controller
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', Password::defaults(), 'confirmed'],
-        ]);
+            'password' => ['required', RegrasPassword::regra(), 'confirmed'],
+        ], RegrasPassword::mensagens());
 
-        $request->user()->update([
-            'password' => Hash::make($validated['password']),
-        ]);
+        // Mudar a password por vontade própria também cumpre a troca obrigatória.
+        $request->user()->forceFill(['password' => $validated['password'], 'must_change_password' => false])->save();
 
         return back();
     }

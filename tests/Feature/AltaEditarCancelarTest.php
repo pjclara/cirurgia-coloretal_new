@@ -86,6 +86,7 @@ test('na lista de espera abre-se a inscrição de um utente escolhido na pesquis
 });
 
 test('os diagnósticos do centro de referência do internamento passam para a referenciação ativa do utente', function () {
+    $this->utilizador->givePermissionTo('update referenciacao');
     $utente = $this->internamento->utente;
     $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
     $normal = DB::table('diagnosticos')->where('centro_de_referencia', 0)->value('id');
@@ -120,4 +121,17 @@ test('a migration associa às referenciações ativas os diagnósticos CR já re
 
     expect($ativa->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr])
         ->and($ativa->diagnosticos()->first()->pivot->modo_id)->toBe(99);
+});
+
+test('sem permissão de atualizar referenciações, gravar o internamento não altera a referenciação', function () {
+    $utente = $this->internamento->utente;
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $referenciacao = new \App\Models\Referenciacao(['data_de_referenciacao' => now()->subDays(10)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $this->utilizador->id]);
+    $referenciacao->utente_id = $utente->id;
+    $referenciacao->created_by_id = $this->utilizador->id;
+    $referenciacao->save();
+
+    $this->actingAs($this->utilizador)->put("/internamentos/{$this->internamento->id}", payloadInternamento($this->internamento, ['diagnosticos' => [$cr]]))->assertSessionHasNoErrors();
+
+    expect($referenciacao->diagnosticos()->count())->toBe(0);
 });

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\RegrasPassword;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,14 +23,8 @@ class ContaController extends Controller
     public function atualizarPassword(Request $request): RedirectResponse
     {
         $dados = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
-        ], [
-            'password.required' => 'Escreva a nova password.',
-            'password.confirmed' => 'As duas passwords não coincidem.',
-            'password.min' => 'A password tem de ter pelo menos :min caracteres.',
-            'password.letters' => 'A password tem de incluir letras.',
-            'password.numbers' => 'A password tem de incluir números.',
-        ]);
+            'password' => ['required', 'confirmed', RegrasPassword::regra()],
+        ], RegrasPassword::mensagens());
 
         $utilizador = $request->user();
 

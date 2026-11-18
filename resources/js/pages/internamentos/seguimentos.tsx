@@ -30,7 +30,8 @@ type Props = {
     seguimentos: Paginado<Linha>;
     filtros: { estado: Estado; periodo: Periodo; responsavel_id: number | null; cr: boolean; q: string };
     responsaveis: Responsavel[];
-    contagens: { em_atraso: number; a_decorrer: number; cr: number };
+    contagens: { em_atraso: number; a_decorrer: number; cr: number | null };
+    podeVerCr: boolean;
     podeRegistar: boolean;
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
@@ -41,7 +42,7 @@ const PERIODOS: { valor: Periodo; rotulo: string }[] = [
     { valor: 'todos', rotulo: 'Todas as altas' },
 ];
 
-export default function Seguimentos({ seguimentos, filtros, responsaveis, contagens, podeRegistar, dominios }: Props) {
+export default function Seguimentos({ seguimentos, filtros, responsaveis, contagens, podeVerCr, podeRegistar, dominios }: Props) {
     const [termo, setTermo] = useState(filtros.q);
     const [abertoId, setAbertoId] = useState<number | null>(null);
     const indice = seguimentos.data.findIndex((l) => l.id === abertoId);
@@ -91,17 +92,19 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                     </button>
                 ))}
 
-                <button
-                    type="button"
-                    aria-pressed={filtros.cr}
-                    onClick={() => aplicar({ cr: !filtros.cr })}
-                    className={`min-w-36 rounded-lg border bg-white px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-teal-700 ${
-                        filtros.cr ? 'border-violet-700 ring-1 ring-violet-700' : 'border-slate-200 hover:border-slate-400'
-                    }`}
-                >
-                    <span className="block text-2xl font-semibold text-violet-800 tabular-nums">{contagens.cr}</span>
-                    <span className="text-sm text-slate-600">{filtros.cr ? 'Só doentes do CR' : 'Doentes do CR'}</span>
-                </button>
+                {podeVerCr && (
+                    <button
+                        type="button"
+                        aria-pressed={filtros.cr}
+                        onClick={() => aplicar({ cr: !filtros.cr })}
+                        className={`min-w-36 rounded-lg border bg-white px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-teal-700 ${
+                            filtros.cr ? 'border-violet-700 ring-1 ring-violet-700' : 'border-slate-200 hover:border-slate-400'
+                        }`}
+                    >
+                        <span className="block text-2xl font-semibold text-violet-800 tabular-nums">{contagens.cr}</span>
+                        <span className="text-sm text-slate-600">{filtros.cr ? 'Só doentes do CR' : 'Doentes do CR'}</span>
+                    </button>
+                )}
 
                 <div className="ml-auto flex flex-wrap items-end gap-2">
                     <label className="text-sm">

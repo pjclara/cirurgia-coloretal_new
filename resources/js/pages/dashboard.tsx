@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FiltroTrimestres } from '../components/analise/filtro-trimestres';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, Linha, formatar, type Ponto } from '../components/analise/graficos';
 import { SeparadoresAnalise } from '../components/analise/separadores';
+import { nomeMes, nomePeriodo, tabela } from '../components/analise/util';
 import ClinicoLayout from '../layouts/clinico-layout';
 
 type Props = {
@@ -27,16 +28,12 @@ type Props = {
     espera: { total: number; mediana_dias: number | null; por_prioridade: Ponto[]; por_espera: Ponto[] };
 };
 
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const nomeMes = (ym: string) => `${MESES[Number(ym.slice(5)) - 1]} ${ym.slice(2, 4)}`;
-
 export default function Analise({ trimestres, de, ate, geradoEm, indicadores, mensal, anual, clavien, intervencoes, diagnosticos, espera }: Props) {
     const [aCarregar, setACarregar] = useState(false);
     const { internamentos: ent } = indicadores;
     const variacao = ent.anterior ? Math.round(((ent.valor - ent.anterior) / ent.anterior) * 100) : null;
-    const nomePeriodo = de === ate ? (de ?? '') : `${de} a ${ate}`;
+    const periodo = nomePeriodo(de, ate);
     const anos: Ponto[] = anual.map((a) => ({ rotulo: String(a.ano), valor: a.internamentos }));
-    const tabela = (pontos: Ponto[], sufixo = '') => pontos.map((p) => [p.rotulo, p.valor === null ? '—' : `${formatar(p.valor)}${sufixo}`]);
 
     return (
         <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga">
@@ -54,7 +51,7 @@ export default function Analise({ trimestres, de, ate, geradoEm, indicadores, me
                 <div className={`space-y-5 transition-opacity ${aCarregar ? 'opacity-50' : ''}`}>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
                         <Indicador
-                            rotulo={`Internamentos (${nomePeriodo})`}
+                            rotulo={`Internamentos (${periodo})`}
                             valor={formatar(ent.valor)}
                             nota={
                                 variacao !== null
@@ -97,7 +94,7 @@ export default function Analise({ trimestres, de, ate, geradoEm, indicadores, me
 
                     <Cartao
                         titulo="Internamentos por mês"
-                        nota={`Entradas por mês (${nomePeriodo}); o mês em curso está incompleto`}
+                        nota={`Entradas por mês (${periodo}); o mês em curso está incompleto`}
                         colunas={['Mês', 'Entradas']}
                         linhas={tabela(mensal.map((m) => ({ ...m, rotulo: nomeMes(m.rotulo) })))}
                     >
@@ -142,7 +139,7 @@ export default function Analise({ trimestres, de, ate, geradoEm, indicadores, me
                         </Cartao>
                         <Cartao
                             titulo="Grau de Clavien-Dindo"
-                            nota={`Grau mais grave por internamento (${nomePeriodo}); 3 e 4 incluem A e B`}
+                            nota={`Grau mais grave por internamento (${periodo}); 3 e 4 incluem A e B`}
                             colunas={['Grau', 'Internamentos']}
                             linhas={tabela(clavien)}
                         >
@@ -158,7 +155,7 @@ export default function Analise({ trimestres, de, ate, geradoEm, indicadores, me
                         </Cartao>
                         <Cartao
                             titulo="Intervenções mais frequentes"
-                            nota={`Top 10 (${nomePeriodo})`}
+                            nota={`Top 10 (${periodo})`}
                             colunas={['Intervenção', 'Cirurgias']}
                             linhas={tabela(intervencoes)}
                         >
@@ -166,7 +163,7 @@ export default function Analise({ trimestres, de, ate, geradoEm, indicadores, me
                         </Cartao>
                         <Cartao
                             titulo="Diagnósticos mais frequentes"
-                            nota={`Top 10 nos internamentos (${nomePeriodo})`}
+                            nota={`Top 10 nos internamentos (${periodo})`}
                             colunas={['Diagnóstico', 'Internamentos']}
                             linhas={tabela(diagnosticos)}
                         >

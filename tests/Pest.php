@@ -174,3 +174,9 @@ function trimestresDesde(int $dias): string
 
     return '?'.http_build_query(['de' => $rotulo(now()->subDays($dias)), 'ate' => $rotulo(now())]);
 }
+
+/** Permissões de internamento e agendamento mais a de ver referenciações. */
+function permissoesComReferenciacao(): array
+{
+    return Permission::where('name', 'like', '%internamento%')->orWhere('name', 'like', '%agendamento%')->orWhere('name', 'show referenciacao')->pluck('name')->all();
+}

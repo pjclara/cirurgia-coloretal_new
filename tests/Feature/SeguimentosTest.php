@@ -60,6 +60,7 @@ test('a lista não mostra o grau da alta: o grau definitivo só existe depois do
 });
 
 test('os doentes do CR vêm primeiro, estão identificados e podem filtrar-se', function () {
+    $this->utilizador->givePermissionTo('show referenciacao');
     $antiga = internamentoComAlta($this, 60);       // sem CR, mais antiga
     $recente = internamentoComAlta($this, 10);      // doente do CR, mais recente
     DB::table('referenciacao_centro_de_referencias')->insert([
@@ -84,4 +85,15 @@ test('os seguimentos podem procurar-se por nome ou processo', function () {
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?q=Zacarias')->assertInertia(fn (Assert $p) => $p
         ->where('seguimentos.total', 1)->where('seguimentos.data.0.id', $um->id)->where('filtros.q', 'Zacarias'));
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?q='.$um->utente->numero_processo)->assertInertia(fn (Assert $p) => $p->where('seguimentos.data.0.id', $um->id));
+});
+
+test('sem permissão de ver referenciações os doentes do CR não são identificados nos seguimentos', function () {
+    $doente = internamentoComAlta($this, 40);
+    DB::table('referenciacao_centro_de_referencias')->insert([
+        'utente_id' => $doente->utente_id, 'data_de_referenciacao' => now()->subDays(60)->format('Y-m-d'),
+        'origem_id' => 1, 'responsavel_id' => $this->utilizador->id, 'created_by_id' => $this->utilizador->id, 'uuid' => (string) \Illuminate\Support\Str::uuid(),
+    ]);
+
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?cr=1')->assertInertia(fn (Assert $p) => $p
+        ->where('podeVerCr', false)->where('contagens.cr', null)->where('filtros.cr', false)->where('seguimentos.data.0.cr', false));
 });

@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Complicacao;
 use App\Models\Internamento;
 use App\Models\Morbilidade;
+use App\Support\Intervalo;
+use App\Support\ReferenciadoAoCentro;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -76,37 +80,14 @@ class CancroRetalAnaliseController extends Controller
      * Trimestres disponíveis (da primeira cirurgia ao trimestre em curso), intervalo escolhido e cirurgias nele.
      * Por omissão, o último trimestre completo (o em curso só se for o único).
      *
-     * @return array{0: list<string>, 1: ?string, 2: ?string, 3: \Illuminate\Support\Collection}
+     * @return array{0: list<string>, 1: ?string, 2: ?string, 3: Collection}
      */
     private function intervalo(Request $request, Carbon $hoje): array
     {
         $todas = $this->cirurgias($hoje);
-        $trimestres = $this->trimestresDesde($todas->first()['trimestre'] ?? null, $hoje);
-        $ultimo = count($trimestres) > 1 ? $trimestres[count($trimestres) - 2] : ($trimestres[0] ?? null);
-        $de = in_array($request->query('de'), $trimestres, true) ? $request->query('de') : $ultimo;
-        $ate = in_array($request->query('ate'), $trimestres, true) ? $request->query('ate') : $ultimo;
-        if ($de !== null && $de > $ate) {
-            [$de, $ate] = [$ate, $de];
-        }
+        ['trimestres' => $trimestres, 'de' => $de, 'ate' => $ate] = Intervalo::trimestres($request, $todas->first()['linha']->data ?? null, $hoje);
 
         return [$trimestres, $de, $ate, $todas->filter(fn ($c) => $c['trimestre'] >= $de && $c['trimestre'] <= $ate)->values()];
-    }
-
-    /** @return list<string> "2023 T1", "2023 T2"... da primeira cirurgia ao trimestre em curso. */
-    private function trimestresDesde(?string $primeiro, Carbon $hoje): array
-    {
-        if (! $primeiro) {
-            return [];
-        }
-        [$ano, $t] = [(int) substr($primeiro, 0, 4), (int) substr($primeiro, -1)];
-        $atual = $hoje->format('Y').' T'.$hoje->quarter;
-        $lista = [];
-        while ("$ano T$t" <= $atual) {
-            $lista[] = "$ano T$t";
-            [$ano, $t] = $t === 4 ? [$ano + 1, 1] : [$ano, $t + 1];
-        }
-
-        return $lista;
     }
 
     /** Uma linha por cirurgia retal de doente referenciado ao CR até à data da cirurgia, com os indicadores já avaliados. */
@@ -118,7 +99,7 @@ class CancroRetalAnaliseController extends Controller
         $retoSigmoideia = self::RESSECCAO_RETO_SIGMOIDEIA;
         $falecido = Internamento::DESTINO_FALECIDO;
         $deiscencia = self::DEISCENCIA;
-        $semComplicacoes = \App\Models\Complicacao::SEM_COMPLICACOES;
+        $semComplicacoes = Complicacao::SEM_COMPLICACOES;
         // Morbilidade grave: grau definitivo de Clavien-Dindo 3 ou superior (3A a 5), como no resto da aplicação.
         $grau = '(m.momento = \''.Morbilidade::AOS_30_DIAS."' or (m.momento = '".Morbilidade::NA_ALTA."' and i.destino_id = $falecido))";
 
@@ -128,8 +109,7 @@ class CancroRetalAnaliseController extends Controller
             ->where('b.data_de_inicio', '>=', config('clinico.data_minima'))
             ->where('b.data_de_inicio', '<=', $hoje->copy()->endOfDay())
             ->whereRaw($tem("$resseccao, $amputacao, $retoSigmoideia"))
-            ->whereRaw('exists (select 1 from referenciacao_centro_de_referencias r
-                where r.utente_id = i.utente_id and r.deleted_at is null and r.data_de_referenciacao <= b.data_de_inicio)')
+            ->whereRaw(ReferenciadoAoCentro::existe('i.utente_id', 'b.data_de_inicio'))
             ->join('utentes as u', 'u.id', '=', 'i.utente_id')
             ->leftJoin('users as ur', 'ur.id', '=', 'i.responsavel_id')
             ->selectRaw("b.data_de_inicio as data, b.id as bloco_id, i.id as internamento_id, u.id as utente_id, u.nome as utente_nome,

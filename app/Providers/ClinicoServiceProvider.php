@@ -28,6 +28,7 @@ class ClinicoServiceProvider extends ServiceProvider
     {
         $router->aliasMiddleware('clinico.ativo', UtilizadorAtivo::class);
         $router->aliasMiddleware('clinico.admin', \App\Http\Middleware\ApenasAdministrador::class);
+        $router->aliasMiddleware('clinico.superadmin', \App\Http\Middleware\ApenasSuperAdmin::class);
         $router->aliasMiddleware('clinico.password', PasswordAlterada::class);
 
         // superAdmin passa em todas as verificações de permissão.

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\PerfilController;
 use App\Http\Controllers\Admin\UtilizadorController;
 use App\Http\Controllers\AgendamentoController;
 use App\Http\Controllers\AnaliseController;
@@ -27,8 +28,6 @@ Route::put('conta/password', [ContaController::class, 'atualizarPassword'])->nam
 Route::middleware('can:show internamento')->group(function () {
     Route::get('quadro', QuadroController::class)->name('quadro');
     Route::get('dashboard', AnaliseController::class)->name('dashboard');
-    Route::get('analise/cancro-retal', CancroRetalAnaliseController::class)->name('analise.cancro-retal');
-    Route::get('analise/cancro-retal/qualidade', [CancroRetalAnaliseController::class, 'qualidade'])->name('analise.cancro-retal.qualidade');
     Route::get('quadro/imprimir', [QuadroController::class, 'imprimir'])->name('quadro.imprimir');
     Route::get('quadro/novo', [QuadroController::class, 'novo'])->middleware('can:create internamento')->name('quadro.novo');
     Route::get('quadro/novo-utente', [QuadroController::class, 'novoUtente'])->middleware('can:create internamento')->name('quadro.novo-utente');
@@ -41,6 +40,12 @@ Route::middleware('can:show internamento')->group(function () {
 
     Route::get('internamentos', [InternamentoController::class, 'index'])->name('internamentos.index');
     Route::get('internamentos/seguimentos', [InternamentoController::class, 'seguimentos'])->name('internamentos.seguimentos');
+});
+
+// Análise do cancro retal: doentes referenciados ao centro de referência, com nome e processo.
+Route::middleware(['can:show internamento', 'can:show referenciacao'])->group(function () {
+    Route::get('analise/cancro-retal', CancroRetalAnaliseController::class)->name('analise.cancro-retal');
+    Route::get('analise/cancro-retal/qualidade', [CancroRetalAnaliseController::class, 'qualidade'])->name('analise.cancro-retal.qualidade');
 });
 
 Route::middleware('can:create internamento')->group(function () {
@@ -90,6 +95,12 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
     Route::post('utilizadores', [UtilizadorController::class, 'store'])->name('utilizadores.store');
     Route::get('utilizadores/{utilizador}', [UtilizadorController::class, 'edit'])->whereNumber('utilizador')->name('utilizadores.edit');
     Route::put('utilizadores/{utilizador}', [UtilizadorController::class, 'update'])->whereNumber('utilizador')->name('utilizadores.update');
+
+    // Perfis e permissões: só o superAdmin.
+    Route::middleware('clinico.superadmin')->group(function () {
+        Route::get('perfis', [PerfilController::class, 'index'])->name('perfis.index');
+        Route::put('perfis', [PerfilController::class, 'update'])->name('perfis.update');
+    });
 });
 
 // Agendamento cirúrgico

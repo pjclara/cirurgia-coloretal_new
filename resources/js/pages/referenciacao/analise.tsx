@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, formatar, type Ponto } from '../../components/analise/graficos';
 import { SeparadoresAnalise } from '../../components/analise/separadores';
+import { nomeMes, nomePeriodo, tabela } from '../../components/analise/util';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Grupo = { internamentos: number; demora: number | null; complicacoes: number | null; mortalidade: number | null; operados: number | null };
@@ -33,10 +34,6 @@ type Props = {
     comparacao: { cr: Grupo; restantes: Grupo };
 };
 
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const nomeMes = (ym: string) => `${MESES[Number(ym.slice(5)) - 1]} ${ym.slice(2, 4)}`;
-
-const tabela = (pontos: Ponto[]) => pontos.map((p) => [p.rotulo, p.valor === null ? '—' : formatar(p.valor)]);
 const pc = (parte: number, todo: number) => (todo > 0 ? `${formatar(Math.round((1000 * parte) / todo) / 10)}%` : '—');
 const valor = (v: number | null, sufixo = '') => (v === null ? '—' : formatar(v, sufixo));
 
@@ -57,7 +54,7 @@ export default function AnaliseCR({
     comparacao,
 }: Props) {
     const [aCarregar, setACarregar] = useState(false);
-    const nomePeriodo = de === ate ? (de ?? '') : `${de} a ${ate}`;
+    const periodo = nomePeriodo(de, ate);
     const { referenciacoes: ref } = ind;
     const variacao = ref.anterior ? Math.round(((ref.valor - ref.anterior) / ref.anterior) * 100) : null;
 
@@ -70,11 +67,7 @@ export default function AnaliseCR({
     ];
 
     return (
-        <ClinicoLayout
-            titulo="Análise"
-            subtitulo={`Centro de referência: doentes referenciados · gerada a ${geradoEm}`}
-            largura="larga"
-        >
+        <ClinicoLayout titulo="Análise" subtitulo={`Centro de referência: doentes referenciados · gerada a ${geradoEm}`} largura="larga">
             <style>{ESTILO_VIZ}</style>
             <SeparadoresAnalise atual="cr" />
             <div className="viz-root space-y-5">
@@ -88,7 +81,7 @@ export default function AnaliseCR({
                 <div className={`space-y-5 transition-opacity ${aCarregar ? 'opacity-50' : ''}`}>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
                         <Indicador
-                            rotulo={`Referenciações (${nomePeriodo})`}
+                            rotulo={`Referenciações (${periodo})`}
                             valor={formatar(ref.valor)}
                             nota={
                                 variacao !== null
@@ -124,7 +117,7 @@ export default function AnaliseCR({
 
                     <Cartao
                         titulo="Referenciações por mês"
-                        nota={`Por data de referenciação (${nomePeriodo}); o mês em curso está incompleto`}
+                        nota={`Por data de referenciação (${periodo}); o mês em curso está incompleto`}
                         colunas={['Mês', 'Referenciações']}
                         linhas={tabela(mensal.map((m) => ({ ...m, rotulo: nomeMes(m.rotulo) })))}
                     >
@@ -142,18 +135,18 @@ export default function AnaliseCR({
                         </Cartao>
                         <Cartao
                             titulo="Tempo até à entrada no centro"
-                            nota={`Dias entre a referenciação e a entrada (${nomePeriodo})`}
+                            nota={`Dias entre a referenciação e a entrada (${periodo})`}
                             colunas={['Tempo', 'Referenciações']}
                             linhas={tabela(tempos)}
                         >
                             <Colunas dados={tempos} passoRotulos={1} />
                         </Cartao>
-                        <Cartao titulo="Origem da referenciação" nota={nomePeriodo} colunas={['Origem', 'Referenciações']} linhas={tabela(origens)}>
+                        <Cartao titulo="Origem da referenciação" nota={periodo} colunas={['Origem', 'Referenciações']} linhas={tabela(origens)}>
                             <BarrasH dados={origens} />
                         </Cartao>
                         <Cartao
                             titulo="Responsável"
-                            nota={`Top 10 (${nomePeriodo})`}
+                            nota={`Top 10 (${periodo})`}
                             colunas={['Responsável', 'Referenciações']}
                             linhas={tabela(responsaveis)}
                         >
@@ -161,7 +154,7 @@ export default function AnaliseCR({
                         </Cartao>
                         <Cartao
                             titulo="Diagnósticos mais frequentes"
-                            nota={`Top 10 (${nomePeriodo})`}
+                            nota={`Top 10 (${periodo})`}
                             colunas={['Diagnóstico', 'Referenciações']}
                             linhas={tabela(diagnosticos)}
                         >
@@ -169,7 +162,7 @@ export default function AnaliseCR({
                         </Cartao>
                         <Cartao
                             titulo="Modo de diagnóstico"
-                            nota={`Diagnósticos registados (${nomePeriodo})`}
+                            nota={`Diagnósticos registados (${periodo})`}
                             colunas={['Modo', 'Diagnósticos']}
                             linhas={tabela(modos)}
                         >
@@ -177,7 +170,7 @@ export default function AnaliseCR({
                         </Cartao>
                         <Cartao
                             titulo="Histologia"
-                            nota={`Diagnósticos registados (${nomePeriodo})`}
+                            nota={`Diagnósticos registados (${periodo})`}
                             colunas={['Histologia', 'Diagnósticos']}
                             linhas={tabela(histologias)}
                         >
@@ -192,8 +185,7 @@ export default function AnaliseCR({
                             <header className="mb-3">
                                 <h2 className="text-sm font-semibold text-[var(--ink)]">Internamentos: doentes do CR e restantes</h2>
                                 <p className="text-xs text-[var(--ink2)]">
-                                    Internamentos do serviço ({nomePeriodo}) de doentes já referenciados ao CR na data de entrada, contra os
-                                    restantes.
+                                    Internamentos do serviço ({periodo}) de doentes já referenciados ao CR na data de entrada, contra os restantes.
                                 </p>
                             </header>
                             <table className="w-full text-left text-xs text-[var(--ink)]">

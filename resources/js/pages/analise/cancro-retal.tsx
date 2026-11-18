@@ -15,7 +15,10 @@ type Serie = {
 };
 type Chave = 'conservacao' | 'deiscencia' | 'mortalidade' | 'morbilidade';
 
+type Metas = Record<Chave, { min?: number; max?: number }>;
+
 type Props = {
+    metas: Metas;
     trimestres: string[];
     de: string | null;
     ate: string | null;
@@ -33,9 +36,6 @@ const INDICADORES: {
     titulo: string;
     curto: string;
     cor: string;
-    meta: number;
-    sentido: 'min' | 'max';
-    textoMeta: string;
     descricao: string;
     evento: string;
 }[] = [
@@ -44,9 +44,6 @@ const INDICADORES: {
         titulo: 'Taxa de cirurgia conservadora de esfíncter',
         curto: 'Conservação de esfíncter',
         cor: '#3266ad',
-        meta: 75,
-        sentido: 'min',
-        textoMeta: '> 75%',
         descricao: 'Ressecção anterior do reto sem amputação abdomino-perineal, sobre as cirurgias retais sem a ressecção reto-sigmoideia.',
         evento: 'conservações',
     },
@@ -55,9 +52,6 @@ const INDICADORES: {
         titulo: 'Taxa de deiscência anastomótica',
         curto: 'Deiscência anastomótica',
         cor: '#e2763d',
-        meta: 15,
-        sentido: 'max',
-        textoMeta: '< 15%',
         descricao: 'Deiscência da anastomose registada na alta ou aos 30 dias, sobre todas as cirurgias retais.',
         evento: 'deiscências',
     },
@@ -66,9 +60,6 @@ const INDICADORES: {
         titulo: 'Taxa de mortalidade operatória',
         curto: 'Mortalidade operatória',
         cor: '#2a8f57',
-        meta: 3,
-        sentido: 'max',
-        textoMeta: '< 3%',
         descricao: 'Internamentos da cirurgia com destino «falecido», sobre todas as cirurgias retais.',
         evento: 'óbitos',
     },
@@ -77,9 +68,6 @@ const INDICADORES: {
         titulo: 'Taxa de morbilidade',
         curto: 'Morbilidade global',
         cor: '#9b59b6',
-        meta: 20,
-        sentido: 'max',
-        textoMeta: '< 20%',
         descricao: 'Complicações de grau 3 ou superior de Clavien-Dindo (grau definitivo, aos 30 dias), sobre todas as cirurgias retais.',
         evento: 'complicações graves',
     },
@@ -221,7 +209,13 @@ function GraficoTrimestral({
     );
 }
 
-export default function CancroRetal({ trimestres, de, ate, geradoEm, total, totalConservacao, indicadores }: Props) {
+export default function CancroRetal({ metas, trimestres, de, ate, geradoEm, total, totalConservacao, indicadores }: Props) {
+    // As metas vêm do servidor (única fonte): `min` = acima de, `max` = abaixo de.
+    const lista = INDICADORES.map((d) => {
+        const sentido: 'min' | 'max' = metas[d.chave].min !== undefined ? 'min' : 'max';
+        const meta = (metas[d.chave].min ?? metas[d.chave].max) as number;
+        return { ...d, sentido, meta, textoMeta: `${sentido === 'min' ? '>' : '<'} ${meta}%` };
+    });
     const [aCarregar, setACarregar] = useState(false);
     return (
         <ClinicoLayout titulo="Análise" subtitulo={`Cancro retal · doentes do CR · gerada a ${geradoEm}`} largura="larga">
@@ -238,7 +232,7 @@ export default function CancroRetal({ trimestres, de, ate, geradoEm, total, tota
                     <section aria-label="Metas definidas">
                         <h2 className="mb-2 text-xs font-semibold tracking-wide text-[var(--ink2)] uppercase">Metas definidas</h2>
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                            {INDICADORES.map((d) => (
+                            {lista.map((d) => (
                                 <Indicador
                                     key={d.chave}
                                     rotulo={d.curto}
@@ -254,7 +248,7 @@ export default function CancroRetal({ trimestres, de, ate, geradoEm, total, tota
                         </div>
                     </section>
 
-                    {INDICADORES.map((d) => {
+                    {lista.map((d) => {
                         const ind = indicadores[d.chave];
                         const foraDaMeta = ind.serie.filter((t) => t.cumpre === false && !t.incompleto);
                         const comCirurgias = ind.serie.filter((t) => t.n > 0 && !t.incompleto);
@@ -280,7 +274,7 @@ export default function CancroRetal({ trimestres, de, ate, geradoEm, total, tota
                                         nota={`${ind.eventos} ${d.evento} em ${ind.n} cirurgias`}
                                     />
                                     <Indicador
-                                        rotulo={d.sentido === 'min' ? 'Pior trimestre' : 'Pior trimestre'}
+                                        rotulo="Pior trimestre"
                                         valor={pc(ind.pior?.taxa ?? null)}
                                         nota={ind.pior ? `${ind.pior.trimestre} — ${ind.pior.eventos} em ${ind.pior.n}` : undefined}
                                     />

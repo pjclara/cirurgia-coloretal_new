@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\InternamentoRequest;
+use App\Models\Complicacao;
 use App\Models\Internamento;
 use App\Models\Morbilidade;
 use App\Models\Utente;
 use App\Services\GuardarInternamento;
+use App\Support\Cirurgias;
 use App\Support\Dominios;
+use App\Support\ReferenciadoAoCentro;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,8 +80,10 @@ class InternamentoController extends Controller
 
     /** Altas cujo seguimento aos 30 dias (morbilidade) ainda não foi registado. */
     /** O doente está referenciado ao centro de referência até à data da alta do internamento. */
-    private const DOENTE_CR = 'exists (select 1 from referenciacao_centro_de_referencias rr
-        where rr.utente_id = internamentos.utente_id and rr.deleted_at is null and rr.data_de_referenciacao <= internamentos.data_de_alta)';
+    private static function doenteCr(): string
+    {
+        return ReferenciadoAoCentro::existe('internamentos.utente_id', 'internamentos.data_de_alta');
+    }
 
     public function seguimentos(Request $request): Response
     {
@@ -86,7 +91,9 @@ class InternamentoController extends Controller
         $periodo = array_key_exists($request->query('periodo'), $periodos) ? $request->query('periodo') : '90';
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
         $responsavelId = ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null;
-        $soCr = $request->boolean('cr');
+        // A identificação dos doentes do CR só é visível a quem pode ver referenciações.
+        $verCr = $request->user()->can('show referenciacao');
+        $soCr = $verCr && $request->boolean('cr');
         $q = trim((string) $request->query('q', ''));
         $administrador = $request->user()->eAdministrador();
         $hoje = now()->startOfDay();
@@ -100,7 +107,7 @@ class InternamentoController extends Controller
             ->whereExists(fn ($q) => $q->selectRaw('1')->from('bloco_operatorios as b')
                 ->whereColumn('b.internamento_id', 'internamentos.id')->whereNull('b.deleted_at'))
             ->when($responsavelId, fn ($q, $id) => $q->where('responsavel_id', $id))
-            ->when($soCr, fn ($q) => $q->whereRaw(self::DOENTE_CR))
+            ->when($soCr, fn ($q) => $q->whereRaw(self::doenteCr()))
             ->when($q !== '', fn ($consulta) => $consulta->whereHas('utente', fn ($u) => $u->pesquisar($q)))
             ->when($periodos[$periodo], fn ($q, $dias) => $q->whereDate('data_de_alta', '>=', $hoje->copy()->subDays($dias)));
 
@@ -108,7 +115,7 @@ class InternamentoController extends Controller
         $aDecorrer = (clone $base)->whereDate('data_de_alta', '>=', $limiteAtraso)->count();
 
         $lista = (clone $base)
-            ->selectRaw('internamentos.*, ('.self::DOENTE_CR.') as doente_cr')
+            ->selectRaw('internamentos.*, '.($verCr ? '('.self::doenteCr().')' : '0').' as doente_cr')
             ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->when($estado === 'em_atraso', fn ($q) => $q->whereDate('data_de_alta', '<', $limiteAtraso))
             ->when($estado === 'a_decorrer', fn ($q) => $q->whereDate('data_de_alta', '>=', $limiteAtraso))
@@ -145,7 +152,8 @@ class InternamentoController extends Controller
             'seguimentos' => $lista,
             'filtros' => ['estado' => $estado, 'periodo' => $periodo, 'responsavel_id' => $responsavelId, 'cr' => $soCr, 'q' => $q],
             'responsaveis' => Dominios::responsaveis($responsavelId),
-            'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer, 'cr' => (clone $base)->when(! $soCr, fn ($q) => $q->whereRaw(self::DOENTE_CR))->count()],
+            'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer, 'cr' => $verCr ? (clone $base)->when(! $soCr, fn ($q) => $q->whereRaw(self::doenteCr()))->count() : null],
+            'podeVerCr' => $verCr,
         ]);
     }
 
@@ -252,7 +260,7 @@ class InternamentoController extends Controller
                 ->where('internamento_id', $internamento->id)
                 ->whereNull('deleted_at')
                 ->count(),
-            'listaCirurgias' => \App\Support\Cirurgias::porInternamento([$internamento->id])->get($internamento->id, collect())->values(),
+            'listaCirurgias' => Cirurgias::porInternamento([$internamento->id])->get($internamento->id, collect())->values(),
             'podeNovaCirurgia' => $utilizador->can('create internamento') && ! $bloqueadoParaMim,
             'podeEditar' => $utilizador->can('update internamento') && ! $bloqueadoParaMim,
             'podeDesbloquear' => $utilizador->eAdministrador(),
@@ -331,8 +339,8 @@ class InternamentoController extends Controller
         ]);
 
         $ids = collect($dados['complicacoes'])->pluck('id')->map(fn ($id) => (int) $id);
-        $temSem = $ids->contains(\App\Models\Complicacao::SEM_COMPLICACOES);
-        $temReal = $ids->contains(fn ($id) => $id !== \App\Models\Complicacao::SEM_COMPLICACOES);
+        $temSem = $ids->contains(Complicacao::SEM_COMPLICACOES);
+        $temReal = $ids->contains(fn ($id) => $id !== Complicacao::SEM_COMPLICACOES);
 
         if ($ids->count() !== $ids->unique()->count()) {
             throw ValidationException::withMessages(['complicacoes' => 'Há complicações repetidas.']);
