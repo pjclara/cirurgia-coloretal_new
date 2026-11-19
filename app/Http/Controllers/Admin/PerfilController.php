@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\Auditoria;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
@@ -123,21 +123,7 @@ class PerfilController extends Controller
 
     private function auditar(Role $perfil, array $antes, array $depois): void
     {
-        $pedido = request();
-        DB::table('audits')->insert([
-            'user_type' => $pedido->user()?->getMorphClass(),
-            'user_id' => $pedido->user()?->getKey(),
-            'event' => 'updated',
-            'auditable_type' => $perfil->getMorphClass(),
-            'auditable_id' => $perfil->getKey(),
-            'old_values' => json_encode(['permissoes' => collect($antes)->sort()->values()->all()], JSON_UNESCAPED_UNICODE),
-            'new_values' => json_encode(['permissoes' => collect($depois)->sort()->values()->all()], JSON_UNESCAPED_UNICODE),
-            'url' => Str::limit($pedido->fullUrl(), 2000, ''),
-            'ip_address' => $pedido->ip(),
-            'user_agent' => Str::limit((string) $pedido->userAgent(), 1000, ''),
-            'tags' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        Auditoria::registar($perfil->getMorphClass(), $perfil->getKey(), 'updated',
+            ['permissoes' => collect($antes)->sort()->values()->all()], ['permissoes' => collect($depois)->sort()->values()->all()]);
     }
 }

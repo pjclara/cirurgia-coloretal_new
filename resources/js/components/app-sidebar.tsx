@@ -16,7 +16,9 @@ import {
     LayoutGrid,
     Map,
     Network,
+    Scissors,
     ShieldCheck,
+    Stethoscope,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -85,6 +87,8 @@ export function AppSidebar() {
                       title: 'Sistema',
                       items: [
                           { title: 'Administração', url: '/admin/utilizadores', icon: ShieldCheck },
+                          { title: 'Diagnósticos', url: '/admin/catalogos/diagnosticos', icon: Stethoscope },
+                          { title: 'Intervenções', url: '/admin/catalogos/intervencoes', icon: Scissors },
                           ...(superAdmin ? [{ title: 'Perfis e permissões', url: '/admin/perfis', icon: KeyRound }] : []),
                       ],
                   },

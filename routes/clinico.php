@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CatalogoController;
 use App\Http\Controllers\Admin\PerfilController;
 use App\Http\Controllers\Admin\UtilizadorController;
 use App\Http\Controllers\AgendamentoController;
@@ -96,6 +97,14 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
     Route::post('utilizadores', [UtilizadorController::class, 'store'])->name('utilizadores.store');
     Route::get('utilizadores/{utilizador}', [UtilizadorController::class, 'edit'])->whereNumber('utilizador')->name('utilizadores.edit');
     Route::put('utilizadores/{utilizador}', [UtilizadorController::class, 'update'])->whereNumber('utilizador')->name('utilizadores.update');
+
+    // Catálogos de diagnósticos e de intervenções.
+    Route::prefix('catalogos/{catalogo}')->where(['catalogo' => 'diagnosticos|intervencoes'])->name('catalogos.')->group(function () {
+        Route::get('/', [CatalogoController::class, 'index'])->name('index');
+        Route::post('/', [CatalogoController::class, 'store'])->name('store');
+        Route::put('{id}', [CatalogoController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('{id}', [CatalogoController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    });
 
     // Perfis e permissões: só o superAdmin.
     Route::middleware('clinico.superadmin')->group(function () {
