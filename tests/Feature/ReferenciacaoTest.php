@@ -303,3 +303,24 @@ test('a migration sincroniza os diagnósticos CR entre referenciações e intern
         ->and($jaTem->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$outroCr])
         ->and($semCirurgia->diagnosticos()->count())->toBe(0);
 });
+
+test('o formulário da referenciação só oferece diagnósticos do centro de referência e «Outro Colorectal»', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->pluck('id')->map(fn ($i) => (int) $i)->all();
+    $normal = (int) DB::table('diagnosticos')->where('centro_de_referencia', 0)->where('id', '<>', \App\Models\Diagnostico::OUTRO)->value('id');
+    $modo = DB::table('diagnostico_referenciacao_modos')->value('id');
+    $linha = fn (int $id) => ['diagnostico_id' => $id, 'modo_id' => $modo, 'histologia_id' => null, 'data_diagnostico' => null];
+
+    $this->actingAs($this->gestor)->get("/referenciacao/utentes/{$this->utente->id}/nova")->assertInertia(fn (Assert $p) => $p
+        ->where('modal.dominios.diagnosticos', function ($lista) use ($cr, $normal) {
+            $ids = collect($lista)->pluck('id')->all();
+
+            return count(array_diff($cr, $ids)) === 0 && in_array(\App\Models\Diagnostico::OUTRO, $ids, true) && ! in_array($normal, $ids, true)
+                && count($ids) === count($cr) + 1;
+        }));
+
+    // Um diagnóstico que não é do centro de referência não se aceita; «Outro Colorectal» sim.
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$this->utente->id}", corpoReferenciacao($this, ['diagnosticos' => [$linha($normal)]]))
+        ->assertSessionHasErrors('diagnosticos.0.diagnostico_id');
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$this->utente->id}", corpoReferenciacao($this, ['diagnosticos' => [$linha(\App\Models\Diagnostico::OUTRO)]]))
+        ->assertSessionHasNoErrors();
+});

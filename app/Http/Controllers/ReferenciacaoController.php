@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Diagnostico;
 use App\Models\Referenciacao;
 use App\Models\Utente;
 use App\Support\DiagnosticosCr;
@@ -191,7 +192,8 @@ class ReferenciacaoController extends Controller
                 'destinos' => Dominios::lista('destinos'),
                 'modos' => Dominios::lista('diagnostico_referenciacao_modos'),
                 'histologias' => Dominios::lista('histologias'),
-                'diagnosticos' => Dominios::diagnosticos(),
+                // Só os diagnósticos do centro de referência, mais «Outro Colorectal» (e os que esta referenciação já tem).
+                'diagnosticos' => collect(Dominios::diagnosticos())->whereIn('id', $this->diagnosticosPermitidos($referenciacao))->values()->all(),
                 'responsaveis' => Dominios::responsaveis($referenciacao?->responsavel_id),
             ],
             // Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem.
@@ -200,6 +202,20 @@ class ReferenciacaoController extends Controller
             'hoje' => now()->format('Y-m-d'),
             'fechar_url' => '/referenciacao',
         ];
+    }
+
+    /**
+     * Os diagnósticos que se podem escolher numa referenciação: os do centro de referência, «Outro Colorectal» e os que a própria
+     * referenciação já tenha (para não perder o que existia antes desta regra).
+     *
+     * @return list<int>
+     */
+    private function diagnosticosPermitidos(?Referenciacao $referenciacao): array
+    {
+        return collect(DB::table('diagnosticos')->where('centro_de_referencia', 1)->pluck('id'))
+            ->push(Diagnostico::OUTRO)
+            ->merge($referenciacao ? $referenciacao->diagnosticos()->pluck('diagnosticos.id') : [])
+            ->map(fn ($id) => (int) $id)->unique()->values()->all();
     }
 
     private function validar(Request $request): array
@@ -216,7 +232,7 @@ class ReferenciacaoController extends Controller
             'responsavel_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'comentarios' => ['nullable', 'string', 'max:20000'],
             'diagnosticos' => ['nullable', 'array'],
-            'diagnosticos.*.diagnostico_id' => ['required', 'integer', 'distinct', Rule::exists('diagnosticos', 'id')],
+            'diagnosticos.*.diagnostico_id' => ['required', 'integer', 'distinct', Rule::in($this->diagnosticosPermitidos($request->route('referenciacao')))],
             'diagnosticos.*.modo_id' => ['required', 'integer', Rule::exists('diagnostico_referenciacao_modos', 'id')],
             'diagnosticos.*.histologia_id' => ['nullable', 'integer', Rule::exists('histologias', 'id')],
             'diagnosticos.*.data_diagnostico' => ['nullable', 'date_format:Y-m-d', "after_or_equal:$minima", 'before_or_equal:today'],
