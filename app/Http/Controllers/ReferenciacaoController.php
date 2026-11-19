@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Referenciacao;
 use App\Models\Utente;
+use App\Support\DiagnosticosCr;
 use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,6 +65,8 @@ class ReferenciacaoController extends Controller
         // O médico escolhido; sem escolha, quem está a registar.
         $referenciacao->responsavel_id = $dados['responsavel_id'] ?? $request->user()->id;
         $referenciacao->save();
+        // Os diagnósticos CR que o utente já tem nos internamentos ficam logo associados.
+        DiagnosticosCr::associar($referenciacao, DiagnosticosCr::doUtente($utente->id)->pluck('id'));
 
         return back()->with('sucesso', 'Utente sinalizado para o centro de referência.');
     }
@@ -151,7 +154,6 @@ class ReferenciacaoController extends Controller
             'origem' => Dominios::nome('origem_da_referenciacaos', $r->origem_id),
             'data_de_entrada' => $r->data_de_entrada?->format('Y-m-d'),
             'data_de_saida' => $r->data_de_saida?->format('Y-m-d'),
-            'data_consulta_seguinte' => $r->data_consulta_seguinte?->format('Y-m-d'),
             'destino' => Dominios::nome('destinos', $r->destino_id),
             'responsavel' => $r->responsavel?->abrev ?: $r->responsavel?->name,
             'situacao' => $r->situacao(),
@@ -171,7 +173,6 @@ class ReferenciacaoController extends Controller
                 'origem_id' => $referenciacao->origem_id,
                 'data_de_entrada' => $referenciacao->data_de_entrada?->format('Y-m-d'),
                 'data_de_saida' => $referenciacao->data_de_saida?->format('Y-m-d'),
-                'data_consulta_seguinte' => $referenciacao->data_consulta_seguinte?->format('Y-m-d'),
                 'destino_id' => $referenciacao->destino_id,
                 'responsavel_id' => $referenciacao->responsavel_id,
                 'comentarios' => $referenciacao->comentarios ?? '',
@@ -191,6 +192,9 @@ class ReferenciacaoController extends Controller
                 'diagnosticos' => Dominios::diagnosticos(),
                 'responsaveis' => Dominios::responsaveis($referenciacao?->responsavel_id),
             ],
+            // Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem.
+            'diagnosticos_do_utente' => DiagnosticosCr::doUtente($utente->id)
+                ->reject(fn ($d) => $referenciacao?->diagnosticos->contains('id', $d->id))->values(),
             'hoje' => now()->format('Y-m-d'),
             'fechar_url' => '/referenciacao',
         ];
@@ -206,7 +210,6 @@ class ReferenciacaoController extends Controller
             'origem_id' => ['required', 'integer', Rule::exists('origem_da_referenciacaos', 'id')],
             'data_de_entrada' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:data_de_referenciacao', 'before_or_equal:today'],
             'data_de_saida' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:data_de_entrada', 'before_or_equal:today', 'required_with:destino_id'],
-            'data_consulta_seguinte' => ['nullable', 'date_format:Y-m-d', "after_or_equal:$minima"],
             'destino_id' => ['nullable', 'integer', 'required_with:data_de_saida', Rule::exists('destinos', 'id')],
             'responsavel_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'comentarios' => ['nullable', 'string', 'max:20000'],

@@ -15,13 +15,14 @@ export type PropsReferenciacao = {
         origem_id: number;
         data_de_entrada: string | null;
         data_de_saida: string | null;
-        data_consulta_seguinte: string | null;
         destino_id: number | null;
         responsavel_id: number;
         comentarios: string;
         diagnosticos: { diagnostico_id: number; modo_id: number | null; histologia_id: number | null; data_diagnostico: string }[];
     } | null;
     utente: { id: number; nome: string; numero_processo: number };
+    /** Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem. */
+    diagnosticos_do_utente: { id: number; nome: string }[];
     dominios: {
         origens: Opcao[];
         destinos: Opcao[];
@@ -75,8 +76,20 @@ function SelecaoDiagnostico({
     );
 }
 
+/** O modo de diagnóstico «Outro» (o modo só se conhece quando se completa a referenciação). */
+const MODO_OUTRO = 99;
+
+const linhaDoUtente = (diagnostico_id: number): Linha => ({ diagnostico_id, modo_id: MODO_OUTRO, histologia_id: '', data_diagnostico: '' });
+
 /** Registo de uma referenciação ao centro de referência, em dois separadores: dados e diagnósticos. */
-export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje, fechar }: PropsReferenciacao & { fechar: () => void }) {
+export function FormularioReferenciacao({
+    referenciacao,
+    utente,
+    diagnosticos_do_utente,
+    dominios,
+    hoje,
+    fechar,
+}: PropsReferenciacao & { fechar: () => void }) {
     const [separador, setSeparador] = useState<Separador>('dados');
     const [confirmarApagar, setConfirmarApagar] = useState(false);
 
@@ -86,16 +99,18 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
         origem_id: (referenciacao?.origem_id ?? '') as number | '',
         data_de_entrada: referenciacao?.data_de_entrada ?? '',
         data_de_saida: referenciacao?.data_de_saida ?? '',
-        data_consulta_seguinte: referenciacao?.data_consulta_seguinte ?? '',
         destino_id: (referenciacao?.destino_id ?? '') as number | '',
         responsavel_id: (referenciacao?.responsavel_id ?? '') as number | '',
         comentarios: referenciacao?.comentarios ?? '',
-        diagnosticos: (referenciacao?.diagnosticos ?? []).map((d) => ({
-            diagnostico_id: d.diagnostico_id,
-            modo_id: d.modo_id ?? '',
-            histologia_id: d.histologia_id ?? '',
-            data_diagnostico: d.data_diagnostico ?? '',
-        })) as Linha[],
+        diagnosticos: (referenciacao
+            ? referenciacao.diagnosticos.map((d) => ({
+                  diagnostico_id: d.diagnostico_id,
+                  modo_id: d.modo_id ?? '',
+                  histologia_id: d.histologia_id ?? '',
+                  data_diagnostico: d.data_diagnostico ?? '',
+              }))
+            : // Referenciação nova: já traz os diagnósticos CR que o utente tem nos internamentos.
+              diagnosticos_do_utente.map((d) => linhaDoUtente(d.id))) as Linha[],
     });
     const { data, setData, processing } = form;
     const erros = form.errors as Record<string, string | undefined>;
@@ -114,6 +129,10 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
         if (referenciacao) form.put(`/referenciacao/${referenciacao.id}`, opcoes);
         else form.post(`/referenciacao/utentes/${utente.id}`, opcoes);
     };
+
+    // Diagnósticos CR do utente que ainda não estão na lista desta referenciação.
+    const sugestoes = diagnosticos_do_utente.filter((d) => !data.diagnosticos.some((l) => l.diagnostico_id === d.id));
+    const adicionarDoUtente = (ids: number[]) => setData('diagnosticos', [...data.diagnosticos, ...ids.map(linhaDoUtente)]);
 
     const mudarLinha = (i: number, alteracoes: Partial<Linha>) =>
         setData(
@@ -242,18 +261,6 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
                                     />
                                 </Campo>
                             </div>
-                            <div className="mt-4 max-w-xs">
-                                <Campo rotulo="Consulta seguinte" para="consulta-seguinte" erro={erros.data_consulta_seguinte} opcional>
-                                    <input
-                                        id="consulta-seguinte"
-                                        type="date"
-                                        value={data.data_consulta_seguinte}
-                                        onChange={(e) => setData('data_consulta_seguinte', e.target.value)}
-                                        className={estiloEntrada}
-                                        aria-invalid={!!erros.data_consulta_seguinte}
-                                    />
-                                </Campo>
-                            </div>
                         </Seccao>
 
                         <Seccao titulo="Notas">
@@ -272,6 +279,36 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
 
                 {separador === 'diagnosticos' && (
                     <Seccao titulo="Diagnósticos" descricao="Cada diagnóstico com o modo como foi feito, a histologia e a data.">
+                        {sugestoes.length > 0 && (
+                            <div className="mb-4 rounded-md border border-violet-200 bg-violet-50/60 p-3 text-sm">
+                                <p className="font-medium text-slate-900">Já registados nos internamentos deste utente</p>
+                                <ul className="mt-2 flex flex-wrap items-center gap-2">
+                                    {sugestoes.map((d) => (
+                                        <li key={d.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => adicionarDoUtente([d.id])}
+                                                className="rounded border border-violet-300 bg-white px-2 py-1 text-xs font-medium text-violet-900 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-teal-700"
+                                            >
+                                                + {d.nome}
+                                            </button>
+                                        </li>
+                                    ))}
+                                    {sugestoes.length > 1 && (
+                                        <li>
+                                            <button
+                                                type="button"
+                                                onClick={() => adicionarDoUtente(sugestoes.map((d) => d.id))}
+                                                className="rounded px-2 py-1 text-xs text-violet-900 underline underline-offset-2 hover:bg-violet-100"
+                                            >
+                                                Adicionar todos
+                                            </button>
+                                        </li>
+                                    )}
+                                </ul>
+                                <p className="mt-2 text-xs text-slate-600">Entram com o modo «Outro»; complete o modo e a histologia.</p>
+                            </div>
+                        )}
                         {data.diagnosticos.length === 0 && <p className="mb-3 text-sm text-slate-600">Ainda sem diagnósticos.</p>}
                         <div className="space-y-3">
                             {data.diagnosticos.map((l, i) => (

@@ -6,6 +6,7 @@ use App\Models\Complicacao;
 use App\Models\Internamento;
 use App\Models\Morbilidade;
 use App\Models\Referenciacao;
+use App\Support\DiagnosticosCr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -82,17 +83,7 @@ class GuardarInternamento
             return;
         }
 
-        $jaAssociados = $referenciacao->diagnosticos()->pluck('diagnosticos.id')->all();
-        $novos = DB::table('diagnosticos')->whereIn('id', $diagnosticos)->where('centro_de_referencia', 1)
-            ->whereNotIn('id', $jaAssociados)->pluck('id');
-        if ($novos->isEmpty()) {
-            return;
-        }
-
-        $referenciacao->diagnosticos()->attach($novos->mapWithKeys(fn ($id) => [
-            (int) $id => ['modo_id' => Referenciacao::MODO_OUTRO, 'histologia_id' => null, 'data_diagnostico' => null],
-        ])->all());
-        $referenciacao->auditar('updated', ['diagnosticos' => $jaAssociados], ['diagnosticos' => array_merge($jaAssociados, $novos->map(fn ($id) => (int) $id)->all())]);
+        DiagnosticosCr::associar($referenciacao, $diagnosticos);
     }
 
     /**

@@ -69,7 +69,7 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
     return (
         <ClinicoLayout
             titulo="Seguimentos aos 30 dias"
-            subtitulo="Altas sem morbilidade registada aos 30 dias. Não inclui doentes falecidos. Os doentes do CR (centro de referência) aparecem primeiro."
+            subtitulo="Altas sem morbilidade registada aos 30 dias. Não inclui doentes falecidos. Os doentes do CR (centro de referência) estão identificados com «CR» e podem filtrar-se."
             largura="larga"
             acoes={
                 <BotaoLigacao href={rotas.internamentos.lista} variante="secundario">

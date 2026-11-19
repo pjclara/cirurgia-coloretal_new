@@ -185,10 +185,23 @@ test('a lista de referenciações filtra por ano e trimestre da data de referenc
     $ver('?trimestre=1')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.trimestre', ''));
 });
 
-test('a data da consulta seguinte grava-se, edita-se e aparece na lista', function () {
-    $proxima = now()->addDays(14)->format('Y-m-d');
-    referenciar($this, ['data_consulta_seguinte' => $proxima])->assertSessionHasNoErrors();
+test('o formulário e a sinalização usam os diagnósticos CR que o utente já tem nos internamentos', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $normal = DB::table('diagnosticos')->where('centro_de_referencia', 0)->value('id');
+    $internamento = novoInternamento($this->utente, $this->gestor, ['data_de_entrada' => now()->subDays(40)->format('Y-m-d')]);
+    $internamento->diagnosticos()->sync([$cr, $normal]);
 
-    $this->actingAs($this->gestor)->get('/referenciacao')->assertInertia(fn (Assert $p) => $p->where('lista.data.0.data_consulta_seguinte', $proxima));
-    $this->actingAs($this->gestor)->post("/referenciacao/utentes/".novoUtente()->id, corpoReferenciacao($this, ['data_consulta_seguinte' => 'lixo']))->assertSessionHasErrors('data_consulta_seguinte');
+    // Referenciação nova: o formulário traz só o diagnóstico CR.
+    $this->actingAs($this->gestor)->get("/referenciacao/utentes/{$this->utente->id}/nova")->assertInertia(fn (Assert $p) => $p
+        ->where('modal.diagnosticos_do_utente', fn ($lista) => collect($lista)->pluck('id')->all() === [$cr]));
+
+    // Sinalização rápida: o diagnóstico CR fica logo associado, com o modo «Outro».
+    $origem = DB::table('origem_da_referenciacaos')->value('id');
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$this->utente->id}/sinalizar", ['data_de_referenciacao' => $this->hoje, 'origem_id' => $origem])->assertSessionHasNoErrors();
+    $referenciacao = Referenciacao::where('utente_id', $this->utente->id)->firstOrFail();
+    expect($referenciacao->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr])
+        ->and($referenciacao->diagnosticos()->first()->pivot->modo_id)->toBe(Referenciacao::MODO_OUTRO);
+
+    // Ao editar, o que já está na referenciação deixa de ser sugerido.
+    $this->actingAs($this->gestor)->get("/referenciacao/{$referenciacao->id}")->assertInertia(fn (Assert $p) => $p->where('modal.diagnosticos_do_utente', []));
 });

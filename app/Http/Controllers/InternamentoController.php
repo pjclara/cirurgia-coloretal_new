@@ -119,8 +119,6 @@ class InternamentoController extends Controller
             ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->when($estado === 'em_atraso', fn ($q) => $q->whereDate('data_de_alta', '<', $limiteAtraso))
             ->when($estado === 'a_decorrer', fn ($q) => $q->whereDate('data_de_alta', '>=', $limiteAtraso))
-            // Os doentes do CR vêm sempre primeiro.
-            ->orderByDesc('doente_cr')
             ->orderBy('data_de_alta')
             ->orderBy('id')
             ->paginate(25)

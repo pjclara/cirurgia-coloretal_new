@@ -59,7 +59,7 @@ test('a lista não mostra o grau da alta: o grau definitivo só existe depois do
     expect($i->fresh()->load('morbilidades')->claviemMaisGrave())->toBeNull();
 });
 
-test('os doentes do CR vêm primeiro, estão identificados e podem filtrar-se', function () {
+test('a lista mostra todos por ordem de alta, com os doentes do CR identificados e filtráveis', function () {
     $this->utilizador->givePermissionTo('show referenciacao');
     $antiga = internamentoComAlta($this, 60);       // sem CR, mais antiga
     $recente = internamentoComAlta($this, 10);      // doente do CR, mais recente
@@ -69,8 +69,9 @@ test('os doentes do CR vêm primeiro, estão identificados e podem filtrar-se', 
     ]);
 
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p
-        ->where('seguimentos.data.0.id', $recente->id)->where('seguimentos.data.0.cr', true)
-        ->where('seguimentos.data.1.id', $antiga->id)->where('seguimentos.data.1.cr', false)
+        ->where('seguimentos.total', 2)
+        ->where('seguimentos.data.0.id', $antiga->id)->where('seguimentos.data.0.cr', false)   // a mais antiga primeiro, CR ou não
+        ->where('seguimentos.data.1.id', $recente->id)->where('seguimentos.data.1.cr', true)
         ->where('contagens.cr', 1));
 
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?cr=1')->assertInertia(fn (Assert $p) => $p

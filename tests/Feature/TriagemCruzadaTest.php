@@ -65,50 +65,63 @@ test('sem o ficheiro a migration não faz nada', function () {
     expect(DB::table('referenciacao_centro_de_referencias')->count())->toBe($antes);
 });
 
-test('o formato com consulta seguinte usa a data de referenciação, o clínico e a nota', function () {
+test('o formato com consulta seguinte usa a data de referenciação, o clínico e a nota, e a consulta passa a ser a entrada', function () {
     $migration = require database_path('migrations/2026_11_18_000004_importar_triagem_cruzada.php');
     $clinico = utilizadorClinico([]);
     $clinico->forceFill(['name' => 'Maria Teste Silva', 'abrev' => 'QQ'])->save();
-    $utente = novoUtente();
+    $comEntrada = novoUtente();
+    $consultaFutura = novoUtente();
+    $consultaAntes = novoUtente();
     $ref = now()->subDays(10)->format('Y-m-d');
+    $consulta = now()->subDays(3)->format('Y-m-d');
+    $cabecalho = ['Nome', 'NUM_PROCESSO_consultas', 'Medico', 'Data_referenciacao', 'Data_consulta_seguinte', 'Tipo_consulta', 'Valencia', 'Clinico', 'Hospital', 'Dias_ate_consulta', 'Nota'];
 
     $migration->caminho = csvTriagem([
-        ['Um Nome', $utente->numero_processo, 'desconhecido', $ref, now()->addDays(3)->format('Y-m-d'), 'Primeiras', 'CIRURGIA GERAL', 'MARIA TESTE SILVA', 'H.LEIRIA', 3, 'Trazer exames'],
-    ], ['Nome', 'NUM_PROCESSO_consultas', 'Medico', 'Data_referenciacao', 'Data_consulta_seguinte', 'Tipo_consulta', 'Valencia', 'Clinico', 'Hospital', 'Dias_ate_consulta', 'Nota']);
+        ['Um Nome', $comEntrada->numero_processo, 'desconhecido', $ref, $consulta, 'Primeiras', 'CIRURGIA GERAL', 'MARIA TESTE SILVA', 'H.LEIRIA', 3, 'Trazer exames'],
+        ['Futura', $consultaFutura->numero_processo, 'QQ', $ref, now()->addDays(5)->format('Y-m-d'), 'Primeiras', 'CIRURGIA GERAL', '', 'H.LEIRIA', 5, ''],   // ainda não aconteceu
+        ['Antes', $consultaAntes->numero_processo, 'QQ', $ref, now()->subDays(20)->format('Y-m-d'), 'Primeiras', 'CIRURGIA GERAL', '', 'H.LEIRIA', 0, ''],     // anterior à referenciação
+    ], $cabecalho);
 
     $migration->up();
 
-    $r = DB::table('referenciacao_centro_de_referencias')->where('utente_id', $utente->id)->first();
-    expect($r->data_de_referenciacao)->toBe($ref)
-        ->and((int) $r->responsavel_id)->toBe($clinico->id)
-        ->and($r->data_consulta_seguinte)->toBe(now()->addDays(3)->format('Y-m-d'))
-        ->and($r->comentarios)->toContain('Consulta seguinte:')->toContain('Primeiras')->toContain('Cirurgia Geral')->toContain('Maria Teste Silva')->toContain('Nota: Trazer exames');
+    $r = fn ($u) => DB::table('referenciacao_centro_de_referencias')->where('utente_id', $u->id)->first();
+    expect($r($comEntrada)->data_de_referenciacao)->toBe($ref)
+        ->and($r($comEntrada)->data_de_entrada)->toBe($consulta)
+        ->and((int) $r($comEntrada)->responsavel_id)->toBe($clinico->id)
+        ->and($r($comEntrada)->comentarios)->toContain('Consulta seguinte (entrada no CR)')->toContain('Primeiras')->toContain('Cirurgia Geral')->toContain('Maria Teste Silva')->toContain('Nota: Trazer exames')
+        ->and($r($consultaFutura)->data_de_entrada)->toBeNull()
+        ->and($r($consultaAntes)->data_de_entrada)->toBeNull();
 });
 
-test('quem já está referenciado só recebe a data da consulta seguinte, e só se estiver vazia', function () {
+test('quem já está referenciado só recebe a data de entrada, e só se estiver vazia e a consulta for válida', function () {
     $migration = require database_path('migrations/2026_11_18_000004_importar_triagem_cruzada.php');
     $medico = utilizadorClinico([]);
     $vazio = novoUtente();
     $preenchido = novoUtente();
-    foreach ([$vazio, $preenchido] as $u) {
-        DB::table('referenciacao_centro_de_referencias')->insert([
-            'uuid' => (string) \Illuminate\Support\Str::uuid(), 'utente_id' => $u->id, 'data_de_referenciacao' => '2024-01-01',
-            'origem_id' => 1, 'responsavel_id' => $medico->id, 'created_by_id' => $medico->id,
-            'data_consulta_seguinte' => $u->is($preenchido) ? '2025-05-05' : null,
-        ]);
-    }
-    $proxima = now()->addDays(7)->format('Y-m-d');
-    $ref = now()->subDays(10)->format('Y-m-d');
+    $consultaAntes = novoUtente();
+    $inserir = fn ($u, $entrada) => DB::table('referenciacao_centro_de_referencias')->insert([
+        'uuid' => (string) \Illuminate\Support\Str::uuid(), 'utente_id' => $u->id, 'data_de_referenciacao' => now()->subDays(30)->format('Y-m-d'),
+        'origem_id' => 1, 'responsavel_id' => $medico->id, 'created_by_id' => $medico->id, 'data_de_entrada' => $entrada,
+    ]);
+    $inserir($vazio, null);
+    $inserir($preenchido, now()->subDays(25)->format('Y-m-d'));
+    $inserir($consultaAntes, null);
+    $consulta = now()->subDays(5)->format('Y-m-d');
     $cabecalho = ['Nome', 'NUM_PROCESSO_consultas', 'Medico', 'Data_referenciacao', 'Data_consulta_seguinte'];
 
-    $migration->caminho = csvTriagem([['A', $vazio->numero_processo, 'x', $ref, $proxima], ['B', $preenchido->numero_processo, 'x', $ref, $proxima]], $cabecalho);
+    $migration->caminho = csvTriagem([
+        ['A', $vazio->numero_processo, 'x', now()->subDays(30)->format('Y-m-d'), $consulta],
+        ['B', $preenchido->numero_processo, 'x', now()->subDays(30)->format('Y-m-d'), $consulta],
+        ['C', $consultaAntes->numero_processo, 'x', now()->subDays(30)->format('Y-m-d'), now()->subDays(40)->format('Y-m-d')],   // antes da referenciação
+    ], $cabecalho);
     $migration->up();
 
-    $data = fn ($u) => DB::table('referenciacao_centro_de_referencias')->where('utente_id', $u->id)->value('data_consulta_seguinte');
-    expect($data($vazio))->toBe($proxima)
-        ->and($data($preenchido))->toBe('2025-05-05')
-        ->and(DB::table('referenciacao_centro_de_referencias')->whereIn('utente_id', [$vazio->id, $preenchido->id])->count())->toBe(2)
-        ->and(DB::table('triagem_importada')->where('acao', 'data')->count())->toBe(1);
+    $entrada = fn ($u) => DB::table('referenciacao_centro_de_referencias')->where('utente_id', $u->id)->value('data_de_entrada');
+    expect($entrada($vazio))->toBe($consulta)
+        ->and($entrada($preenchido))->toBe(now()->subDays(25)->format('Y-m-d'))
+        ->and($entrada($consultaAntes))->toBeNull()
+        ->and(DB::table('referenciacao_centro_de_referencias')->whereIn('utente_id', [$vazio->id, $preenchido->id, $consultaAntes->id])->count())->toBe(3)
+        ->and(DB::table('triagem_importada')->where('acao', 'entrada')->count())->toBe(1);
 });
 
 test('os doentes que não existem na base são criados por completar, sem inventar dados', function () {

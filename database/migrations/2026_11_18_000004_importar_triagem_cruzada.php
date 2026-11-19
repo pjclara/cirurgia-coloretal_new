@@ -11,19 +11,23 @@ use Illuminate\Support\Str;
 /**
  * Referencia ao centro de referência os doentes da triagem (`excels/triagem_proxima_consulta.csv`: Nome,
  * NUM_PROCESSO_consultas, Medico, Data_referenciacao e, da consulta seguinte, Data_consulta_seguinte, Tipo_consulta,
- * Valencia, Clinico, Hospital, Dias_ate_consulta e Nota). Aceita também o formato antigo `triagem_cruzada.csv`, com `Data`.
+ * Valencia, Clinico, Hospital, Dias_ate_consulta e Nota). A consulta seguinte conta como a entrada no centro de
+ * referência: a sua data passa a ser a data de entrada da referenciação. Aceita também o formato antigo `triagem_cruzada.csv`, com `Data`.
  *
  * Como se faz:
  *  - o doente identifica-se pelo número de processo; se não existir nenhum utente com esse processo, cria-se um com o
  *    nome do ficheiro e sem data de nascimento, sexo e concelho (a completar na ficha; ver a migração anterior); com mais
  *    de um utente com esse processo, fica por importar;
- *  - quem já tem uma referenciação (ativa ou não) não é referenciado de novo: só se lhe preenche a data da consulta
- *    seguinte, se estiver vazia (a referenciação mais recente);
+ *  - quem já tem uma referenciação (ativa ou não) não é referenciado de novo: só se lhe preenche a data de entrada, se
+ *    estiver vazia (na referenciação mais recente) e a data da consulta seguinte for válida para ela (não anterior à
+ *    referenciação, não futura e não posterior à saída);
  *  - cria uma referenciação com a data de referenciação do ficheiro (a mais antiga, se o processo aparece mais vezes); datas vazias,
  *    inválidas, futuras ou anteriores à data mínima da aplicação deixam o doente por importar;
  *  - origem «Outro», responsável pelo médico do ficheiro (abreviatura, iniciais ou nome; senão o clínico da consulta
  *    seguinte; se não houver correspondência única, o superAdmin) e um comentário a dizer de onde veio, com a consulta
- *    seguinte (data, tipo, valência, clínico, hospital) e a nota, quando existem;
+ *    seguinte (tipo, valência, clínico, hospital) e a nota, quando existem;
+ *  - a data de entrada só se preenche com a data da consulta seguinte se esta não for futura nem anterior à referenciação
+ *    (a entrada ainda não aconteceu, ou não faz sentido); fica no comentário na mesma;
  *  - o que ficou por importar e porquê vai para `storage/app/private/importacoes/` (sem nomes, só processos).
  *
  * Com várias contas a corresponder ao mesmo médico, conta só a ativa.
@@ -31,8 +35,8 @@ use Illuminate\Support\Str;
  * O ficheiro tem dados de doentes e NÃO está no git: copie-o para `excels/` (ou indique o caminho em
  * CLINICO_TRIAGEM_CSV) antes de migrar. Sem ficheiro, a migração não faz nada. Pode correr-se mais do que uma vez.
  *
- * Reversível: guarda em `triagem_importada` as referenciações criadas e as que só receberam a data da consulta seguinte,
- * e em `triagem_utentes_criados` os utentes criados; o `down` apaga as primeiras, limpa a data das segundas e apaga os
+ * Reversível: guarda em `triagem_importada` as referenciações criadas e as que só receberam a data de entrada, e em
+ * `triagem_utentes_criados` os utentes criados; o `down` apaga as primeiras, limpa a data de entrada das segundas e apaga os
  * utentes criados que ainda não tenham registos próprios.
  * Faça um backup da base de dados antes de correr.
  */
@@ -62,8 +66,15 @@ return new class extends Migration
         if (! Schema::hasTable('triagem_importada')) {
             Schema::create('triagem_importada', function (Blueprint $tabela) {
                 $tabela->unsignedBigInteger('referenciacao_id')->primary();
-                $tabela->string('acao', 10); // criada | data
+                $tabela->string('acao', 10); // criada | entrada
                 $tabela->timestamp('importada_em')->useCurrent();
+            });
+        }
+
+        // Tabela de uma execução anterior, antes de existir a coluna `acao`: o que lá está foi criado por essa execução.
+        if (! Schema::hasColumn('triagem_importada', 'acao')) {
+            Schema::table('triagem_importada', function (Blueprint $tabela) {
+                $tabela->string('acao', 10)->default('criada')->after('referenciacao_id');
             });
         }
 
@@ -75,13 +86,37 @@ return new class extends Migration
         }
 
         [$linhas, $descartadas, $nomes] = $this->ler($ficheiro);
+
+        // Tudo ou nada: uma falha a meio não deixa utentes ou referenciações por rastrear.
+        DB::beginTransaction();
+        try {
+            [$utentesCriados, $criadas, $atualizadas] = $this->importar($linhas, $nomes, $descartadas);
+            DB::commit();
+        } catch (\Throwable $erro) {
+            DB::rollBack();
+
+            throw $erro;
+        }
+
+        $relatorio = $this->gravarRelatorio($descartadas);
+        echo "  Triagem: $utentesCriados utentes criados, $criadas referenciações criadas, $atualizadas com a data da consulta seguinte preenchida; ".count($descartadas)." linhas por importar".($relatorio ? " (ver $relatorio)" : '').".
+";
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $linhas
+     * @param  array<int, string>  $nomes
+     * @param  list<array{0: mixed, 1: string}>  $descartadas
+     * @return array{0: int, 1: int, 2: int} utentes criados, referenciações criadas, datas preenchidas
+     */
+    private function importar(array $linhas, array $nomes, array &$descartadas): array
+    {
         $utentesCriados = $this->criarUtentesEmFalta($nomes, $descartadas);
-        $porImportar = [];
         $origem = DB::table('origem_da_referenciacaos')->where('id', self::ORIGEM_OUTRO)->value('id') ?? DB::table('origem_da_referenciacaos')->min('id');
         $substituto = $this->responsavelPorOmissao();
         $utilizadores = DB::table('users')->get(['id', 'name', 'abrev', 'username', 'activo']);
 
-        $comData = Schema::hasColumn('referenciacao_centro_de_referencias', 'data_consulta_seguinte');
+        $hoje = now()->format('Y-m-d');
         $criadas = 0;
         $atualizadas = 0;
         foreach ($linhas as $processo => $linha) {
@@ -95,10 +130,12 @@ return new class extends Migration
             $existente = DB::table('referenciacao_centro_de_referencias')->whereNull('deleted_at')->where('utente_id', $utente)
                 ->orderByDesc('data_de_referenciacao')->orderByDesc('id')->first();
             if ($existente) {
-                // Já referenciado: só se preenche a data da consulta seguinte, se estiver vazia.
-                if ($comData && $linha['proxima'] && $existente->data_consulta_seguinte === null) {
-                    DB::table('referenciacao_centro_de_referencias')->where('id', $existente->id)->update(['data_consulta_seguinte' => $linha['proxima'], 'updated_at' => now()]);
-                    DB::table('triagem_importada')->insertOrIgnore(['referenciacao_id' => $existente->id, 'acao' => 'data']);
+                // Já referenciado: só se preenche a data de entrada, se estiver vazia e a consulta seguinte for válida para ela.
+                $entrada = $linha['proxima'];
+                if ($entrada && $existente->data_de_entrada === null && $entrada >= $existente->data_de_referenciacao && $entrada <= $hoje
+                    && ($existente->data_de_saida === null || $entrada <= $existente->data_de_saida)) {
+                    DB::table('referenciacao_centro_de_referencias')->where('id', $existente->id)->update(['data_de_entrada' => $entrada, 'updated_at' => now()]);
+                    DB::table('triagem_importada')->insertOrIgnore(['referenciacao_id' => $existente->id, 'acao' => 'entrada']);
                     $atualizadas++;
                 }
 
@@ -111,7 +148,8 @@ return new class extends Migration
 
                 continue;
             }
-            $id = DB::table('referenciacao_centro_de_referencias')->insertGetId(($comData ? ['data_consulta_seguinte' => $linha['proxima']] : []) + [
+            $id = DB::table('referenciacao_centro_de_referencias')->insertGetId([
+                'data_de_entrada' => $linha['proxima'] && $linha['proxima'] >= $linha['data'] && $linha['proxima'] <= $hoje ? $linha['proxima'] : null,
                 'uuid' => (string) Str::uuid(),
                 'utente_id' => $utente,
                 'data_de_referenciacao' => $linha['data'],
@@ -126,8 +164,7 @@ return new class extends Migration
             $criadas++;
         }
 
-        $relatorio = $this->gravarRelatorio($descartadas);
-        echo "  Triagem: $utentesCriados utentes criados, $criadas referenciações criadas, $atualizadas com a data da consulta seguinte preenchida; ".count($descartadas)." linhas por importar".($relatorio ? " (ver $relatorio)" : '').".\n";
+        return [$utentesCriados, $criadas, $atualizadas];
     }
 
     public function down(): void
@@ -137,10 +174,8 @@ return new class extends Migration
         }
 
         $criadas = DB::table('triagem_importada')->where('acao', 'criada')->pluck('referenciacao_id');
-        if (Schema::hasColumn('referenciacao_centro_de_referencias', 'data_consulta_seguinte')) {
-            DB::table('referenciacao_centro_de_referencias')->whereIn('id', DB::table('triagem_importada')->where('acao', 'data')->pluck('referenciacao_id'))
-                ->update(['data_consulta_seguinte' => null]);
-        }
+        DB::table('referenciacao_centro_de_referencias')->whereIn('id', DB::table('triagem_importada')->where('acao', 'entrada')->pluck('referenciacao_id'))
+            ->update(['data_de_entrada' => null]);
         DB::table('diagnostico_referenciacao')->whereIn('referenciacao_id', $criadas)->delete();
         DB::table('referenciacao_centro_de_referencias')->whereIn('id', $criadas)->delete();
         Schema::drop('triagem_importada');
@@ -257,7 +292,7 @@ return new class extends Migration
         return Schema::hasColumn($tabela, $coluna) && collect(Schema::getColumns($tabela))->firstWhere('name', $coluna)['nullable'] === true;
     }
 
-    /** Data Y-m-d real e não anterior à data mínima da aplicação (a consulta seguinte pode ser futura). */
+    /** Data Y-m-d real e não anterior à data mínima da aplicação . */
     private function dataValida(string $data, string $minima): bool
     {
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $data) === 1 && checkdate((int) substr($data, 5, 2), (int) substr($data, 8, 2), (int) substr($data, 0, 4)) && $data >= $minima;
@@ -320,7 +355,7 @@ return new class extends Migration
         $texto = 'Importado da triagem (referenciação em '.$linha['data'].($linha['medico'] !== '' ? ', médico: '.$linha['medico'] : '').').';
         $c = $linha['consulta'];
         if ($c !== []) {
-            $texto .= ' Consulta seguinte: '.collect([$c['data'] ?? null, $c['tipo'] ?? null, $c['valencia'] ?? null, $c['clinico'] ?? null, $c['hospital'] ?? null])->filter()->implode(', ').'.';
+            $texto .= ' Consulta seguinte (entrada no CR): '.collect([$c['data'] ?? null, $c['tipo'] ?? null, $c['valencia'] ?? null, $c['clinico'] ?? null, $c['hospital'] ?? null])->filter()->implode(', ').'.';
         }
         if ($linha['nota'] !== '') {
             $texto .= ' Nota: '.$linha['nota'].'.';
