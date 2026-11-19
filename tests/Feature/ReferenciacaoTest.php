@@ -184,3 +184,11 @@ test('a lista de referenciações filtra por ano e trimestre da data de referenc
     $ver('?ano=lixo&trimestre=9')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.ano', ''));
     $ver('?trimestre=1')->assertInertia(fn (Assert $p) => $p->where('lista.total', 2)->where('filtros.trimestre', ''));
 });
+
+test('a data da consulta seguinte grava-se, edita-se e aparece na lista', function () {
+    $proxima = now()->addDays(14)->format('Y-m-d');
+    referenciar($this, ['data_consulta_seguinte' => $proxima])->assertSessionHasNoErrors();
+
+    $this->actingAs($this->gestor)->get('/referenciacao')->assertInertia(fn (Assert $p) => $p->where('lista.data.0.data_consulta_seguinte', $proxima));
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/".novoUtente()->id, corpoReferenciacao($this, ['data_consulta_seguinte' => 'lixo']))->assertSessionHasErrors('data_consulta_seguinte');
+});

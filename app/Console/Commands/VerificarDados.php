@@ -64,6 +64,11 @@ class VerificarDados extends Command
                 ->where(fn ($q) => $q->where('data_nascimento', '<', '1900-01-01')->orWhere('data_nascimento', '>', $hoje))
                 ->get(['id', 'data_nascimento']), 'data_nascimento');
 
+        $registar('Utente por completar (sem data de nascimento, sexo ou concelho)', 'utentes',
+            DB::table('utentes')->whereNull('deleted_at')
+                ->where(fn ($q) => $q->whereNull('data_nascimento')->orWhereNull('sexo_id')->orWhereNull('concelho_id'))
+                ->get(['id', 'numero_processo']), 'numero_processo');
+
         $registar('Entrada anterior ao nascimento', 'internamentos',
             DB::table('internamentos as i')->join('utentes as u', 'u.id', '=', 'i.utente_id')
                 ->whereNull('i.deleted_at')->whereColumn('i.data_de_entrada', '<', 'u.data_nascimento')

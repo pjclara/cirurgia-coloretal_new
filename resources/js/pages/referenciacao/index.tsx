@@ -20,6 +20,7 @@ type Linha = {
     origem: string | null;
     data_de_entrada: string | null;
     data_de_saida: string | null;
+    data_consulta_seguinte: string | null;
     destino: string | null;
     responsavel: string | null;
     situacao: 'referenciado' | 'no_centro' | 'saida';
@@ -162,6 +163,7 @@ export default function Referenciacao({ lista, filtros, anos, modal, origens, re
                             <th className="px-4 py-2.5 font-medium">Utente</th>
                             <th className="px-4 py-2.5 font-medium">Diagnósticos</th>
                             <th className="px-4 py-2.5 font-medium">Referenciação</th>
+                            <th className="px-4 py-2.5 font-medium">Consulta seguinte</th>
                             <th className="px-4 py-2.5 font-medium">Entrada</th>
                             <th className="px-4 py-2.5 font-medium">Saída</th>
                             <th className="px-4 py-2.5 font-medium">Situação</th>
@@ -171,7 +173,7 @@ export default function Referenciacao({ lista, filtros, anos, modal, origens, re
                     <tbody className="divide-y divide-slate-100">
                         {lista.data.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                                     Nenhuma referenciação encontrada.
                                 </td>
                             </tr>
@@ -195,6 +197,7 @@ export default function Referenciacao({ lista, filtros, anos, modal, origens, re
                                     <span className="text-xs text-slate-500">{[l.origem, l.responsavel].filter(Boolean).join(' · ')}</span>
                                 </td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{formatarData(l.data_de_referenciacao)}</td>
+                                <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{formatarData(l.data_consulta_seguinte)}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{formatarData(l.data_de_entrada)}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">
                                     {formatarData(l.data_de_saida)}

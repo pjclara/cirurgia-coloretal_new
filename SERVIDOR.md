@@ -35,6 +35,9 @@ O que as migrações recentes fazem à base de dados (todas reversíveis e repet
 | `…_clavien_da_alta_passa_a_definitivo` | O grau de Clavien-Dindo passa a ser o definitivo aos 30 dias |
 | `…_associar_diagnosticos_cr_as_referenciacoes` | Copia os diagnósticos «centro de referência» dos internamentos para a referenciação ativa de cada utente (modo «Outro», histologia por preencher) |
 | `…_remover_permissoes_sem_uso` | Apaga as permissões que a app já não verifica (as `edit …` e as de diagnóstico, intervenção, complicação, resolução e reunião) |
+| `…_data_consulta_seguinte_na_referenciacao` | Acrescenta a data da consulta seguinte à referenciação (campo opcional) |
+| `…_utentes_com_dados_por_completar` | Permite utentes sem data de nascimento, sexo e concelho (a completar na ficha; continuam obrigatórios ao guardar). Necessária para a importação da triagem |
+| `…_importar_triagem_cruzada` | Referencia ao centro de referência os doentes de `excels/triagem_proxima_consulta.csv` (por número de processo), **cria os utentes que não existem na base** (só nome e processo) e preenche a data da consulta seguinte. `php artisan dados:verificar` lista os utentes por completar. **O ficheiro não está no git**: copiar para `excels/` no servidor antes de reconstruir a imagem e migrar; sem ele não faz nada. O que ficou por importar vai para `storage/app/private/importacoes/` |
 
 Depois de migrar, em **Administração > Perfis e permissões** (superAdmin) conferir o que cada perfil pode fazer.
 Com `AUTO_MIGRAR=true` o `atualizar.sh` já faz o backup e corre as migrações a cada versão publicada.

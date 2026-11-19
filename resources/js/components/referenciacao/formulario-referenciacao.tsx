@@ -15,6 +15,7 @@ export type PropsReferenciacao = {
         origem_id: number;
         data_de_entrada: string | null;
         data_de_saida: string | null;
+        data_consulta_seguinte: string | null;
         destino_id: number | null;
         responsavel_id: number;
         comentarios: string;
@@ -85,6 +86,7 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
         origem_id: (referenciacao?.origem_id ?? '') as number | '',
         data_de_entrada: referenciacao?.data_de_entrada ?? '',
         data_de_saida: referenciacao?.data_de_saida ?? '',
+        data_consulta_seguinte: referenciacao?.data_consulta_seguinte ?? '',
         destino_id: (referenciacao?.destino_id ?? '') as number | '',
         responsavel_id: (referenciacao?.responsavel_id ?? '') as number | '',
         comentarios: referenciacao?.comentarios ?? '',
@@ -237,6 +239,18 @@ export function FormularioReferenciacao({ referenciacao, utente, dominios, hoje,
                                         aoMudar={(v) => setData('destino_id', v)}
                                         vazio="Ainda no centro"
                                         invalido={!!erros.destino_id}
+                                    />
+                                </Campo>
+                            </div>
+                            <div className="mt-4 max-w-xs">
+                                <Campo rotulo="Consulta seguinte" para="consulta-seguinte" erro={erros.data_consulta_seguinte} opcional>
+                                    <input
+                                        id="consulta-seguinte"
+                                        type="date"
+                                        value={data.data_consulta_seguinte}
+                                        onChange={(e) => setData('data_consulta_seguinte', e.target.value)}
+                                        className={estiloEntrada}
+                                        aria-invalid={!!erros.data_consulta_seguinte}
                                     />
                                 </Campo>
                             </div>

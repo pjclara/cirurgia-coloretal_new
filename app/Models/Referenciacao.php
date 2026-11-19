@@ -26,6 +26,7 @@ class Referenciacao extends Model
         'origem_id',
         'data_de_entrada',
         'data_de_saida',
+        'data_consulta_seguinte',
         'destino_id',
         'responsavel_id',
         'comentarios',
@@ -38,6 +39,7 @@ class Referenciacao extends Model
             'data_de_referenciacao' => 'date',
             'data_de_entrada' => 'date',
             'data_de_saida' => 'date',
+            'data_consulta_seguinte' => 'date',
         ];
     }
 
