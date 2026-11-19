@@ -5,6 +5,7 @@ import { rotas } from '../../clinico/rotas';
 import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
 import { ESTILO_VIZ, formatar } from '../../components/analise/graficos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
+import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Campo = 'alta' | 'destino' | 'morbilidade_alta' | 'seguimento_30' | 'clavien_30' | 'datas';
@@ -44,6 +45,7 @@ const CAMPOS: { campo: Campo; rotulo: string; ajuda: string }[] = [
 ];
 
 type Props = {
+    modal: ModalInternamentoDados | null;
     qualidade: Qualidade;
     trimestres: string[];
     de: string | null;
@@ -51,7 +53,7 @@ type Props = {
     geradoEm: string;
 };
 
-export default function QualidadeDados({ qualidade, trimestres, de, ate, geradoEm }: Props) {
+export default function QualidadeDados({ modal, qualidade, trimestres, de, ate, geradoEm }: Props) {
     const [aCarregar, setACarregar] = useState(false);
 
     const escolher = (id: number | null) =>
@@ -65,6 +67,12 @@ export default function QualidadeDados({ qualidade, trimestres, de, ate, geradoE
                 onFinish: () => setACarregar(false),
             },
         );
+    // Os filtros em vigor acompanham a modal, para a página ficar igual ao fechar ou gravar.
+    const consultaAtual = `?${new URLSearchParams({
+        de: de ?? '',
+        ate: ate ?? '',
+        ...(qualidade.responsavel !== null ? { responsavel: String(qualidade.responsavel) } : {}),
+    }).toString()}`;
     const selecionado = qualidade.responsaveis.find((r) => r.id === qualidade.responsavel);
 
     return (
@@ -236,7 +244,11 @@ export default function QualidadeDados({ qualidade, trimestres, de, ate, geradoE
                                                     </td>
                                                 ))}
                                                 <td className="py-1.5 whitespace-nowrap">
-                                                    <Link href={rotas.internamentos.registo(l.internamento)} className="underline underline-offset-2">
+                                                    <Link
+                                                        href={`/analise/cancro-retal/qualidade/internamentos/${l.internamento}${consultaAtual}`}
+                                                        preserveScroll
+                                                        className="underline underline-offset-2"
+                                                    >
                                                         Abrir
                                                     </Link>
                                                 </td>
@@ -249,6 +261,7 @@ export default function QualidadeDados({ qualidade, trimestres, de, ate, geradoE
                     </section>
                 </div>
             </div>
+            <ModalInternamento modal={modal} />
         </ClinicoLayout>
     );
 }

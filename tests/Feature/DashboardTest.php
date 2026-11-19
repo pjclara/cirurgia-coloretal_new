@@ -162,3 +162,54 @@ test('a readmissão aos 30 dias conta a nova entrada nos 30 dias seguintes à al
         ->where('indicadores.readmissao.cumpre', false)
         ->where('metas.readmissao.max', 10));
 });
+
+test('o grau de Clavien-Dindo só falta se houve complicações: «sem complicações» não precisa de grau', function () {
+    $utilizador = utilizadorClinico(permissoesComReferenciacao());
+    $data = now()->subDays(70)->format('Y-m-d');
+    $vivo = DB::table('destinos')->where('id', '<>', 6)->value('id');
+
+    // Cirurgia retal de doente do CR, já com alta, com os registos da alta e dos 30 dias.
+    $cirurgia = function (int $complicacaoAlta, int $complicacao30, ?int $clavien) use ($utilizador, $data, $vivo) {
+        $utente = novoUtente();
+        DB::table('referenciacao_centro_de_referencias')->insert(['utente_id' => $utente->id, 'data_de_referenciacao' => $data, 'origem_id' => 1, 'responsavel_id' => $utilizador->id, 'created_by_id' => $utilizador->id, 'uuid' => (string) \Illuminate\Support\Str::uuid()]);
+        $i = novoInternamento($utente, $utilizador, ['data_de_entrada' => $data]);
+        $i->forceFill(['data_de_alta' => now()->subDays(60)->format('Y-m-d'), 'destino_id' => $vivo])->save();
+        $b = \App\Models\BlocoOperatorio::create(['internamento_id' => $i->id, 'data_de_inicio' => $data, 'tipo_de_cirurgia_id' => 1, 'tipo_de_abordagem_id' => 1, 're_intervencao_nao_programada_id' => 1]);
+        DB::table('bloco_operatorio_intervencao')->insert(['bloco_operatorio_id' => $b->id, 'intervencao_id' => 1]);
+        foreach (['alta' => [$complicacaoAlta, null], '30_dias' => [$complicacao30, $clavien]] as $momento => [$comp, $grau]) {
+            $m = DB::table('morbilidades')->insertGetId(['internamento_id' => $i->id, 'momento' => $momento, 'data_registo' => now()->subDays(40)->format('Y-m-d'), 'clavien_dindo_id' => $grau, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('complicacao_morbilidade')->insert(['morbilidade_id' => $m, 'complicacao_id' => $comp]);
+        }
+
+        return $utente->id;
+    };
+
+    $semComplicacoes = $cirurgia(1, 1, null);   // sem complicações em nenhum dos momentos, sem grau: está completo
+    $comComplicacao = $cirurgia(2, 1, null);    // complicação na alta e sem grau aos 30 dias: falta o grau
+
+    $this->actingAs($utilizador)->get('/analise/cancro-retal/qualidade'.trimestresDesde(70))->assertInertia(fn (Assert $p) => $p
+        ->where('qualidade.totais.clavien_30', 1)
+        ->where('qualidade.linhas', fn ($linhas) => collect($linhas)->contains(fn ($l) => $l['utente']['id'] === $comComplicacao && in_array('clavien_30', $l['falta'], true))
+            && ! collect($linhas)->contains(fn ($l) => $l['utente']['id'] === $semComplicacoes && in_array('clavien_30', $l['falta'], true))));
+});
+
+test('na qualidade dos dados o internamento abre numa modal, grava e volta à página com os mesmos filtros', function () {
+    $utilizador = utilizadorClinico(permissoesComReferenciacao());
+    $i = novoInternamento(novoUtente(), $utilizador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d')]);
+    $filtros = 'ate='.rawurlencode('2026 T3').'&de='.rawurlencode('2026 T1');   // pela ordem alfabética em que o pedido é normalizado
+    $pagina = '/analise/cancro-retal/qualidade';
+
+    $this->actingAs($utilizador)->get("$pagina/internamentos/{$i->id}?$filtros")->assertInertia(fn (Assert $p) => $p
+        ->component('analise/qualidade-dados')
+        ->where('modal.internamento.id', $i->id)
+        ->where('modal.origem', 'qualidade')
+        ->where('modal.fechar_url', "$pagina?$filtros"));
+    $this->actingAs($utilizador)->get($pagina)->assertInertia(fn (Assert $p) => $p->where('modal', null));
+
+    // Gravar volta à página com os filtros; um endereço de fora é ignorado.
+    $this->actingAs($utilizador)->put("/internamentos/{$i->id}", payloadInternamento($i, ['origem' => 'qualidade', 'retorno' => "$pagina?$filtros"]))->assertRedirect("$pagina?$filtros");
+    $this->actingAs($utilizador)->put("/internamentos/{$i->id}", payloadInternamento($i, ['origem' => 'qualidade', 'retorno' => 'https://exemplo.pt/x']))->assertRedirect($pagina);
+
+    // Sem poder ver referenciações, a página (e a modal) não abrem.
+    $this->actingAs(utilizadorClinico())->get("$pagina/internamentos/{$i->id}")->assertForbidden();
+});

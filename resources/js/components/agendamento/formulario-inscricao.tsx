@@ -23,6 +23,8 @@ export type PropsInscricao = {
     } | null;
     utente: { id: number; nome: string; numero_processo: number; sinalizado?: boolean };
     sinalizacao?: DadosSinalizacao | null;
+    /** Diagnósticos CR que o utente já tem registados: a inscrição nova já os traz. */
+    diagnosticos_cr_do_utente?: number[];
     dominios: { prioridades: Opcao[]; responsaveis: Responsavel[]; diagnosticos: OpcaoAgrupada[]; intervencoes: OpcaoAgrupada[] };
     hoje: string;
     estados: Opcao[];
@@ -30,14 +32,14 @@ export type PropsInscricao = {
 
 type Props = PropsInscricao & { fechar: () => void };
 
-export function FormularioInscricao({ espera, utente, sinalizacao, dominios, hoje, estados, fechar }: Props) {
+export function FormularioInscricao({ espera, utente, sinalizacao, diagnosticos_cr_do_utente, dominios, hoje, estados, fechar }: Props) {
     const form = useForm({
         prioridade_id: (espera?.prioridade_id ?? 1) as number | '',
         data_de_lista: espera?.data_de_lista ?? hoje,
         responsavel_id: (espera?.responsavel_id ?? '') as number | '',
         comentarios: espera?.comentarios ?? '',
         intervencoes: espera?.intervencoes ?? ([] as number[]),
-        diagnosticos: espera?.diagnosticos ?? ([] as number[]),
+        diagnosticos: espera?.diagnosticos ?? [...(diagnosticos_cr_do_utente ?? [])],
     });
     const { data, setData, processing } = form;
     const erros = form.errors as Record<string, string | undefined>;

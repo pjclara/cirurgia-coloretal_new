@@ -38,8 +38,8 @@ class GuardarInternamento
 
             $diagnosticos = collect($dados['diagnosticos'] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values();
             $internamento->diagnosticos()->sync($diagnosticos->all());
-            // Os diagnósticos CR do internamento passam sozinhos para a referenciação do utente.
-            DiagnosticosCr::levarParaReferenciacao($internamento->utente_id);
+            // Os diagnósticos CR do internamento passam sozinhos para a referenciação do utente e para a sua lista de espera.
+            DiagnosticosCr::sincronizar($internamento->utente_id, 'internamento');
 
             $this->gravarMorbilidade($internamento, $dados['morbilidade'] ?? [], (int) ($dados['destino_id'] ?? 0) === Internamento::DESTINO_FALECIDO);
 

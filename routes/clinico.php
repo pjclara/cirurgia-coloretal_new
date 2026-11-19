@@ -46,6 +46,7 @@ Route::middleware('can:show internamento')->group(function () {
 Route::middleware(['can:show internamento', 'can:show referenciacao'])->group(function () {
     Route::get('analise/cancro-retal', CancroRetalAnaliseController::class)->name('analise.cancro-retal');
     Route::get('analise/cancro-retal/qualidade', [CancroRetalAnaliseController::class, 'qualidade'])->name('analise.cancro-retal.qualidade');
+    Route::get('analise/cancro-retal/qualidade/internamentos/{internamento}', [CancroRetalAnaliseController::class, 'qualidadeComInternamento'])->whereNumber('internamento')->name('analise.cancro-retal.qualidade.internamento');
 });
 
 Route::middleware('can:create internamento')->group(function () {

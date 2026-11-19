@@ -7,12 +7,13 @@ import { ModalAgendamento, type Modal } from '../../components/agendamento/modal
 import { NovaInscricao } from '../../components/agendamento/nova-inscricao';
 import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
+import { EtiquetaCr } from '../../components/clinico/etiqueta-cr';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Linha = {
     id: number;
-    utente: { id: number | null; nome: string | null; numero_processo: number | null };
+    utente: { id: number | null; nome: string | null; numero_processo: number | null; cr: boolean };
     data: string | null;
     prioridade: number;
     estado: number;
@@ -117,6 +118,7 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                                     ) : (
                                         '—'
                                     )}
+                                    {l.utente.cr && <EtiquetaCr />}
                                     <span className="ml-2 text-xs text-slate-500 tabular-nums">
                                         <NumeroProcesso semRotulo valor={l.utente.numero_processo} />
                                     </span>

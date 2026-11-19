@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { PRIORIDADE } from '../../clinico/agendamento';
 import { diasEntre, formatarData } from '../../clinico/formato';
 import { CaixaPesquisa } from '../clinico/caixa-pesquisa';
+import { EtiquetaCr } from '../clinico/etiqueta-cr';
 import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type ItemEspera = {
     id: number;
-    utente: { id: number | null; nome: string | null; numero_processo: number | null };
+    utente: { id: number | null; nome: string | null; numero_processo: number | null; cr: boolean };
     data: string | null;
     prioridade: number;
     intervencoes: string[];
@@ -113,7 +114,10 @@ export function PainelEspera({
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium text-slate-900">{e.utente.nome ?? 'Utente sem ficha'}</p>
+                                        <p className="truncate text-sm font-medium text-slate-900">
+                                            {e.utente.nome ?? 'Utente sem ficha'}
+                                            {e.utente.cr && <EtiquetaCr />}
+                                        </p>
                                         <p className="text-xs text-slate-600 tabular-nums">
                                             <NumeroProcesso valor={e.utente.numero_processo} />
                                             {dias !== null && dias < 3650 && ` · há ${dias} d`}

@@ -6,6 +6,7 @@ use App\Models\Agendamento;
 use App\Models\ListaDeEspera;
 use App\Models\Utente;
 use App\Services\SincronizarOperados;
+use App\Support\DiagnosticosCr;
 use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,7 +47,7 @@ class AgendamentoController extends Controller
         $mostrarCancelados = $request->boolean('cancelados');
 
         $agendamentos = Agendamento::query()
-            ->with(['espera.utente:id,nome,numero_processo', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
+            ->with(['espera.utente:id,nome,numero_processo', 'espera.utente.referenciacoesAtivas', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
             ->whereBetween('start', [$inicio->copy()->startOfDay(), $fim->copy()->endOfDay()])
             ->tap(fn ($q) => $this->ordenarPorDiaSalaEHora($q))
             ->get()
@@ -95,13 +96,13 @@ class AgendamentoController extends Controller
 
         $total = (clone $consulta)->count();
         $itens = $consulta
-            ->with(['utente:id,nome,numero_processo', 'intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
+            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas', 'intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
             ->orderByRaw('CASE prioridade_id WHEN 2 THEN 0 WHEN 3 THEN 1 WHEN 1 THEN 2 ELSE 3 END')
             ->orderBy('data_de_lista')
             ->limit(60)->get()
             ->map(fn (ListaDeEspera $e) => [
                 'id' => $e->id,
-                'utente' => ['id' => $e->utente?->id, 'nome' => $e->utente?->nome, 'numero_processo' => $e->utente?->numero_processo],
+                'utente' => ['id' => $e->utente?->id, 'nome' => $e->utente?->nome, 'numero_processo' => $e->utente?->numero_processo, 'cr' => $this->marcaCr($e->utente)],
                 'data' => $e->data_de_lista?->format('Y-m-d'),
                 'prioridade' => (int) $e->prioridade_id,
                 'intervencoes' => $e->intervencoes->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),
@@ -136,7 +137,7 @@ class AgendamentoController extends Controller
         $fim = $inicio->copy()->addDays($nDias - 1)->endOfDay();
 
         $agendamentos = Agendamento::query()
-            ->with(['espera.utente:id,nome,numero_processo,data_nascimento', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
+            ->with(['espera.utente:id,nome,numero_processo,data_nascimento', 'espera.utente.referenciacoesAtivas', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
             ->whereBetween('start', [$inicio, $fim])
             ->tap(fn ($q) => $this->ordenarPorDiaSalaEHora($q))
             ->get()
@@ -177,7 +178,7 @@ class AgendamentoController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $lista = ListaDeEspera::query()
-            ->with(['utente:id,nome,numero_processo', 'intervencoes:id,nome,abrev', 'diagnosticos:id,nome', 'responsavel:id,name,abrev', 'agendamentos'])
+            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas', 'intervencoes:id,nome,abrev', 'diagnosticos:id,nome', 'responsavel:id,name,abrev', 'agendamentos'])
             ->when($estados[$estado], fn ($query, $ids) => $query->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), $ids))
             ->when($prioridade, fn ($query, $p) => $query->where('prioridade_id', $p))
             ->when($q !== '', fn ($query) => $query->whereHas('utente', fn ($u) => $u->pesquisar($q)))
@@ -190,7 +191,7 @@ class AgendamentoController extends Controller
 
                 return [
                     'id' => $e->id,
-                    'utente' => ['id' => $e->utente?->id, 'nome' => $e->utente?->nome, 'numero_processo' => $e->utente?->numero_processo],
+                    'utente' => ['id' => $e->utente?->id, 'nome' => $e->utente?->nome, 'numero_processo' => $e->utente?->numero_processo, 'cr' => $this->marcaCr($e->utente)],
                     'data' => $e->data_de_lista?->format('Y-m-d'),
                     'prioridade' => (int) $e->prioridade_id,
                     'estado' => (int) $e->estado_lista_espera,
@@ -235,6 +236,8 @@ class AgendamentoController extends Controller
             $espera->intervencoes()->sync($dados['intervencoes']);
             $espera->diagnosticos()->sync($dados['diagnosticos'] ?? []);
         });
+        // Os diagnósticos CR da inscrição passam sozinhos para a referenciação e para os internamentos do utente.
+        DiagnosticosCr::sincronizar($utente->id, 'lista');
 
         return redirect()->route('agendamento.espera')->with('sucesso', 'Utente inscrito em lista de espera.');
     }
@@ -248,6 +251,7 @@ class AgendamentoController extends Controller
             $espera->intervencoes()->sync($dados['intervencoes']);
             $espera->diagnosticos()->sync($dados['diagnosticos'] ?? []);
         });
+        DiagnosticosCr::sincronizar($espera->utente_id, 'lista');
 
         return redirect()->route('agendamento.espera')->with('sucesso', 'Inscrição atualizada.');
     }
@@ -347,7 +351,7 @@ class AgendamentoController extends Controller
         return [
             'id' => $a->id,
             'data' => $a->start?->format('Y-m-d'),
-            'utente' => ['id' => $a->espera?->utente?->id, 'nome' => $a->espera?->utente?->nome, 'numero_processo' => $a->espera?->utente?->numero_processo],
+            'utente' => ['id' => $a->espera?->utente?->id, 'nome' => $a->espera?->utente?->nome, 'numero_processo' => $a->espera?->utente?->numero_processo, 'cr' => $this->marcaCr($a->espera?->utente)],
             'intervencoes' => ($a->espera?->intervencoes ?? collect())->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),
             'hora' => $a->horaCurta(),
             'periodo' => Dominios::tabela('periodo_de_agendamentos', $a->periodo_de_agendamento_id),
@@ -360,6 +364,13 @@ class AgendamentoController extends Controller
             'reserva_sangue' => (string) $a->reserva_sangue === '1',
             'comentarios' => $a->comentarios,
         ];
+    }
+
+    /** O utente está referenciado ao CR (só se vê com permissão para ver referenciações). */
+    private function marcaCr(?Utente $utente): bool
+    {
+        return $utente !== null && request()->user()->can('show referenciacao')
+            && ($utente->relationLoaded('referenciacoesAtivas') ? $utente->referenciacoesAtivas->isNotEmpty() : $utente->referenciacoesAtivas()->exists());
     }
 
     private function opcoesPrioridade(): array
@@ -386,6 +397,8 @@ class AgendamentoController extends Controller
                 ])->values(),
             ] : null,
             'utente' => ['id' => $utente->id, 'nome' => $utente->nome, 'numero_processo' => $utente->numero_processo, 'sinalizado' => $utente->referenciacoesAtivas()->exists()],
+            // Diagnósticos CR que o utente já tem registados (internamentos, referenciação, outra inscrição): a inscrição nova já os traz.
+            'diagnosticos_cr_do_utente' => $espera ? [] : DiagnosticosCr::doUtente($utente->id)->pluck('id')->values(),
             'sinalizacao' => Dominios::sinalizacao(request()->user()),
             'dominios' => [
                 'prioridades' => $this->opcoesPrioridade(),

@@ -10,12 +10,12 @@ class SincronizarDiagnosticosCr extends Command
 {
     protected $signature = 'diagnosticos-cr:sincronizar';
 
-    protected $description = 'Sincroniza os diagnósticos CR entre os internamentos e as referenciações de todos os utentes referenciados';
+    protected $description = 'Sincroniza os diagnósticos CR entre os internamentos, as referenciações e a lista de espera de todos os utentes referenciados';
 
     public function handle(): int
     {
         $r = DiagnosticosCr::sincronizarTodos();
-        $this->info("{$r['utentes']} utentes verificados; {$r['referenciacoes']} diagnósticos acrescentados a referenciações; {$r['internamentos']} internamentos atualizados.");
+        $this->info("{$r['utentes']} utentes verificados; {$r['referenciacoes']} diagnósticos acrescentados a referenciações; {$r['internamentos']} internamentos e {$r['esperas']} inscrições em lista de espera atualizados.");
 
         return self::SUCCESS;
     }

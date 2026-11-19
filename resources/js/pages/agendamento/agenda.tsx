@@ -7,13 +7,14 @@ import { ModalAgendamento, type Modal } from '../../components/agendamento/modal
 import { NovaInscricao } from '../../components/agendamento/nova-inscricao';
 import { PainelEspera, type Espera } from '../../components/agendamento/painel-espera';
 import { Botao, BotaoLigacao } from '../../components/clinico/campos';
+import { EtiquetaCr } from '../../components/clinico/etiqueta-cr';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Item = {
     id: number;
     data: string;
-    utente: { id: number | null; nome: string | null; numero_processo: number | null };
+    utente: { id: number | null; nome: string | null; numero_processo: number | null; cr: boolean };
     intervencoes: string[];
     hora: string | null;
     periodo: string | null;
@@ -303,6 +304,7 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                                                             ) : (
                                                                 <span className="text-sm font-semibold">Utente sem ficha</span>
                                                             )}
+                                                            {a.utente.cr && <EtiquetaCr />}
                                                             <span className="ml-2 text-sm text-slate-600 tabular-nums">
                                                                 <NumeroProcesso valor={a.utente.numero_processo} />
                                                             </span>

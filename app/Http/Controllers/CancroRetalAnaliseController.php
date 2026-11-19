@@ -66,18 +66,29 @@ class CancroRetalAnaliseController extends Controller
     }
 
     /** Doentes referenciados operados com dados em falta para os indicadores. */
-    public function qualidade(Request $request): Response
+    public function qualidade(Request $request, ?Internamento $internamento = null): Response
     {
         $hoje = now()->startOfDay();
         [$trimestres, $de, $ate, $cirurgias] = $this->intervalo($request, $hoje);
+        $consulta = $request->getQueryString();
 
         return Inertia::render('analise/qualidade-dados', [
+            // O internamento a completar abre numa modal por cima desta página (com os mesmos filtros ao fechar).
+            'modal' => $internamento ? app(InternamentoController::class)->propsEdicao($request, $internamento) + [
+                'fechar_url' => '/analise/cancro-retal/qualidade'.($consulta ? '?'.$consulta : ''),
+                'origem' => 'qualidade',
+            ] : null,
             'trimestres' => $trimestres,
             'de' => $de,
             'ate' => $ate,
             'geradoEm' => now()->format('d/m/Y H:i'),
             'qualidade' => $this->dadosEmFalta($cirurgias, $hoje, ctype_digit((string) $request->query('responsavel')) ? (int) $request->query('responsavel') : null),
         ]);
+    }
+
+    public function qualidadeComInternamento(Request $request, Internamento $internamento): Response
+    {
+        return $this->qualidade($request, $internamento);
     }
 
     /**
@@ -124,7 +135,9 @@ class CancroRetalAnaliseController extends Controller
                     where m.internamento_id = i.id and m.momento = 'alta' and c.complicacao_id <> $semComplicacoes) as complicacao_alta,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias') as morb_30,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias'
-                    and (m.clavien_dindo_id is null or m.clavien_dindo_id = ".Morbilidade::CLAVIEN_A_AGUARDAR.")) as clavien_em_falta,
+                    and (m.clavien_dindo_id is null or m.clavien_dindo_id = ".Morbilidade::CLAVIEN_A_AGUARDAR.")
+                    and exists (select 1 from morbilidades m2 join complicacao_morbilidade c2 on c2.morbilidade_id = m2.id
+                        where m2.internamento_id = i.id and m2.momento in ('alta', '30_dias') and c2.complicacao_id <> $semComplicacoes)) as clavien_em_falta,
                 (i.data_de_alta is not null and i.data_de_alta <= date_sub(curdate(), interval 30 day)
                     and (i.destino_id is null or i.destino_id <> $falecido)) as na_readmissao,
                 exists (select 1 from internamentos r where r.utente_id = i.utente_id and r.id <> i.id and r.deleted_at is null
@@ -156,7 +169,8 @@ class CancroRetalAnaliseController extends Controller
 
     /**
      * Cirurgias do período a que falta algum dado necessário aos indicadores. `falta` lista os campos em falta;
-     * o seguimento aos 30 dias só falta nos doentes vivos cuja alta foi há mais de 30 dias. `responsaveis` resume
+     * o grau de Clavien-Dindo só falta se houve complicações (na alta ou aos 30 dias) e o registo dos 30 dias não tem grau:
+     * «sem complicações» não tem grau. O seguimento aos 30 dias só falta nos doentes vivos cuja alta foi há mais de 30 dias. `responsaveis` resume
      * por responsável do internamento (sempre sobre todo o período) e `$responsavel` restringe a lista (0 = sem responsável).
      *
      * @return array<string, mixed>

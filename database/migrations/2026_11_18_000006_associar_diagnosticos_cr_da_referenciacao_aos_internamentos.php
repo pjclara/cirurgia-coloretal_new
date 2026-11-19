@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Sincroniza os diagnósticos «centro de referência» entre os internamentos e as referenciações de todos os utentes
  * referenciados, pela mesma regra que a aplicação já aplica sozinha a cada alteração (`App\Support\DiagnosticosCr`):
- *  - internamentos -> referenciação ativa mais recente (o que lhe falta; modo «Outro»);
- *  - referenciações -> internamentos com cirurgia que ainda não têm nenhum diagnóstico CR.
+ *  - internamentos e inscrições ativas em lista de espera -> referenciação ativa mais recente (o que lhe falta; modo «Outro»);
+ *  - referenciações -> internamentos com cirurgia e inscrições ativas em lista de espera que ainda não têm nenhum diagnóstico CR.
  *
  * Só acrescenta, nunca remove, e pode correr-se mais do que uma vez. Não tem reversão: o que a aplicação mantém
  * sozinha não se desfaz. Também se pode correr à mão: `php artisan diagnosticos-cr:sincronizar`.
@@ -28,7 +28,7 @@ return new class extends Migration
         }
 
         $r = DiagnosticosCr::sincronizarTodos();
-        echo "  Diagnósticos CR: {$r['utentes']} utentes verificados, {$r['referenciacoes']} diagnósticos acrescentados a referenciações, {$r['internamentos']} internamentos atualizados.\n";
+        echo "  Diagnósticos CR: {$r['utentes']} utentes verificados, {$r['referenciacoes']} diagnósticos acrescentados a referenciações, {$r['internamentos']} internamentos e {$r['esperas']} inscrições em lista de espera atualizados.\n";
     }
 
     public function down(): void

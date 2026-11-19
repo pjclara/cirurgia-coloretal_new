@@ -2,12 +2,13 @@ import { Head, Link, router } from '@inertiajs/react';
 import { NOMES_DIA, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao } from '../../clinico/tipos';
+import { EtiquetaCr } from '../../components/clinico/etiqueta-cr';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 
 type Item = {
     id: number;
     data: string;
-    utente: { id: number | null; nome: string | null; numero_processo: number | null };
+    utente: { id: number | null; nome: string | null; numero_processo: number | null; cr: boolean };
     idade: number | null;
     intervencoes: string[];
     hora: string | null;
@@ -112,6 +113,7 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, estados,
                                                 </td>
                                                 <td className="py-1.5 pr-2 font-medium">
                                                     {a.utente.nome ?? 'Utente sem ficha'}
+                                                    {a.utente.cr && <EtiquetaCr />}
                                                     {a.idade !== null && <span className="font-normal text-slate-600"> ({a.idade} anos)</span>}
                                                 </td>
                                                 <td className="py-1.5 pr-2 tabular-nums">

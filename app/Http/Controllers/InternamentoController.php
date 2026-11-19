@@ -280,6 +280,13 @@ class InternamentoController extends Controller
         if ($request->input('origem') === 'lista') {
             return redirect()->route('internamentos.index')->with('sucesso', 'Alterações guardadas.');
         }
+        // Gravado a partir da «Qualidade dos dados»: volta lá, com os mesmos filtros (só endereços desta aplicação).
+        if ($request->input('origem') === 'qualidade') {
+            $retorno = (string) $request->input('retorno');
+
+            return redirect(str_starts_with($retorno, '/analise/cancro-retal/qualidade') ? $retorno : '/analise/cancro-retal/qualidade')
+                ->with('sucesso', 'Alterações guardadas.');
+        }
 
         return redirect()
             ->route('internamentos.edit', $internamento)
