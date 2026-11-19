@@ -127,3 +127,38 @@ test('o cancro retal e a qualidade dos dados exigem poder ver referenciações',
     $this->actingAs($semReferenciacao)->get('/analise/cancro-retal/qualidade')->assertForbidden();
     $this->actingAs(utilizadorClinico(permissoesComReferenciacao()))->get('/analise/cancro-retal')->assertOk();
 });
+
+test('a readmissão aos 30 dias conta a nova entrada nos 30 dias seguintes à alta, só em altas com 30 dias decorridos e sem óbito', function () {
+    $utilizador = utilizadorClinico(permissoesComReferenciacao());
+    $vivo = DB::table('destinos')->where('id', '<>', 6)->value('id');
+    $dia = now()->subDays(80);
+
+    $cirurgiaRetal = function (int $diasDeAlta, ?int $voltaAposDias, int $destino) use ($utilizador, $dia) {
+        $utente = novoUtente();
+        DB::table('referenciacao_centro_de_referencias')->insert([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(), 'utente_id' => $utente->id, 'data_de_referenciacao' => $dia->copy()->subDays(20)->format('Y-m-d'),
+            'origem_id' => 1, 'responsavel_id' => $utilizador->id, 'created_by_id' => $utilizador->id,
+        ]);
+        $alta = now()->subDays($diasDeAlta);
+        $i = novoInternamento($utente, $utilizador, ['data_de_entrada' => $dia->format('Y-m-d')]);
+        $i->forceFill(['data_de_alta' => $alta->format('Y-m-d'), 'destino_id' => $destino])->save();
+        $b = \App\Models\BlocoOperatorio::create(['internamento_id' => $i->id, 'data_de_inicio' => $dia->format('Y-m-d'), 'tipo_de_cirurgia_id' => 1, 'tipo_de_abordagem_id' => 1, 're_intervencao_nao_programada_id' => 1]);
+        DB::table('bloco_operatorio_intervencao')->insert(['bloco_operatorio_id' => $b->id, 'intervencao_id' => 1]);
+        if ($voltaAposDias !== null) {
+            novoInternamento($utente, $utilizador, ['data_de_entrada' => $alta->copy()->addDays($voltaAposDias)->format('Y-m-d')]);
+        }
+    };
+
+    $cirurgiaRetal(40, 10, $vivo);   // readmitida em 10 dias
+    $cirurgiaRetal(40, 45, $vivo);   // voltou, mas depois dos 30 dias
+    $cirurgiaRetal(40, null, $vivo); // sem regresso
+    $cirurgiaRetal(10, null, $vivo); // alta há menos de 30 dias: fora do denominador
+    $cirurgiaRetal(40, 5, 6);        // falecido: fora do denominador
+
+    $this->actingAs($utilizador)->get('/analise/cancro-retal'.trimestresDesde(80))->assertInertia(fn (Assert $p) => $p
+        ->where('indicadores.readmissao.n', 3)
+        ->where('indicadores.readmissao.eventos', 1)
+        ->where('indicadores.readmissao.taxa', 33.3)
+        ->where('indicadores.readmissao.cumpre', false)
+        ->where('metas.readmissao.max', 10));
+});

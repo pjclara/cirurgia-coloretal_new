@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Complicacao;
 use App\Models\Internamento;
 use App\Models\Morbilidade;
-use App\Models\Referenciacao;
 use App\Support\DiagnosticosCr;
 use Illuminate\Support\Facades\DB;
 
@@ -39,7 +38,8 @@ class GuardarInternamento
 
             $diagnosticos = collect($dados['diagnosticos'] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values();
             $internamento->diagnosticos()->sync($diagnosticos->all());
-            $this->associarDiagnosticosAoCentro($internamento, $diagnosticos->all());
+            // Os diagnósticos CR do internamento passam sozinhos para a referenciação do utente.
+            DiagnosticosCr::levarParaReferenciacao($internamento->utente_id);
 
             $this->gravarMorbilidade($internamento, $dados['morbilidade'] ?? [], (int) ($dados['destino_id'] ?? 0) === Internamento::DESTINO_FALECIDO);
 
@@ -61,29 +61,6 @@ class GuardarInternamento
 
             return $internamento;
         });
-    }
-
-    /**
-     * Os diagnósticos do internamento marcados como «centro de referência» passam também para a referenciação ativa
-     * do utente (a mais recente, sem saída), se ainda lá não estiverem e se o utilizador puder atualizar referenciações. O modo fica «Outro» e a histologia por
-     * preencher, para completar na referenciação; nada se remove.
-     *
-     * @param  list<int>  $diagnosticos
-     */
-    private function associarDiagnosticosAoCentro(Internamento $internamento, array $diagnosticos): void
-    {
-        // Só quem pode atualizar referenciações altera os diagnósticos delas (a migration cobre o histórico).
-        if ($diagnosticos === [] || ! auth()->user()?->can('update referenciacao')) {
-            return;
-        }
-
-        $referenciacao = Referenciacao::where('utente_id', $internamento->utente_id)->whereNull('data_de_saida')
-            ->orderByDesc('data_de_referenciacao')->orderByDesc('id')->first();
-        if (! $referenciacao) {
-            return;
-        }
-
-        DiagnosticosCr::associar($referenciacao, $diagnosticos);
     }
 
     /**

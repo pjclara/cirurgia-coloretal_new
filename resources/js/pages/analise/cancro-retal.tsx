@@ -13,7 +13,7 @@ type Serie = {
     pior: Trimestre | null;
     serie: Trimestre[];
 };
-type Chave = 'conservacao' | 'deiscencia' | 'mortalidade' | 'morbilidade';
+type Chave = 'conservacao' | 'deiscencia' | 'mortalidade' | 'morbilidade' | 'readmissao';
 
 type Metas = Record<Chave, { min?: number; max?: number }>;
 
@@ -70,6 +70,15 @@ const INDICADORES: {
         cor: '#9b59b6',
         descricao: 'Complicações de grau 3 ou superior de Clavien-Dindo (grau definitivo, aos 30 dias), sobre todas as cirurgias retais.',
         evento: 'complicações graves',
+    },
+    {
+        chave: 'readmissao',
+        titulo: 'Taxa de readmissão aos 30 dias',
+        curto: 'Readmissão aos 30 dias',
+        cor: '#0f8b8d',
+        descricao:
+            'Altas de cirurgia retal (sem óbito e com 30 dias já decorridos) seguidas de uma nova entrada do mesmo utente nos 30 dias após a alta, seja qual for a origem.',
+        evento: 'readmissões',
     },
 ];
 
@@ -231,7 +240,7 @@ export default function CancroRetal({ metas, trimestres, de, ate, geradoEm, tota
                 <div className={`space-y-5 transition-opacity ${aCarregar ? 'opacity-50' : ''}`}>
                     <section aria-label="Metas definidas">
                         <h2 className="mb-2 text-xs font-semibold tracking-wide text-[var(--ink2)] uppercase">Metas definidas</h2>
-                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                             {lista.map((d) => (
                                 <Indicador
                                     key={d.chave}

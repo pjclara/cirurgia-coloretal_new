@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Internamento;
 use App\Models\Referenciacao;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -46,5 +47,75 @@ class DiagnosticosCr
         $referenciacao->auditar('updated', ['diagnosticos' => $jaAssociados], ['diagnosticos' => array_merge($jaAssociados, $novos)]);
 
         return $novos;
+    }
+
+    /**
+     * Internamento -> referenciação: os diagnósticos CR dos internamentos do utente passam para a sua referenciação ativa
+     * (a mais recente, sem saída), se ainda lá não estiverem. Devolve os ids acrescentados.
+     *
+     * @return list<int>
+     */
+    public static function levarParaReferenciacao(int $utenteId): array
+    {
+        $referenciacao = Referenciacao::where('utente_id', $utenteId)->whereNull('data_de_saida')
+            ->orderByDesc('data_de_referenciacao')->orderByDesc('id')->first();
+
+        return $referenciacao ? self::associar($referenciacao, self::doUtente($utenteId)->pluck('id')) : [];
+    }
+
+    /**
+     * Referenciação -> internamentos: os diagnósticos CR das referenciações do utente passam para os seus internamentos com
+     * cirurgia que ainda não têm nenhum diagnóstico CR (os sem cirurgia podem ser de outra causa; o que já tem diagnóstico
+     * CR fica). Com `$soInternamento`, só esse internamento. Devolve o número de internamentos alterados.
+     */
+    public static function levarParaInternamentos(int $utenteId, ?int $soInternamento = null): int
+    {
+        $ids = DB::table('diagnostico_referenciacao as dr')
+            ->join('referenciacao_centro_de_referencias as r', 'r.id', '=', 'dr.referenciacao_id')
+            ->join('diagnosticos as d', 'd.id', '=', 'dr.diagnostico_id')
+            ->where('r.utente_id', $utenteId)->whereNull('r.deleted_at')->where('d.centro_de_referencia', 1)
+            ->distinct()->pluck('dr.diagnostico_id')->map(fn ($id) => (int) $id)->all();
+        if ($ids === []) {
+            return 0;
+        }
+
+        $internamentos = DB::table('internamentos as i')->where('i.utente_id', $utenteId)->whereNull('i.deleted_at')
+            ->when($soInternamento, fn ($q, $id) => $q->where('i.id', $id))
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('bloco_operatorios as b')->whereColumn('b.internamento_id', 'i.id')->whereNull('b.deleted_at'))
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('diagnostico_internamento as di')
+                ->join('diagnosticos as d', 'd.id', '=', 'di.diagnostico_id')->whereColumn('di.internamento_id', 'i.id')->where('d.centro_de_referencia', 1))
+            ->pluck('i.id');
+
+        foreach ($internamentos as $id) {
+            DB::table('diagnostico_internamento')->insert(collect($ids)->map(fn ($d) => ['internamento_id' => $id, 'diagnostico_id' => $d])->all());
+            Internamento::find($id)?->auditar('updated', ['diagnosticos' => []], ['diagnosticos' => $ids]);
+        }
+
+        return $internamentos->count();
+    }
+
+    /** Os dois sentidos, para um utente. Idempotente: só acrescenta o que falta. */
+    public static function sincronizar(int $utenteId): void
+    {
+        self::levarParaReferenciacao($utenteId);
+        self::levarParaInternamentos($utenteId);
+    }
+
+    /**
+     * Todos os utentes com referenciação (para o histórico: migrações e comando).
+     *
+     * @return array{utentes: int, referenciacoes: int, internamentos: int}
+     */
+    public static function sincronizarTodos(): array
+    {
+        $resultado = ['utentes' => 0, 'referenciacoes' => 0, 'internamentos' => 0];
+        DB::table('referenciacao_centro_de_referencias')->whereNull('deleted_at')->distinct()->orderBy('utente_id')->pluck('utente_id')
+            ->each(function ($utente) use (&$resultado) {
+                $resultado['utentes']++;
+                $resultado['referenciacoes'] += count(self::levarParaReferenciacao((int) $utente));
+                $resultado['internamentos'] += self::levarParaInternamentos((int) $utente);
+            });
+
+        return $resultado;
     }
 }

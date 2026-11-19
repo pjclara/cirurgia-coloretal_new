@@ -19,6 +19,8 @@ use Inertia\Response;
  *
  * Uma cirurgia retal é uma cirurgia com ressecção anterior do reto, amputação abdomino-perineal ou ressecção
  * reto-sigmoideia. A conservação de esfíncter exclui a ressecção reto-sigmoideia; os restantes indicadores incluem-na.
+ * A readmissão aos 30 dias conta as altas de quem não faleceu e já completou 30 dias após a alta, seguidas de uma nova
+ * entrada do mesmo utente nesses 30 dias, seja qual for a origem.
  */
 class CancroRetalAnaliseController extends Controller
 {
@@ -37,6 +39,7 @@ class CancroRetalAnaliseController extends Controller
         'deiscencia' => ['max' => 15],
         'mortalidade' => ['max' => 3],
         'morbilidade' => ['max' => 20],
+        'readmissao' => ['max' => 10],
     ];
 
     public function __invoke(Request $request): Response
@@ -57,6 +60,7 @@ class CancroRetalAnaliseController extends Controller
                 'deiscencia' => $this->indicador($cirurgias, 'deiscencia', null, 'deiscencia', 'max', $hoje, $trimestres, $de, $ate),
                 'mortalidade' => $this->indicador($cirurgias, 'mortalidade', null, 'obito', 'max', $hoje, $trimestres, $de, $ate),
                 'morbilidade' => $this->indicador($cirurgias, 'morbilidade', null, 'grave', 'max', $hoje, $trimestres, $de, $ate),
+                'readmissao' => $this->indicador($cirurgias, 'readmissao', 'na_readmissao', 'readmitido', 'max', $hoje, $trimestres, $de, $ate),
             ],
         ]);
     }
@@ -121,6 +125,10 @@ class CancroRetalAnaliseController extends Controller
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias') as morb_30,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = '30_dias'
                     and (m.clavien_dindo_id is null or m.clavien_dindo_id = ".Morbilidade::CLAVIEN_A_AGUARDAR.")) as clavien_em_falta,
+                (i.data_de_alta is not null and i.data_de_alta <= date_sub(curdate(), interval 30 day)
+                    and (i.destino_id is null or i.destino_id <> $falecido)) as na_readmissao,
+                exists (select 1 from internamentos r where r.utente_id = i.utente_id and r.id <> i.id and r.deleted_at is null
+                    and r.data_de_entrada >= i.data_de_alta and r.data_de_entrada <= date_add(i.data_de_alta, interval 30 day)) as readmitido,
                 ({$tem("$resseccao, $amputacao")}) as na_conservacao,
                 ({$tem((string) $resseccao)} and not {$tem((string) $amputacao)}) as conservou,
                 (i.destino_id = $falecido) as obito,
@@ -138,6 +146,8 @@ class CancroRetalAnaliseController extends Controller
                 'obito' => (bool) $c->obito,
                 'deiscencia' => (bool) $c->deiscencia,
                 'grave' => (bool) $c->grave,
+                'na_readmissao' => (bool) $c->na_readmissao,
+                'readmitido' => (bool) $c->readmitido,
             ]);
     }
 

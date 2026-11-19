@@ -41,6 +41,7 @@ class ReferenciacaoController extends Controller
             $referenciacao->save();
             $this->gravarDiagnosticos($referenciacao, $dados['diagnosticos'] ?? []);
         });
+        DiagnosticosCr::sincronizar($utente->id);
 
         return redirect()->route('referenciacao.index')->with('sucesso', 'Utente referenciado ao centro de referência.');
     }
@@ -65,8 +66,8 @@ class ReferenciacaoController extends Controller
         // O médico escolhido; sem escolha, quem está a registar.
         $referenciacao->responsavel_id = $dados['responsavel_id'] ?? $request->user()->id;
         $referenciacao->save();
-        // Os diagnósticos CR que o utente já tem nos internamentos ficam logo associados.
-        DiagnosticosCr::associar($referenciacao, DiagnosticosCr::doUtente($utente->id)->pluck('id'));
+        // Os diagnósticos CR que o utente já tem nos internamentos ficam logo associados (e vice-versa).
+        DiagnosticosCr::sincronizar($utente->id);
 
         return back()->with('sucesso', 'Utente sinalizado para o centro de referência.');
     }
@@ -79,6 +80,7 @@ class ReferenciacaoController extends Controller
             $referenciacao->update(collect($dados)->except('diagnosticos')->all());
             $this->gravarDiagnosticos($referenciacao, $dados['diagnosticos'] ?? []);
         });
+        DiagnosticosCr::sincronizar($referenciacao->utente_id);
 
         return redirect()->route('referenciacao.index')->with('sucesso', 'Referenciação atualizada.');
     }

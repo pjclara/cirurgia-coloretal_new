@@ -205,3 +205,101 @@ test('o formulário e a sinalização usam os diagnósticos CR que o utente já 
     // Ao editar, o que já está na referenciação deixa de ser sugerido.
     $this->actingAs($this->gestor)->get("/referenciacao/{$referenciacao->id}")->assertInertia(fn (Assert $p) => $p->where('modal.diagnosticos_do_utente', []));
 });
+
+test('os diagnósticos CR da referenciação passam para os internamentos com cirurgia do utente, sem tocar nos outros', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $editor = utilizadorClinico(array_merge(\Spatie\Permission\Models\Permission::where('name', 'like', '%internamento%')->pluck('name')->all(), ['show referenciacao', 'create referenciacao', 'update referenciacao']));
+    $this->utilizador = $editor;
+    $operado = internamentoOperado($this, novoInternamento($this->utente, $editor, ['data_de_entrada' => now()->subDays(60)->format('Y-m-d')]));
+    $semCirurgia = novoInternamento($this->utente, $editor, ['data_de_entrada' => now()->subDays(30)->format('Y-m-d')]);
+    $operado->diagnosticos()->sync([]);
+    $semCirurgia->diagnosticos()->sync([]);
+
+    $corpo = corpoReferenciacao($this, ['responsavel_id' => $editor->id, 'diagnosticos' => [[
+        'diagnostico_id' => $cr, 'modo_id' => DB::table('diagnostico_referenciacao_modos')->value('id'), 'histologia_id' => null, 'data_diagnostico' => null,
+    ]]]);
+    $this->actingAs($editor)->post("/referenciacao/utentes/{$this->utente->id}", $corpo)->assertSessionHasNoErrors();
+
+    expect($operado->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr])
+        ->and($semCirurgia->diagnosticos()->count())->toBe(0);
+});
+
+test('referenciar sincroniza os diagnósticos CR com os internamentos qualquer que seja a permissão de quem grava', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $operador = utilizadorClinico();
+    $this->utilizador = $operador;
+    $operado = internamentoOperado($this, novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(60)->format('Y-m-d')]));
+    $operado->diagnosticos()->sync([]);
+
+    $corpo = corpoReferenciacao($this, ['diagnosticos' => [[
+        'diagnostico_id' => $cr, 'modo_id' => DB::table('diagnostico_referenciacao_modos')->value('id'), 'histologia_id' => null, 'data_diagnostico' => null,
+    ]]]);
+    $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$this->utente->id}", $corpo)->assertSessionHasNoErrors();
+
+    expect($operado->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr]);
+});
+
+test('uma cirurgia nova recebe sozinha os diagnósticos CR da referenciação do utente', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $operador = utilizadorClinico();
+    $this->utilizador = $operador;
+    $internamento = novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d')]);
+    $internamento->diagnosticos()->sync([]);
+    $ref = new Referenciacao(['data_de_referenciacao' => now()->subDays(40)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $operador->id]);
+    $ref->utente_id = $this->utente->id;
+    $ref->created_by_id = $operador->id;
+    $ref->save();
+    $ref->diagnosticos()->attach([$cr => ['modo_id' => 99, 'histologia_id' => null, 'data_diagnostico' => null]]);
+    expect($internamento->diagnosticos()->count())->toBe(0); // ainda sem cirurgia
+
+    internamentoOperado($this, $internamento);
+
+    expect($internamento->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr]);
+});
+
+test('retirar o diagnóstico CR a um internamento ao gravá-lo não o faz voltar', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $operador = utilizadorClinico();
+    $this->utilizador = $operador;
+    $internamento = internamentoOperado($this, novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d')]));
+    $ref = new Referenciacao(['data_de_referenciacao' => now()->subDays(40)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $operador->id]);
+    $ref->utente_id = $this->utente->id;
+    $ref->created_by_id = $operador->id;
+    $ref->save();
+    $ref->diagnosticos()->attach([$cr => ['modo_id' => 99, 'histologia_id' => null, 'data_diagnostico' => null]]);
+    $outro = DB::table('diagnosticos')->where('centro_de_referencia', 0)->value('id');
+
+    // Gravar o internamento só com um diagnóstico que não é CR: a escolha de quem grava respeita-se.
+    $this->actingAs($operador)->put("/internamentos/{$internamento->id}", payloadInternamento($internamento, ['diagnosticos' => [$outro]]))->assertSessionHasNoErrors();
+
+    expect($internamento->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$outro]);
+});
+
+test('a migration sincroniza os diagnósticos CR entre referenciações e internamentos com cirurgia', function () {
+    $migration = require database_path('migrations/2026_11_18_000006_associar_diagnosticos_cr_da_referenciacao_aos_internamentos.php');
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $outroCr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->where('id', '<>', $cr)->value('id');
+    $operador = utilizadorClinico();
+    $this->utilizador = $operador;
+    $semDiagnostico = internamentoOperado($this, novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(90)->format('Y-m-d')]));
+    $jaTem = internamentoOperado($this, novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(60)->format('Y-m-d')]));
+    $jaTem->diagnosticos()->sync([$outroCr]);
+    $semCirurgia = novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(30)->format('Y-m-d')]);
+    $semDiagnostico->diagnosticos()->sync([]);
+    $semCirurgia->diagnosticos()->sync([]);
+    $ref = new Referenciacao(['data_de_referenciacao' => now()->subDays(100)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $operador->id]);
+    $ref->utente_id = $this->utente->id;
+    $ref->created_by_id = $operador->id;
+    $ref->save();
+    $ref->diagnosticos()->attach([$cr => ['modo_id' => 99, 'histologia_id' => null, 'data_diagnostico' => null]]);
+
+    $migration->up();
+    $migration->up(); // idempotente
+
+    // A união dos diagnósticos CR do utente: a referenciação ganha o do outro internamento e o internamento sem diagnóstico fica com ambos.
+    $todos = collect([$cr, $outroCr])->sort()->values()->all();
+    expect($semDiagnostico->diagnosticos()->pluck('diagnosticos.id')->sort()->values()->all())->toBe($todos)
+        ->and($ref->diagnosticos()->pluck('diagnosticos.id')->sort()->values()->all())->toBe($todos)
+        ->and($jaTem->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$outroCr])
+        ->and($semCirurgia->diagnosticos()->count())->toBe(0);
+});

@@ -123,7 +123,7 @@ test('a migration associa às referenciações ativas os diagnósticos CR já re
         ->and($ativa->diagnosticos()->first()->pivot->modo_id)->toBe(99);
 });
 
-test('sem permissão de atualizar referenciações, gravar o internamento não altera a referenciação', function () {
+test('gravar o internamento leva os diagnósticos CR para a referenciação, qualquer que seja a permissão de quem grava', function () {
     $utente = $this->internamento->utente;
     $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
     $referenciacao = new \App\Models\Referenciacao(['data_de_referenciacao' => now()->subDays(10)->format('Y-m-d'), 'origem_id' => 1, 'responsavel_id' => $this->utilizador->id]);
@@ -133,5 +133,5 @@ test('sem permissão de atualizar referenciações, gravar o internamento não a
 
     $this->actingAs($this->utilizador)->put("/internamentos/{$this->internamento->id}", payloadInternamento($this->internamento, ['diagnosticos' => [$cr]]))->assertSessionHasNoErrors();
 
-    expect($referenciacao->diagnosticos()->count())->toBe(0);
+    expect($referenciacao->diagnosticos()->pluck('diagnosticos.id')->all())->toBe([$cr]);
 });

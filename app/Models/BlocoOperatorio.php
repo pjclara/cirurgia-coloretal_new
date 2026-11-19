@@ -27,6 +27,17 @@ class BlocoOperatorio extends Model
         'comentarios',
     ];
 
+    protected static function booted(): void
+    {
+        // Um internamento que passa a ter cirurgia recebe os diagnósticos CR da referenciação do utente, sem ninguém ter de o fazer.
+        static::created(function (BlocoOperatorio $bloco) {
+            $internamento = Internamento::withTrashed()->find($bloco->internamento_id);
+            if ($internamento) {
+                \App\Support\DiagnosticosCr::levarParaInternamentos($internamento->utente_id, $internamento->id);
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return ['data_de_inicio' => 'date'];
