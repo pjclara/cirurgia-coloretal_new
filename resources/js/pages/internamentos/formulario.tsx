@@ -21,6 +21,7 @@ import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import { PerguntaCentroReferencia } from '../../components/referenciacao/pergunta-centro';
 import ClinicoLayout from '../../layouts/clinico-layout';
+import { executarTutorial, type PassoTutorial } from '../../tutorial/executar';
 import { CorpoFormularioUtente, type PropsUtente } from '../utentes/formulario';
 
 type RegistoMorbilidade = Record<
@@ -310,6 +311,7 @@ export function FormularioInternamento({
 
     const painelDeAlta = (
         <div
+            data-tour="painel-alta"
             role={tentouAlta && pendenciasDeAlta.length > 0 ? 'alert' : 'status'}
             className={`mb-5 rounded-md border px-4 py-3 text-sm ${
                 !data.data_de_alta
@@ -423,12 +425,116 @@ export function FormularioInternamento({
         </Dialog>
     );
 
+    /** Tutorial do formulário. Os passos mudam consoante a situação: registo novo, internamento aberto, com ou sem cirurgias, com ou sem alta. */
+    const iniciarTutorial = () => {
+        const ir = (s: Separador) => () => setSeparador(s);
+        const passos: PassoTutorial[] = [];
+
+        if (!internamento) {
+            passos.push(
+                {
+                    elemento: '[data-tour="utente"]',
+                    titulo: '1. Escolha o utente',
+                    texto: 'Procure pelo nome ou pelo número de processo. Só crie uma ficha nova se o utente não existir. Ao criar, pode colar os dados do processo para preencher a ficha de uma vez.',
+                    preparar: ir('dados'),
+                },
+                {
+                    elemento: '[data-tour="entrada"]',
+                    titulo: '2. Dados da entrada',
+                    texto: 'Data de entrada (hoje por omissão), origem, médico responsável, localização e cama. Só o responsável pelo internamento, ou um administrador, pode alterá-lo depois.',
+                },
+                {
+                    elemento: '[data-tour="diagnosticos"]',
+                    titulo: '3. Diagnósticos e motivo',
+                    texto: 'Escolha pelo menos um diagnóstico. O primeiro preenche o motivo de internamento, que pode ajustar. Sem diagnóstico não é possível dar alta.',
+                },
+                {
+                    elemento: '[data-tour="centro-referencia"]',
+                    titulo: 'Centro de referência',
+                    texto: 'Se o utente deve ser referenciado para um centro de referência, sinalize-o aqui. Pode também fazê-lo mais tarde, em Referenciação.',
+                },
+                {
+                    elemento: '[data-tour="separadores"]',
+                    titulo: '4. Notas',
+                    texto: 'No separador Notas indica se é caso social e deixa comentários livres. É opcional.',
+                    preparar: ir('notas'),
+                },
+                {
+                    elemento: '[data-tour="guardar"]',
+                    titulo: '5. Registar',
+                    texto: 'Carregue em "Registar internamento". Depois de registado, abra o internamento (no Quadro ou na lista) para acrescentar cirurgias, morbilidade e dar alta. Pode repetir este tutorial lá.',
+                },
+            );
+        } else {
+            passos.push(
+                {
+                    elemento: '[data-tour="separadores"]',
+                    titulo: 'As secções do internamento',
+                    texto: 'Dados, Cirurgias, Morbilidade (só aparece quando há cirurgias), Notas e Alta. Um ! vermelho num separador indica um campo com erro.',
+                    preparar: ir('dados'),
+                },
+                {
+                    elemento: '[data-tour="cirurgias"]',
+                    titulo: 'Cirurgias',
+                    texto: temCirurgias
+                        ? 'Aqui estão as cirurgias deste internamento. Clique numa para a abrir ou use "Nova cirurgia" para acrescentar outra.'
+                        : 'Ainda não há cirurgias. Se o doente for operado, use "Nova cirurgia". Se não for, deixe vazio: a alta pede apenas a confirmação de que não houve cirurgia.',
+                    preparar: ir('cirurgias'),
+                },
+            );
+            if (temCirurgias) {
+                passos.push({
+                    elemento: '[data-tour="morbilidade"]',
+                    titulo: 'Morbilidade (doentes operados)',
+                    texto: 'Registe as complicações na alta (obrigatório para dar alta) e aos 30 dias. Se não houve, escolha "Sem complicações". O registo aos 30 dias só abre depois de preenchida a data de alta.',
+                    preparar: ir('morbilidade'),
+                });
+            }
+            passos.push(
+                {
+                    elemento: '[data-tour="painel-alta"]',
+                    titulo: 'Dar alta: o que tem de estar preenchido',
+                    texto: 'Este painel mostra o que falta (destino, diagnóstico, motivo e, se houve cirurgia, a morbilidade da alta). Enquanto faltar algo, não é possível guardar a alta. Deixe a data de alta vazia enquanto o doente estiver internado.',
+                    preparar: ir('alta'),
+                },
+                {
+                    elemento: '#estado',
+                    titulo: 'Estado da alta',
+                    texto: temCirurgias
+                        ? 'Com cirurgia, a alta fica "Pendente" até ser registada a revisão aos 30 dias. Esse registo também pode ser feito em Internamentos > Seguimentos.'
+                        : 'Sem cirurgia, a alta fica "Concluída" assim que preenche a data.',
+                },
+                {
+                    titulo: 'Ao guardar a alta',
+                    texto: temCirurgias
+                        ? 'Abre uma janela para confirmar que todas as cirurgias estão registadas.'
+                        : 'Abre uma janela onde confirma que o doente não foi operado e que não se trata de um caso social.',
+                },
+                {
+                    titulo: 'Alta dada por engano?',
+                    texto: 'Em Alta, o botão "Cancelar alta" volta a pôr o doente como internado e retira o seguimento aos 30 dias. Só fica guardado ao carregar em "Guardar alterações".',
+                },
+                {
+                    elemento: '[data-tour="guardar"]',
+                    titulo: 'Guardar',
+                    texto: 'Nada fica gravado até carregar em "Guardar alterações". Se o registo estiver bloqueado, peça a um administrador que o desbloqueie.',
+                },
+            );
+        }
+        executarTutorial(passos);
+    };
+
     const numeroDeErros = Object.keys(erros).length;
 
     return (
         <Quadro
             modal={!!aoFechar}
             titulo={internamento ? 'Internamento' : 'Registar internamento'}
+            acoes={
+                <Botao variante="secundario" onClick={iniciarTutorial}>
+                    ? Tutorial
+                </Botao>
+            }
             subtitulo={
                 internamento && data.data_de_entrada ? (
                     <span className="tabular-nums">
@@ -446,7 +552,7 @@ export function FormularioInternamento({
                 <p className="mb-4 rounded-md border border-slate-300 bg-slate-100 px-4 py-2.5 text-sm text-slate-800">
                     {bloqueadoAntes
                         ? 'Este registo está bloqueado. Para o alterar, peça a um administrador que o desbloqueie.'
-                        : 'Pode consultar este registo, mas a sua conta não tem permissão para o alterar.'}
+                        : 'Pode consultar este registo, mas só o responsável pelo internamento ou um administrador o pode alterar.'}
                 </p>
             )}
 
@@ -478,9 +584,13 @@ export function FormularioInternamento({
                 </p>
             )}
 
-            {!internamento && <PerguntaCentroReferencia utente={utente} sinalizacao={referenciacao} />}
+            {!internamento && (
+                <div data-tour="centro-referencia">
+                    <PerguntaCentroReferencia utente={utente} sinalizacao={referenciacao} />
+                </div>
+            )}
 
-            <div role="tablist" aria-label="Secções do internamento" className="mb-5 flex flex-wrap gap-1 border-b border-slate-200">
+            <div data-tour="separadores" role="tablist" aria-label="Secções do internamento" className="mb-5 flex flex-wrap gap-1 border-b border-slate-200">
                 {(
                     [
                         ['dados', internamento ? 'Dados do internamento' : 'Dados'],
@@ -516,6 +626,7 @@ export function FormularioInternamento({
                 <div className="mb-5">
                     <Seccao
                         titulo="Cirurgias"
+                        tour="cirurgias"
                         descricao={listaCirurgias.length > 0 ? plural(listaCirurgias.length, 'registo', 'registos') : undefined}
                     >
                         {listaCirurgias.length === 0 && <p className="text-sm text-slate-600">Sem cirurgias registadas neste internamento.</p>}
@@ -561,7 +672,7 @@ export function FormularioInternamento({
                         <div className="grid items-start gap-5 lg:grid-cols-2">
                             <div className="space-y-5">
                                 {!internamento && (
-                                    <Seccao titulo="Utente">
+                                    <Seccao titulo="Utente" tour="utente">
                                         {utente ? (
                                             <div className="flex flex-wrap items-center justify-between gap-3">
                                                 <div>
@@ -607,7 +718,7 @@ export function FormularioInternamento({
                                     </Seccao>
                                 )}
 
-                                <Seccao titulo="Entrada">
+                                <Seccao titulo="Entrada" tour="entrada">
                                     <div className="grid gap-4 sm:grid-cols-6">
                                         <Campo rotulo="Data de entrada" para="data_de_entrada" erro={erros.data_de_entrada} className="sm:col-span-2">
                                             <input
@@ -664,6 +775,7 @@ export function FormularioInternamento({
 
                             <Seccao
                                 titulo="Diagnósticos"
+                                tour="diagnosticos"
                                 descricao="Escolha pelo menos um. O primeiro preenche o motivo de internamento, que pode ajustar."
                             >
                                 <EscolhaMultipla
@@ -696,7 +808,7 @@ export function FormularioInternamento({
                     )}
 
                     {separador === 'notas' && (
-                        <Seccao titulo="Notas">
+                        <Seccao titulo="Notas" tour="notas">
                             <div className="grid gap-4 sm:grid-cols-6">
                                 <Campo rotulo="Caso social" para="caso_social" erro={erros.caso_social_id} className="sm:col-span-3">
                                     <Selecao
@@ -721,7 +833,7 @@ export function FormularioInternamento({
                     )}
 
                     {internamento && separador === 'morbilidade' && listaCirurgias.length > 0 && (
-                        <Seccao titulo="Morbilidade" descricao="Escolha “Sem complicações” ou “Com complicações”.">
+                        <Seccao titulo="Morbilidade" tour="morbilidade" descricao="Escolha “Sem complicações” ou “Com complicações”.">
                             <div role="tablist" aria-label="Momento da morbilidade" className="mb-3 flex gap-1 border-b border-slate-200">
                                 {MOMENTOS.map((m) => {
                                     const bloco = data.morbilidade[m.id];
@@ -791,6 +903,7 @@ export function FormularioInternamento({
                     {internamento && separador === 'alta' && (
                         <Seccao
                             titulo="Alta"
+                            tour="alta"
                             descricao="Deixe a data de alta vazia enquanto o doente estiver internado. As complicações da alta registam-se em Morbilidade."
                         >
                             {painelDeAlta}
@@ -874,7 +987,7 @@ export function FormularioInternamento({
                     )}
                 </fieldset>
 
-                <div className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 py-3">
+                <div data-tour="guardar" className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 py-3">
                     {podeEditar && (
                         <Botao type="submit" disabled={processing}>
                             {internamento ? 'Guardar alterações' : 'Registar internamento'}

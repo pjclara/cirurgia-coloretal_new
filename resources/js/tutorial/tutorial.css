@@ -1,0 +1,27 @@
+/* Dentro de uma janela modal (Radix) o body fica com pointer-events:none; o balão do tutorial tem de continuar clicável. */
+.driver-popover,
+.driver-popover * {
+    pointer-events: auto;
+}
+
+.driver-popover {
+    max-width: 340px;
+    color: #0f172a;
+}
+
+.driver-popover-title {
+    font-size: 1rem;
+}
+
+.driver-popover-description {
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: #334155;
+}
+
+.driver-popover-next-btn {
+    background-color: #a3213e;
+    border-color: #a3213e;
+    color: #fff;
+    text-shadow: none;
+}

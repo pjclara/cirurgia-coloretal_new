@@ -112,9 +112,9 @@ export function BotaoLigacao({
     );
 }
 
-export function Seccao({ titulo, descricao, children }: { titulo: string; descricao?: string; children: ReactNode }) {
+export function Seccao({ titulo, descricao, tour, children }: { titulo: string; descricao?: string; tour?: string; children: ReactNode }) {
     return (
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section data-tour={tour} className="rounded-lg border border-slate-200 bg-white">
             <header className="border-b border-slate-200 px-5 py-3">
                 <h2 className="text-base font-semibold text-slate-900">{titulo}</h2>
                 {descricao && <p className="mt-0.5 text-sm text-slate-600">{descricao}</p>}
