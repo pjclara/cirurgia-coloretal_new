@@ -10,6 +10,7 @@ import { PainelEspera, type Espera } from '../../components/agendamento/painel-e
 import { Botao, BotaoLigacao } from '../../components/clinico/campos';
 import { EtiquetaCr } from '../../components/clinico/etiqueta-cr';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
+import { ModalUtente, type ModalUtenteDados } from '../../components/utentes/modal-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Item = {
@@ -39,6 +40,7 @@ type Props = {
     cancelados: boolean;
     estados: Opcao[];
     modal: Modal | null;
+    modalUtente: ModalUtenteDados | null;
     espera: Espera;
     ambulatoriosPorValidar: AmbulatorioPorValidar[];
 };
@@ -62,6 +64,7 @@ export default function Agenda({
     cancelados,
     estados,
     modal,
+    modalUtente,
     espera,
     ambulatoriosPorValidar,
 }: Props) {
@@ -408,6 +411,7 @@ export default function Agenda({
                 />
             </div>
             <ModalAgendamento modal={modal} />
+            <ModalUtente modal={modalUtente} />
         </ClinicoLayout>
     );
 }

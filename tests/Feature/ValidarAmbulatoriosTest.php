@@ -53,7 +53,7 @@ test('quem não pode alterar agendamentos não valida ambulatórios', function (
 });
 
 test('criar um utente a partir do agendamento segue para a inscrição em lista de espera, não para o internamento', function () {
-    $this->actingAs($this->utilizador)->get('/quadro/novo-utente?origem=agendamento')
+    $this->actingAs($this->utilizador)->get('/agendamento/novo-utente')
         ->assertInertia(fn (Assert $p) => $p->where('modalUtente.origem', 'agendamento')->where('modalUtente.fechar_url', '/agendamento'));
 
     $this->actingAs($this->utilizador)->post('/utentes', [

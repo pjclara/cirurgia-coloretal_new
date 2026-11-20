@@ -12,7 +12,7 @@ export function NovaInscricao() {
             <p className="mb-2 text-sm font-medium text-slate-900">Nova inscrição em lista de espera</p>
             <PesquisaUtente
                 podeCriar={permissoes.includes('create internamento')}
-                criarHref="/quadro/novo-utente?origem=agendamento"
+                criarHref="/agendamento/novo-utente"
                 placeholder="Procurar o utente por nome ou processo"
                 aoEscolher={(u) => router.visit(`/agendamento/utentes/${u.id}/inscrever`)}
             />

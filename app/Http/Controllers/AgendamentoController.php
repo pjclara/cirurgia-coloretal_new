@@ -27,7 +27,16 @@ class AgendamentoController extends Controller
         return $this->montarAgenda($request, null);
     }
 
-    private function montarAgenda(Request $request, ?array $modal, ?string $dataBase = null): Response
+    /** A agenda com o formulário de novo utente numa modal por cima; ao criar, segue para a inscrição em lista de espera. */
+    public function novoUtente(Request $request, UtenteController $formulario): Response
+    {
+        return $this->montarAgenda($request, null, null, $formulario->propsCriacao($request) + [
+            'fechar_url' => '/agendamento',
+            'origem' => 'agendamento',
+        ]);
+    }
+
+    private function montarAgenda(Request $request, ?array $modal, ?string $dataBase = null, ?array $modalUtente = null): Response
     {
         try {
             $data = $dataBase ?? $request->query('semana');
@@ -78,6 +87,7 @@ class AgendamentoController extends Controller
             'ambulatoriosPorValidar' => $request->user()->can('update agendamento')
                 ? $this->ambulatoriosPorValidar()->limit(300)->get()->map(fn (Agendamento $a) => $this->resumo($a))->values()
                 : [],
+            'modalUtente' => $modalUtente,
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
     }

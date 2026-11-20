@@ -115,6 +115,7 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
 });
 
 // Agendamento cirúrgico
+Route::get('agendamento/novo-utente', [AgendamentoController::class, 'novoUtente'])->middleware('can:create internamento')->name('agendamento.novo-utente');
 Route::prefix('agendamento')->name('agendamento.')->group(function () {
     Route::middleware('can:show agendamento')->group(function () {
         Route::get('/', [AgendamentoController::class, 'agenda'])->name('agenda');
