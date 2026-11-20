@@ -9,6 +9,7 @@ import { BotaoLigacao, estiloEntrada } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
+import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import { FormularioReferenciacao, type PropsReferenciacao } from '../../components/referenciacao/formulario-referenciacao';
 import { SinalizarCentro } from '../../components/referenciacao/sinalizar-centro';
 import ClinicoLayout from '../../layouts/clinico-layout';
@@ -33,6 +34,7 @@ type Props = {
     filtros: { situacao: Situacao; q: string; ano: string; trimestre: string };
     anos: string[];
     modal: PropsReferenciacao | null;
+    modalInternamento: ModalInternamentoDados | null;
     origens: { id: number; nome: string }[];
     responsaveis: { id: number; nome: string; equipa: string | null }[];
     /** Utente a sinalizar de imediato (acabado de criar). */
@@ -49,7 +51,7 @@ const SITUACOES: { valor: Situacao; rotulo: string }[] = [
 const COR = { referenciado: 'bg-sky-100 text-sky-900', no_centro: 'bg-amber-100 text-amber-900', saida: 'bg-teal-100 text-teal-900' } as const;
 const ROTULO = { referenciado: 'Referenciado', no_centro: 'No centro', saida: 'Saída registada' } as const;
 
-export default function Referenciacao({ lista, filtros, anos, modal, origens, responsaveis, referenciar }: Props) {
+export default function Referenciacao({ lista, filtros, anos, modal, modalInternamento, origens, responsaveis, referenciar }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(filtros.q);
     const podeReferenciar = permissoes.includes('create referenciacao');
@@ -236,6 +238,7 @@ export default function Referenciacao({ lista, filtros, anos, modal, origens, re
                     {modal && <FormularioReferenciacao key={modal.referenciacao?.id ?? modal.utente.id} {...modal} fechar={fechar} />}
                 </DialogContent>
             </Dialog>
+            <ModalInternamento modal={modalInternamento} />
         </ClinicoLayout>
     );
 }

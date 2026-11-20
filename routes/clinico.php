@@ -142,6 +142,7 @@ Route::prefix('referenciacao')->name('referenciacao.')->group(function () {
     Route::middleware('can:show referenciacao')->group(function () {
         Route::get('/', [ReferenciacaoController::class, 'index'])->name('index');
         Route::get('analise', ReferenciacaoAnaliseController::class)->name('analise');
+        Route::get('internamentos/{internamento}', [ReferenciacaoController::class, 'internamento'])->whereNumber('internamento')->name('internamento');
         Route::get('{referenciacao}', [ReferenciacaoController::class, 'editar'])->whereNumber('referenciacao')->name('edit');
     });
     Route::middleware('can:create referenciacao')->group(function () {

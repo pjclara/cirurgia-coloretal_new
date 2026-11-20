@@ -280,6 +280,12 @@ class InternamentoController extends Controller
         if ($request->input('origem') === 'lista') {
             return redirect()->route('internamentos.index')->with('sucesso', 'Alterações guardadas.');
         }
+        // Gravado a partir de uma referenciação: volta à referenciação que abriu o internamento.
+        if ($request->input('origem') === 'referenciacao') {
+            $retorno = (string) $request->input('retorno');
+
+            return redirect(str_starts_with($retorno, '/referenciacao') ? $retorno : '/referenciacao')->with('sucesso', 'Alterações guardadas.');
+        }
         // Gravado a partir da «Qualidade dos dados»: volta lá, com os mesmos filtros (só endereços desta aplicação).
         if ($request->input('origem') === 'qualidade') {
             $retorno = (string) $request->input('retorno');

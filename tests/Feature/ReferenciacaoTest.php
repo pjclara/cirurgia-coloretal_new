@@ -324,3 +324,46 @@ test('o formulário da referenciação só oferece diagnósticos do centro de re
     $this->actingAs($this->gestor)->post("/referenciacao/utentes/{$this->utente->id}", corpoReferenciacao($this, ['diagnosticos' => [$linha(\App\Models\Diagnostico::OUTRO)]]))
         ->assertSessionHasNoErrors();
 });
+
+test('o formulário da referenciação traz os internamentos do utente, só para quem os pode ver', function () {
+    $cr = DB::table('diagnosticos')->where('centro_de_referencia', 1)->value('id');
+    $operador = utilizadorClinico();
+    $this->utilizador = $operador;
+    $antigo = novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(90)->format('Y-m-d'), 'motivo_internamento' => 'Motivo antigo']);
+    $recente = internamentoOperado($this, novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d')]));
+    $recente->diagnosticos()->sync([$cr]);
+
+    // Com permissão para ver internamentos: do mais recente para o mais antigo, com diagnósticos e cirurgias.
+    $leitor = utilizadorClinico(['show internamento', 'show referenciacao', 'create referenciacao']);
+    $this->actingAs($leitor)->get("/referenciacao/utentes/{$this->utente->id}/nova")->assertInertia(fn (Assert $p) => $p
+        ->where('modal.internamentos.0.id', $recente->id)
+        ->where('modal.internamentos.1.id', $antigo->id)
+        ->where('modal.internamentos.0.diagnosticos.0.cr', true)
+        ->where('modal.internamentos.0.cirurgias', fn ($c) => count($c) === 1));
+
+    // Só com permissão de referenciação, os internamentos não se mostram.
+    $this->actingAs($this->gestor)->get("/referenciacao/utentes/{$this->utente->id}/nova")->assertInertia(fn (Assert $p) => $p->where('modal.internamentos', null));
+});
+
+test('o internamento abre numa modal por cima da referenciação e, ao gravar, volta a ela', function () {
+    $operador = utilizadorClinico(['show internamento', 'update internamento', 'show referenciacao', 'create referenciacao', 'update referenciacao']);
+    $internamento = novoInternamento($this->utente, $operador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d')]);
+    $retorno = "/referenciacao/utentes/{$this->utente->id}/nova";
+
+    $this->actingAs($operador)->get("/referenciacao/internamentos/{$internamento->id}?retorno=".urlencode($retorno))->assertInertia(fn (Assert $p) => $p
+        ->component('referenciacao/index')
+        ->where('modalInternamento.internamento.id', $internamento->id)
+        ->where('modalInternamento.origem', 'referenciacao')
+        ->where('modalInternamento.fechar_url', $retorno)
+        ->where('modal', null));
+
+    // Endereços de fora da referenciação não se aceitam como retorno.
+    $this->actingAs($operador)->get("/referenciacao/internamentos/{$internamento->id}?retorno=".urlencode('https://exemplo.pt'))->assertInertia(fn (Assert $p) => $p->where('modalInternamento.fechar_url', '/referenciacao'));
+
+    // Gravar volta à referenciação que o abriu.
+    $this->actingAs($operador)->put("/internamentos/{$internamento->id}", payloadInternamento($internamento, ['origem' => 'referenciacao', 'retorno' => $retorno]))->assertRedirect($retorno);
+    $this->actingAs($operador)->put("/internamentos/{$internamento->id}", payloadInternamento($internamento, ['origem' => 'referenciacao', 'retorno' => 'https://exemplo.pt']))->assertRedirect('/referenciacao');
+
+    // Sem permissão para ver internamentos, não abre.
+    $this->actingAs($this->gestor)->get("/referenciacao/internamentos/{$internamento->id}")->assertForbidden();
+});

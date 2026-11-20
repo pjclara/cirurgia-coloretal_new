@@ -1,11 +1,22 @@
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { router, useForm } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
+import { formatarData } from '../../clinico/formato';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
 import { Botao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
 
 type Linha = { diagnostico_id: number | ''; modo_id: number | ''; histologia_id: number | ''; data_diagnostico: string };
+
+type InternamentoDoUtente = {
+    id: number;
+    data_de_entrada: string | null;
+    data_de_alta: string | null;
+    motivo: string | null;
+    destino: string | null;
+    diagnosticos: { nome: string; cr: boolean }[];
+    cirurgias: { id: number; data: string; tipo: string | null; intervencoes: string[] }[];
+};
 
 export type PropsReferenciacao = {
     referenciacao: {
@@ -21,6 +32,8 @@ export type PropsReferenciacao = {
         diagnosticos: { diagnostico_id: number; modo_id: number | null; histologia_id: number | null; data_diagnostico: string }[];
     } | null;
     utente: { id: number; nome: string; numero_processo: number };
+    /** Internamentos do utente (null sem permissão para os ver). */
+    internamentos?: InternamentoDoUtente[] | null;
     /** Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem. */
     diagnosticos_do_utente: { id: number; nome: string }[];
     dominios: {
@@ -35,7 +48,7 @@ export type PropsReferenciacao = {
     fechar_url: string;
 };
 
-type Separador = 'dados' | 'diagnosticos';
+type Separador = 'dados' | 'diagnosticos' | 'internamentos';
 
 /** Escolha de diagnóstico agrupada por grupo de diagnóstico. */
 function SelecaoDiagnostico({
@@ -85,11 +98,13 @@ const linhaDoUtente = (diagnostico_id: number): Linha => ({ diagnostico_id, modo
 export function FormularioReferenciacao({
     referenciacao,
     utente,
+    internamentos,
     diagnosticos_do_utente,
     dominios,
     hoje,
     fechar,
 }: PropsReferenciacao & { fechar: () => void }) {
+    const paginaAtual = usePage().url; // a referenciação aberta: é para onde se volta ao fechar o internamento
     const [separador, setSeparador] = useState<Separador>('dados');
     const [confirmarApagar, setConfirmarApagar] = useState(false);
 
@@ -154,6 +169,7 @@ export function FormularioReferenciacao({
                     [
                         ['dados', 'Referenciação'],
                         ['diagnosticos', `Diagnósticos${data.diagnosticos.length > 0 ? ` (${data.diagnosticos.length})` : ''}`],
+                        ...(internamentos ? [['internamentos', `Internamentos (${internamentos.length})`] as [Separador, string]] : []),
                     ] as [Separador, string][]
                 ).map(([id, rotulo]) => (
                     <button
@@ -275,6 +291,60 @@ export function FormularioReferenciacao({
                             </Campo>
                         </Seccao>
                     </>
+                )}
+
+                {separador === 'internamentos' && internamentos && (
+                    <Seccao
+                        titulo="Internamentos do utente"
+                        descricao="Do mais recente para o mais antigo. Os diagnósticos do centro de referência estão destacados."
+                    >
+                        {internamentos.length === 0 ? (
+                            <p className="text-sm text-slate-600">Este utente não tem internamentos registados.</p>
+                        ) : (
+                            <ul className="space-y-3">
+                                {internamentos.map((i) => (
+                                    <li key={i.id} className="rounded-md border border-slate-200 p-3 text-sm">
+                                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                            <p className="font-medium text-slate-900 tabular-nums">
+                                                {formatarData(i.data_de_entrada)} → {i.data_de_alta ? formatarData(i.data_de_alta) : 'internado'}
+                                                {i.destino && <span className="ml-2 font-normal text-slate-600">{i.destino}</span>}
+                                            </p>
+                                            <Link
+                                                href={`/referenciacao/internamentos/${i.id}?retorno=${encodeURIComponent(paginaAtual)}`}
+                                                className="text-xs font-medium text-[#7d1830] hover:underline"
+                                            >
+                                                Abrir internamento
+                                            </Link>
+                                        </div>
+                                        {i.motivo && <p className="mt-1 text-slate-700">{i.motivo}</p>}
+                                        {i.diagnosticos.length > 0 && (
+                                            <ul className="mt-2 flex flex-wrap gap-1.5">
+                                                {i.diagnosticos.map((d) => (
+                                                    <li
+                                                        key={d.nome}
+                                                        className={`rounded px-1.5 py-0.5 text-xs ${d.cr ? 'bg-violet-100 font-semibold text-violet-900' : 'bg-slate-100 text-slate-700'}`}
+                                                    >
+                                                        {d.nome}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        {i.cirurgias.length > 0 && (
+                                            <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+                                                {i.cirurgias.map((c) => (
+                                                    <li key={c.id} className="tabular-nums">
+                                                        Cirurgia {formatarData(c.data)}
+                                                        {c.tipo ? ` · ${c.tipo}` : ''}
+                                                        {c.intervencoes.length > 0 ? ` · ${c.intervencoes.join(', ')}` : ''}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </Seccao>
                 )}
 
                 {separador === 'diagnosticos' && (

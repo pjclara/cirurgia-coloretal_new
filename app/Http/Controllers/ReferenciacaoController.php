@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Diagnostico;
+use App\Models\Internamento;
 use App\Models\Referenciacao;
 use App\Models\Utente;
+use App\Support\Cirurgias;
 use App\Support\DiagnosticosCr;
 use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
@@ -96,7 +98,19 @@ class ReferenciacaoController extends Controller
 
     // ---- Auxiliares ----
 
-    private function montarLista(Request $request, ?array $modal): Response
+    /** O internamento do utente numa modal por cima da lista; ao fechar ou gravar volta à referenciação que a abriu. */
+    public function internamento(Request $request, Internamento $internamento): Response
+    {
+        abort_unless($request->user()->can('show internamento'), 403);
+        $retorno = (string) $request->query('retorno');
+
+        return $this->montarLista($request, null, app(InternamentoController::class)->propsEdicao($request, $internamento) + [
+            'fechar_url' => str_starts_with($retorno, '/referenciacao') ? $retorno : '/referenciacao',
+            'origem' => 'referenciacao',
+        ]);
+    }
+
+    private function montarLista(Request $request, ?array $modal, ?array $modalInternamento = null): Response
     {
         $situacoes = ['referenciado', 'no_centro', 'saida', 'todas'];
         $situacao = in_array($request->query('situacao'), $situacoes, true) ? $request->query('situacao') : 'todas';
@@ -141,6 +155,7 @@ class ReferenciacaoController extends Controller
             'filtros' => ['situacao' => $situacao, 'q' => $q, 'ano' => $ano, 'trimestre' => $trimestre],
             'anos' => $anos,
             'modal' => $modal,
+            'modalInternamento' => $modalInternamento,
             'origens' => $podeReferenciar ? Dominios::lista('origem_da_referenciacaos') : [],
             'responsaveis' => $podeReferenciar ? Dominios::responsaveis() : [],
             'referenciar' => $referenciar,
@@ -162,6 +177,27 @@ class ReferenciacaoController extends Controller
             'situacao' => $r->situacao(),
             'diagnosticos' => $r->diagnosticos->map(fn ($d) => trim($d->abrev ?: $d->nome))->values(),
         ];
+    }
+
+    /**
+     * Os internamentos não apagados do utente, do mais recente para o mais antigo, com os diagnósticos e as cirurgias.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function internamentosDoUtente(Utente $utente): array
+    {
+        $internamentos = $utente->internamentos()->with('diagnosticos:id,nome,centro_de_referencia')->get();
+        $cirurgias = Cirurgias::porInternamento($internamentos->pluck('id'));
+
+        return $internamentos->map(fn (Internamento $i) => [
+            'id' => $i->id,
+            'data_de_entrada' => $i->data_de_entrada?->format('Y-m-d'),
+            'data_de_alta' => $i->data_de_alta?->format('Y-m-d'),
+            'motivo' => $i->motivo_internamento,
+            'destino' => Dominios::nome('destinos', $i->destino_id),
+            'diagnosticos' => $i->diagnosticos->map(fn ($d) => ['nome' => trim($d->nome), 'cr' => (bool) $d->centro_de_referencia])->values(),
+            'cirurgias' => $cirurgias->get($i->id, collect())->values(),
+        ])->values()->all();
     }
 
     private function formulario(Utente $utente, ?Referenciacao $referenciacao): array
@@ -196,6 +232,8 @@ class ReferenciacaoController extends Controller
                 'diagnosticos' => collect(Dominios::diagnosticos())->whereIn('id', $this->diagnosticosPermitidos($referenciacao))->values()->all(),
                 'responsaveis' => Dominios::responsaveis($referenciacao?->responsavel_id),
             ],
+            // Os internamentos do utente, para ter o contexto clínico à vista (só com permissão para os ver).
+            'internamentos' => request()->user()->can('show internamento') ? $this->internamentosDoUtente($utente) : null,
             // Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem.
             'diagnosticos_do_utente' => DiagnosticosCr::doUtente($utente->id)
                 ->reject(fn ($d) => $referenciacao?->diagnosticos->contains('id', $d->id))->values(),
