@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\BlocoOperatorio;
+use App\Models\BlocoOperatorioCr;
 use App\Models\Internamento;
+use App\Models\IntervencaoDescricao;
 use App\Models\Utente;
 use App\Services\SincronizarOperados;
+use App\Support\CirurgiaCr;
 use App\Support\Dominios;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +21,31 @@ use Inertia\Response;
 class CirurgiaController extends Controller
 {
     private const CONVERSAO = 4;
+
+    /** Campo => tabela de referência, nos dados do CR da cirurgia. */
+    private const LISTAS_CR = [
+        'intencao_id' => 'intencaos',
+        'estoma_de_protecao_id' => 'estoma_de_protecaos',
+        'local_extracao_peca_id' => 'local_extracao_pecas',
+        'tipo_de_dreno_id' => 'tipo_de_drenos',
+        'aderencia_id' => 'aderencias',
+        'tipo_de_resseccao_id' => 'tipo_de_resseccaos',
+        'neoplasia_residual_id' => 'neoplasia_residuals',
+        'perdas_hematica_id' => 'perdas_hematicas',
+    ];
+
+    /** Campos com 1 = Não, 2 = Sim, 99 = Não aplicado. */
+    private const SIM_NAO_CR = ['resseccao_multi_orgao', 'transfusao_intra_operatoria', 'protector_de_parede', 'complicacoes'];
+
+    /** Campo => tabela de referência, na descrição da intervenção. */
+    private const LISTAS_DESCRICAO = [
+        'anastemose_modo_id' => 'anastemose_modos',
+        'anastemose_via_id' => 'anastemose_vias',
+        'anastemose_sentido_id' => 'anastemose_sentidos',
+        'tipo_de_reconstrucao_id' => 'tipo_de_reconstrucaos',
+        'localizacao_anastemose_id' => 'localizacao_anastemoses',
+        'confirmacao_anastemose_id' => 'confirmacao_anastemoses',
+    ];
 
     /** Lista de todas as cirurgias de um utente. */
     public function porUtente(Request $request, Utente $utente): Response
@@ -71,12 +99,14 @@ class CirurgiaController extends Controller
         $dados = $this->validar($request);
         $intervencoes = $dados['intervencoes'];
         unset($dados['intervencoes']);
+        [$cr, $descricoes] = $this->validarCr($request, $internamento, $dados['data_de_inicio'], $intervencoes);
 
-        DB::transaction(function () use ($internamento, $dados, $intervencoes) {
+        DB::transaction(function () use ($internamento, $dados, $intervencoes, $cr, $descricoes) {
             $bloco = new BlocoOperatorio($dados);
             $bloco->internamento_id = $internamento->id;
             $bloco->save();
-            $bloco->intervencoes()->sync($intervencoes);
+            $this->sincronizarIntervencoes($bloco, $intervencoes);
+            $this->gravarCr($bloco, $cr, $descricoes);
         });
 
         return $this->destino($request, $internamento->utente_id, 'Cirurgia registada.'.$this->agendamentosAtualizados($internamento->utente_id));
@@ -89,10 +119,12 @@ class CirurgiaController extends Controller
         $dados = $this->validar($request);
         $intervencoes = $dados['intervencoes'];
         unset($dados['intervencoes']);
+        [$cr, $descricoes] = $this->validarCr($request, $bloco->internamento, $dados['data_de_inicio'], $intervencoes);
 
-        DB::transaction(function () use ($bloco, $dados, $intervencoes) {
+        DB::transaction(function () use ($bloco, $dados, $intervencoes, $cr, $descricoes) {
             $bloco->update($dados);
-            $bloco->intervencoes()->sync($intervencoes);
+            $this->sincronizarIntervencoes($bloco, $intervencoes);
+            $this->gravarCr($bloco, $cr, $descricoes);
         });
 
         return $this->destino($request, $bloco->internamento->utente_id, 'Cirurgia atualizada.'.$this->agendamentosAtualizados($bloco->internamento->utente_id));
@@ -107,6 +139,113 @@ class CirurgiaController extends Controller
         $bloco->delete();
 
         return $this->destino($request, $utenteId, 'Cirurgia apagada.');
+    }
+
+    /**
+     * Acrescenta e retira intervenções sem recriar as que se mantêm: as descrições (anastomose, etc.) apontam para a
+     * linha da tabela de ligação, que por isso tem de manter o id. Retirar uma intervenção apaga a sua descrição.
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function sincronizarIntervencoes(BlocoOperatorio $bloco, array $ids): void
+    {
+        $atuais = DB::table('bloco_operatorio_intervencao')->where('bloco_operatorio_id', $bloco->id)->get(['id', 'intervencao_id']);
+        $retirar = $atuais->filter(fn ($l) => ! in_array((int) $l->intervencao_id, $ids, true))->pluck('id')->all();
+
+        if ($retirar !== []) {
+            IntervencaoDescricao::withTrashed()->whereIn('intervencao_id', $retirar)->forceDelete();
+            DB::table('bloco_operatorio_intervencao')->whereIn('id', $retirar)->delete();
+        }
+        $bloco->intervencoes()->attach(array_values(array_diff($ids, $atuais->pluck('intervencao_id')->map(fn ($i) => (int) $i)->all())));
+    }
+
+    /**
+     * Os dados do CR só existem em doentes referenciados ao centro de referência com cirurgia de ressecção, e só se
+     * guardam quando o formulário os envia (podem preencher-se mais tarde). Devolve [dados da cirurgia|null, descrições por intervenção].
+     *
+     * @param  array<int, int>  $intervencoes
+     * @return array{0: ?array<string, mixed>, 1: array<int, array<string, mixed>>}
+     */
+    private function validarCr(Request $request, Internamento $internamento, string $data, array $intervencoes): array
+    {
+        if (! CirurgiaCr::aplica($internamento, $data, $intervencoes)) {
+            return [null, []];
+        }
+
+        $cr = null;
+        if (is_array($request->input('cr'))) {
+            $regras = [
+                'asa' => ['nullable', 'integer', 'between:1,5'],
+                'duracao' => ['required', 'integer', 'between:1,1440'],
+                'paleativa_causa' => ['nullable', 'string', 'max:2000'],
+                'resseccao_multi_orgao_quais' => ['nullable', 'string', 'max:2000'],
+                'unidades_globulos' => ['nullable', 'integer', 'between:0,50'],
+                'complicacoes_quais' => ['nullable', 'string', 'max:2000'],
+            ];
+            foreach (self::LISTAS_CR as $campo => $tabela) {
+                $regras[$campo] = ['required', 'integer', Rule::exists($tabela, 'id')];
+            }
+            foreach (self::SIM_NAO_CR as $campo) {
+                $regras[$campo] = ['required', Rule::in(['1', '2', '99'])];
+            }
+            $cr = $request->validate(
+                collect($regras)->mapWithKeys(fn ($r, $k) => ["cr.$k" => $r])->all(),
+                ['required' => 'Preencha este campo.', 'in' => 'Escolha uma opção.']
+            )['cr'];
+
+            $cr['paleativa_causa'] = (int) $cr['intencao_id'] === 2 ? ($cr['paleativa_causa'] ?? null) : null;
+            $cr['resseccao_multi_orgao_quais'] = $cr['resseccao_multi_orgao'] === '2' ? ($cr['resseccao_multi_orgao_quais'] ?? null) : null;
+            $cr['unidades_globulos'] = $cr['transfusao_intra_operatoria'] === '2' ? ($cr['unidades_globulos'] ?? null) : null;
+            $cr['complicacoes_quais'] = $cr['complicacoes'] === '2' ? ($cr['complicacoes_quais'] ?? null) : null;
+        }
+
+        $descricoes = [];
+        $enviadas = $request->input('descricoes');
+        if (is_array($enviadas)) {
+            $permitidas = array_values(array_intersect(array_map('intval', $intervencoes), CirurgiaCr::RESSECCOES));
+            $regras = [
+                'numero_cargas' => ['nullable', 'integer', 'between:0,20'],
+                'distancia_linha_pectinea_anastemose' => ['nullable', 'integer', 'between:0,300'],
+                'distancia_linha_pectinea_tumor' => ['nullable', 'integer', 'between:0,300'],
+                'qualidade_peca_operatoria_id' => ['nullable', 'integer', Rule::exists('qualidade_peca_operatorias', 'id')],
+                'comentarios' => ['nullable', 'string', 'max:2000'],
+            ];
+            foreach (self::LISTAS_DESCRICAO as $campo => $tabela) {
+                $regras[$campo] = ['required', 'integer', Rule::exists($tabela, 'id')];
+            }
+            foreach (['reforco_anastemose', 'libertacao_angulo'] as $campo) {
+                $regras[$campo] = ['required', Rule::in(['1', '2', '99'])];
+            }
+            foreach (array_keys($enviadas) as $intervencaoId) {
+                if (! in_array((int) $intervencaoId, $permitidas, true)) {
+                    continue;
+                }
+                $descricoes[(int) $intervencaoId] = $request->validate(
+                    collect($regras)->mapWithKeys(fn ($r, $k) => ["descricoes.$intervencaoId.$k" => $r])->all(),
+                    ['required' => 'Preencha este campo.', 'in' => 'Escolha uma opção.']
+                )['descricoes'][$intervencaoId];
+            }
+        }
+
+        return [$cr, $descricoes];
+    }
+
+    /**
+     * @param  ?array<string, mixed>  $cr
+     * @param  array<int, array<string, mixed>>  $descricoes  por id da intervenção do catálogo
+     */
+    private function gravarCr(BlocoOperatorio $bloco, ?array $cr, array $descricoes): void
+    {
+        if ($cr !== null) {
+            BlocoOperatorioCr::updateOrCreate(['bloco_operatorio_id' => $bloco->id], $cr);
+        }
+        foreach ($descricoes as $intervencaoId => $dados) {
+            $linha = DB::table('bloco_operatorio_intervencao')
+                ->where('bloco_operatorio_id', $bloco->id)->where('intervencao_id', $intervencaoId)->orderBy('id')->value('id');
+            if ($linha) {
+                IntervencaoDescricao::updateOrCreate(['intervencao_id' => $linha], $dados);
+            }
+        }
     }
 
     /** Com a cirurgia registada, o agendamento (e a lista de espera) do utente passam a operados; devolve o aviso para a mensagem. */
@@ -157,10 +296,39 @@ class CirurgiaController extends Controller
                     ->map(fn ($i) => ['id' => (int) $i->id, 'nome' => trim($i->nome), 'grupo' => $i->grupo ?? 'Outro'])
                     ->all(),
             ],
+            'cr' => $this->propsCr($internamento, $bloco),
             'conversao' => self::CONVERSAO,
             'hoje' => now()->format('Y-m-d'),
             'podeEditar' => $utilizador->can($bloco ? 'update internamento' : 'create internamento') && ! $bloqueado,
             'podeApagar' => $bloco && $utilizador->can('delete internamento') && ! $bloqueado,
+        ];
+    }
+
+    /** Dados do CR da cirurgia: quando se aplicam, o que já está gravado e as listas de escolha. */
+    private function propsCr(Internamento $internamento, ?BlocoOperatorio $bloco): array
+    {
+        $cr = $bloco ? BlocoOperatorioCr::where('bloco_operatorio_id', $bloco->id)->first() : null;
+        $descricoes = $bloco
+            ? IntervencaoDescricao::query()
+                ->join('bloco_operatorio_intervencao as p', 'p.id', '=', 'intervencao_descricaos.intervencao_id')
+                ->where('p.bloco_operatorio_id', $bloco->id)
+                ->get(['intervencao_descricaos.*', 'p.intervencao_id as catalogo_id'])
+                ->mapWithKeys(fn ($d) => [(int) $d->catalogo_id => $d->only(array_merge(
+                    array_keys(self::LISTAS_DESCRICAO),
+                    ['reforco_anastemose', 'libertacao_angulo', 'numero_cargas', 'distancia_linha_pectinea_anastemose', 'distancia_linha_pectinea_tumor', 'qualidade_peca_operatoria_id', 'comentarios'],
+                ))])
+                ->all()
+            : [];
+
+        $listas = fn (array $mapa) => collect($mapa)->mapWithKeys(fn ($tabela, $campo) => [$campo => Dominios::tabelaLista($tabela)])->all();
+
+        return [
+            'referenciado_desde' => CirurgiaCr::referenciadoDesde($internamento->utente_id),
+            'resseccoes' => CirurgiaCr::RESSECCOES,
+            'dados' => $cr?->only(array_merge(array_keys(self::LISTAS_CR), self::SIM_NAO_CR, ['asa', 'duracao', 'paleativa_causa', 'resseccao_multi_orgao_quais', 'unidades_globulos', 'complicacoes_quais'])),
+            'descricoes' => (object) $descricoes,
+            'listas' => $listas(self::LISTAS_CR),
+            'listas_descricao' => $listas(self::LISTAS_DESCRICAO) + ['qualidade_peca_operatoria_id' => Dominios::tabelaLista('qualidade_peca_operatorias')],
         ];
     }
 

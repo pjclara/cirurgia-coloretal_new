@@ -13,7 +13,7 @@ export function ModalCirurgia({ modal }: { modal: ModalCirurgiaDados | null }) {
     return (
         <Dialog open={modal !== null} onOpenChange={(aberto) => !aberto && fechar()}>
             <DialogContent
-                className="max-h-[92vh] max-w-6xl overflow-y-auto bg-white text-slate-900"
+                className="max-h-[92vh] w-[90vw] max-w-[90vw] overflow-y-auto bg-white text-slate-900"
                 onInteractOutside={(e) => e.preventDefault()}
                 aria-describedby={undefined}
             >

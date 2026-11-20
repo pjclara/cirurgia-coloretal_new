@@ -9,7 +9,7 @@ type Props = {
     acoes?: ReactNode;
     /** Linha de contexto por baixo do título. */
     subtitulo?: ReactNode;
-    largura?: 'normal' | 'larga';
+    largura?: 'normal' | 'larga' | 'noventa';
     /** Pesquisa ou filtro mostrado no topo (ex.: o quadro filtra os internados). */
     pesquisa?: ReactNode;
     children: ReactNode;
@@ -18,7 +18,7 @@ type Props = {
 export default function ClinicoLayout({ titulo, acoes, subtitulo, largura = 'normal', pesquisa, children }: Props) {
     const pagina = usePage<PropsPartilhadas>();
     const { flash } = pagina.props.clinico;
-    const contentor = largura === 'larga' ? 'max-w-[96rem]' : 'max-w-6xl';
+    const contentor = largura === 'larga' ? 'max-w-[96rem]' : largura === 'noventa' ? 'max-w-[90%]' : 'max-w-6xl';
 
     return (
         <AppLayout breadcrumbs={[{ title: titulo, href: pagina.url.split('?')[0] }]}>
