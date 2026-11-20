@@ -90,6 +90,22 @@ class InternamentoController extends Controller
 
     public function seguimentos(Request $request): Response
     {
+        return $this->montarSeguimentos($request, null);
+    }
+
+    /** O internamento numa modal por cima dos seguimentos; ao fechar ou gravar volta à lista, com os mesmos filtros. */
+    public function abrirNosSeguimentos(Request $request, Internamento $internamento): Response
+    {
+        $consulta = $request->getQueryString();
+
+        return $this->montarSeguimentos($request, $this->propsEdicao($request, $internamento) + [
+            'fechar_url' => '/internamentos/seguimentos'.($consulta ? '?'.$consulta : ''),
+            'origem' => 'seguimentos',
+        ]);
+    }
+
+    private function montarSeguimentos(Request $request, ?array $modal): Response
+    {
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
         $responsavelId = ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null;
         // A identificação dos doentes do CR só é visível a quem pode ver referenciações.
@@ -150,6 +166,7 @@ class InternamentoController extends Controller
             });
 
         return Inertia::render('internamentos/seguimentos', [
+            'modal' => $modal,
             'podeRegistar' => $request->user()->can('update internamento'),
             'dominios' => [
                 'complicacoes' => Dominios::complicacoes(),
@@ -295,6 +312,13 @@ class InternamentoController extends Controller
             $retorno = (string) $request->input('retorno');
 
             return redirect(str_starts_with($retorno, '/referenciacao') ? $retorno : '/referenciacao')->with('sucesso', 'Alterações guardadas.');
+        }
+        // Gravado a partir dos seguimentos: volta à lista, com os mesmos filtros.
+        if ($request->input('origem') === 'seguimentos') {
+            $retorno = (string) $request->input('retorno');
+
+            return redirect(str_starts_with($retorno, '/internamentos/seguimentos') ? $retorno : '/internamentos/seguimentos')
+                ->with('sucesso', 'Alterações guardadas.');
         }
         // Gravado a partir da «Qualidade dos dados»: volta lá, com os mesmos filtros (só endereços desta aplicação).
         if ($request->input('origem') === 'qualidade') {

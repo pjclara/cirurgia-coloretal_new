@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { BotaoPartilhar } from '../../components/analise/botao-partilhar';
 import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
 import { Cartao, ESTILO_VIZ, Indicador, formatar } from '../../components/analise/graficos';
+import { nomePeriodo } from '../../components/analise/util';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Trimestre = { trimestre: string; n: number; eventos: number; taxa: number | null; cumpre: boolean | null; incompleto: boolean };
@@ -227,7 +229,12 @@ export default function CancroRetal({ metas, trimestres, de, ate, geradoEm, tota
     });
     const [aCarregar, setACarregar] = useState(false);
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Cancro retal · doentes do CR · gerada a ${geradoEm}`} largura="larga">
+        <ClinicoLayout
+            titulo="Centro de referência"
+            subtitulo={`Cancro retal · doentes do CR · gerada a ${geradoEm}`}
+            largura="larga"
+            acoes={<BotaoPartilhar ficheiro="centro-de-referencia" periodo={nomePeriodo(de, ate)} />}
+        >
             <style>{ESTILO_VIZ}</style>
             <div className="viz-root space-y-5">
                 <FiltroTrimestres url="/analise/cancro-retal" trimestres={trimestres} de={de} ate={ate} aoMudar={setACarregar} />

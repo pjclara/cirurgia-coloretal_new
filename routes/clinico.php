@@ -41,6 +41,7 @@ Route::middleware('can:show internamento')->group(function () {
 
     Route::get('internamentos', [InternamentoController::class, 'index'])->name('internamentos.index');
     Route::get('internamentos/seguimentos', [InternamentoController::class, 'seguimentos'])->name('internamentos.seguimentos');
+    Route::get('internamentos/seguimentos/{internamento}', [InternamentoController::class, 'abrirNosSeguimentos'])->whereNumber('internamento')->name('internamentos.seguimentos.abrir');
 });
 
 // Análise do cancro retal: doentes referenciados ao centro de referência, com nome e processo.

@@ -10,6 +10,8 @@ import {
     BarChart3,
     BedDouble,
     CalendarDays,
+    ChartLine,
+    ClipboardCheck,
     ClipboardList,
     DatabaseZap,
     KeyRound,
@@ -38,6 +40,7 @@ export function AppSidebar() {
                       items: [
                           { title: 'Quadro', url: '/quadro', icon: LayoutGrid },
                           { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
+                          { title: 'Seguimentos aos 30 dias', url: '/internamentos/seguimentos', icon: ClipboardCheck },
                       ],
                   },
               ]
@@ -70,10 +73,11 @@ export function AppSidebar() {
                   {
                       title: 'Análise',
                       items: [
-                          { title: 'Painel de análise', url: '/dashboard', icon: BarChart3, alias: ['/referenciacao/analise'] },
+                          { title: 'Análise global', url: '/dashboard', icon: BarChart3 },
                           ...(pode('show referenciacao')
                               ? [
-                                    { title: 'Cancro retal', url: '/analise/cancro-retal', icon: Activity },
+                                    { title: 'Análise colorretal', url: '/referenciacao/analise', icon: ChartLine },
+                                    { title: 'Centro de referência', url: '/analise/cancro-retal', icon: Activity },
                                     { title: 'Qualidade dos dados', url: '/analise/cancro-retal/qualidade', icon: DatabaseZap },
                                 ]
                               : []),

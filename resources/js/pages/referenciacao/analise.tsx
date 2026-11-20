@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { BotaoPartilhar } from '../../components/analise/botao-partilhar';
 import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, formatar, type Ponto } from '../../components/analise/graficos';
-import { SeparadoresAnalise } from '../../components/analise/separadores';
 import { nomeMes, nomePeriodo, tabela } from '../../components/analise/util';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -91,9 +91,13 @@ export default function AnaliseCR({
     ];
 
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Centro de referência: doentes referenciados · gerada a ${geradoEm}`} largura="larga">
+        <ClinicoLayout
+            titulo="Análise colorretal"
+            subtitulo={`Doentes referenciados · gerada a ${geradoEm}`}
+            largura="larga"
+            acoes={<BotaoPartilhar ficheiro="analise-colorretal" periodo={periodo} />}
+        >
             <style>{ESTILO_VIZ}</style>
-            <SeparadoresAnalise atual="cr" />
             <div className="viz-root space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
                     <FiltroTrimestres url="/referenciacao/analise" trimestres={trimestres} de={de} ate={ate} aoMudar={setACarregar} />

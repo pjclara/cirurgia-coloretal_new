@@ -22,15 +22,39 @@ export function FiltroTrimestres({ url, trimestres, de, ate, aoMudar, extra }: P
                 onFinish: () => aoMudar?.(false),
             },
         );
+    const anos = [...new Set(trimestres.map((t) => t.slice(0, 4)))];
+    const anoSelecionado =
+        anos.find((a) => {
+            const doAno = trimestres.filter((t) => t.startsWith(a));
+            return de === doAno[0] && ate === doAno[doAno.length - 1];
+        }) ?? '';
+    const escolherAno = (ano: string) => {
+        const doAno = ano === '' ? trimestres : trimestres.filter((t) => t.startsWith(ano));
+        mudar({ de: doAno[0], ate: doAno[doAno.length - 1] });
+    };
     const selecao = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-transparent';
-    const opcoes = trimestres.map((t) => (
-        <option key={t} value={t}>
-            {t}
-        </option>
-    ));
+    // Com um ano escolhido, só se mostram os trimestres desse ano.
+    const opcoes = trimestres
+        .filter((t) => anoSelecionado === '' || t.startsWith(anoSelecionado))
+        .map((t) => (
+            <option key={t} value={t}>
+                {t}
+            </option>
+        ));
 
     return (
-        <div className="flex flex-wrap items-center gap-3 text-sm" role="group" aria-label="Período por trimestre">
+        <div data-sem-exportar className="flex flex-wrap items-center gap-3 text-sm" role="group" aria-label="Período por trimestre">
+            <label className="flex items-center gap-2">
+                Ano
+                <select className={selecao} value={anoSelecionado} onChange={(e) => escolherAno(e.target.value)}>
+                    <option value="">Todos</option>
+                    {anos.map((a) => (
+                        <option key={a} value={a}>
+                            {a}
+                        </option>
+                    ))}
+                </select>
+            </label>
             <label className="flex items-center gap-2">
                 De
                 <select className={selecao} value={de ?? ''} onChange={(e) => mudar({ de: e.target.value })}>

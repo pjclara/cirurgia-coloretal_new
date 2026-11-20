@@ -1,8 +1,8 @@
 import { Link } from '@inertiajs/react';
 import { useState } from 'react';
+import { BotaoPartilhar } from '../components/analise/botao-partilhar';
 import { FiltroTrimestres } from '../components/analise/filtro-trimestres';
 import { BarrasH, Cartao, Colunas, ESTILO_VIZ, Indicador, Linha, formatar, type Ponto } from '../components/analise/graficos';
-import { SeparadoresAnalise } from '../components/analise/separadores';
 import { nomeMes, nomePeriodo, tabela } from '../components/analise/util';
 import ClinicoLayout from '../layouts/clinico-layout';
 
@@ -36,9 +36,13 @@ export default function Analise({ trimestres, de, ate, geradoEm, indicadores, me
     const anos: Ponto[] = anual.map((a) => ({ rotulo: String(a.ano), valor: a.internamentos }));
 
     return (
-        <ClinicoLayout titulo="Análise" subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`} largura="larga">
+        <ClinicoLayout
+            titulo="Análise global"
+            subtitulo={`Avaliação da base de dados · gerada a ${geradoEm}`}
+            largura="larga"
+            acoes={<BotaoPartilhar ficheiro="analise-global" periodo={periodo} />}
+        >
             <style>{ESTILO_VIZ}</style>
-            <SeparadoresAnalise atual="geral" />
             <div className="viz-root space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
                     <FiltroTrimestres url="/dashboard" trimestres={trimestres} de={de} ate={ate} aoMudar={setACarregar} />

@@ -17,6 +17,8 @@ export const rotas = {
     internamentos: {
         lista: '/internamentos',
         seguimentos: '/internamentos/seguimentos',
+        /** Abre o internamento numa modal por cima dos seguimentos (`consulta` mantém os filtros ao voltar). */
+        nosSeguimentos: (id: number, consulta = '') => `/internamentos/seguimentos/${id}${consulta}`,
         novo: (utenteId?: number) => (utenteId ? `/quadro/novo?utente=${utenteId}` : '/quadro/novo'),
         registo: (id: number) => `/internamentos/${id}`,
         /** Abre o internamento numa modal por cima da lista. */

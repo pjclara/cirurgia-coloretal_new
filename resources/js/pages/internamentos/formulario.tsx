@@ -117,7 +117,11 @@ export type PropsFormulario = {
     referenciacao?: { origens: { id: number; nome: string }[]; responsaveis: Responsavel[] } | null;
 };
 
-type Props = PropsFormulario & { aoFechar?: () => void; origem?: 'quadro' | 'lista' | 'qualidade' | 'referenciacao'; retorno?: string };
+type Props = PropsFormulario & {
+    aoFechar?: () => void;
+    origem?: 'quadro' | 'lista' | 'qualidade' | 'referenciacao' | 'seguimentos';
+    retorno?: string;
+};
 
 /** Página completa ou, com `modal`, apenas o cabeçalho e o conteúdo para uma janela modal. */
 function Quadro({
@@ -294,7 +298,7 @@ export function FormularioInternamento({
             ...atual,
             ...(aguardaRevisao ? { estado_da_alta_id: ALTA_PENDENTE } : {}),
             ...(origem ? { origem } : {}),
-            ...((origem === 'qualidade' || origem === 'referenciacao') && retorno ? { retorno } : {}),
+            ...((origem === 'qualidade' || origem === 'referenciacao' || origem === 'seguimentos') && retorno ? { retorno } : {}),
         }));
         const opcoes = {
             preserveScroll: true,

@@ -44,15 +44,15 @@ test('não inclui falecidos nem quem já tem o seguimento registado', function (
 });
 
 test('por defeito mostra todas as altas e filtra por trimestres', function () {
-    $i = internamentoComAlta($this, 200);
-    $trimestre = \App\Support\Intervalo::rotuloTrimestre($i->data_de_alta);
-    $outro = \App\Support\Intervalo::rotuloTrimestre($i->data_de_alta->copy()->subMonths(6));
+    $recente = internamentoComAlta($this, 200);
+    $antigo = internamentoComAlta($this, 500);
+    $rotulo = fn ($i) => urlencode(\App\Support\Intervalo::rotuloTrimestre($i->data_de_alta));
+    $contagem = fn (string $url, int $esperado) => $this->actingAs($this->utilizador)->get($url)
+        ->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', $esperado));
 
-    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 1));
-    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?de='.urlencode($trimestre).'&ate='.urlencode($trimestre))
-        ->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 1));
-    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?de='.urlencode($outro).'&ate='.urlencode($outro))
-        ->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 0));
+    $contagem('/internamentos/seguimentos', 2);
+    $contagem('/internamentos/seguimentos?de='.$rotulo($recente).'&ate='.$rotulo($recente), 1);
+    $contagem('/internamentos/seguimentos?de='.$rotulo($antigo).'&ate='.$rotulo($antigo), 1);
 });
 
 test('a lista não mostra o grau da alta: o grau definitivo só existe depois dos 30 dias', function () {
@@ -102,4 +102,15 @@ test('sem permissão de ver referenciações os doentes do CR não são identifi
 
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?cr=1')->assertInertia(fn (Assert $p) => $p
         ->where('podeVerCr', false)->where('contagens.cr', null)->where('filtros.cr', false)->where('seguimentos.data.0.cr', false));
+});
+
+test('o nome do utente abre o internamento numa modal por cima dos seguimentos', function () {
+    $i = internamentoComAlta($this, 40);
+
+    $this->actingAs($this->utilizador)->get("/internamentos/seguimentos/{$i->id}?estado=em_atraso")->assertInertia(fn (Assert $p) => $p
+        ->component('internamentos/seguimentos')
+        ->where('modal.origem', 'seguimentos')
+        ->where('modal.fechar_url', '/internamentos/seguimentos?estado=em_atraso')
+        ->where('modal.internamento.id', $i->id));
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('modal', null));
 });

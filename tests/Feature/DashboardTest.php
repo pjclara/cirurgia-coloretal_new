@@ -28,14 +28,15 @@ test('a análise calcula os indicadores a partir dos registos', function () {
         ->where('mensal', fn ($m) => count($m) >= 1 && count($m) <= 3 * 4 + 2));
 });
 
-test('a análise abre por omissão no último trimestre completo e ignora trimestres inválidos', function () {
+test('a análise abre por omissão no ano em curso e ignora trimestres inválidos', function () {
     $utilizador = utilizadorClinico();
     novoInternamento(novoUtente(), $utilizador, ['data_de_entrada' => now()->subMonths(5)->format('Y-m-d')]);
-    $anterior = now()->subMonths(3);
-    $esperado = $anterior->format('Y').' T'.$anterior->quarter;
+    $primeira = now()->subMonths(5);
+    $esperadoDe = max(now()->format('Y').' T1', $primeira->format('Y').' T'.$primeira->quarter); // a lista começa no trimestre do primeiro registo
+    $esperadoAte = now()->format('Y').' T'.now()->quarter;
 
     $this->actingAs($utilizador)->get('/dashboard?de=lixo&ate=2999%20T9')
-        ->assertInertia(fn (Assert $p) => $p->where('de', $esperado)->where('ate', $esperado)->has('trimestres'));
+        ->assertInertia(fn (Assert $p) => $p->where('de', $esperadoDe)->where('ate', $esperadoAte)->has('trimestres'));
 });
 
 test('a análise do cancro retal calcula os indicadores por trimestre', function () {
@@ -72,7 +73,7 @@ test('o filtro por trimestre do cancro retal ignora valores inválidos e funcion
         ->assertOk()->assertInertia(fn (Assert $p) => $p->where('trimestres', [])->where('total', 0));
 });
 
-test('o cancro retal abre por omissão no último trimestre completo', function () {
+test('o cancro retal abre por omissão no ano em curso', function () {
     $utilizador = utilizadorClinico(permissoesComReferenciacao());
     $data = now()->subMonths(5)->format('Y-m-d');
     $utente = novoUtente();
@@ -80,10 +81,11 @@ test('o cancro retal abre por omissão no último trimestre completo', function 
     $i = novoInternamento($utente, $utilizador, ['data_de_entrada' => $data]);
     $b = \App\Models\BlocoOperatorio::create(['internamento_id' => $i->id, 'data_de_inicio' => $data, 'tipo_de_cirurgia_id' => 1, 'tipo_de_abordagem_id' => 1, 're_intervencao_nao_programada_id' => 1]);
     DB::table('bloco_operatorio_intervencao')->insert(['bloco_operatorio_id' => $b->id, 'intervencao_id' => 1]);
-    $anterior = now()->subMonths(3);
-    $esperado = $anterior->format('Y').' T'.$anterior->quarter;
+    $primeira = now()->subMonths(5);
+    $esperadoDe = max(now()->format('Y').' T1', $primeira->format('Y').' T'.$primeira->quarter); // a lista começa no trimestre do primeiro registo
+    $esperadoAte = now()->format('Y').' T'.now()->quarter;
 
-    $this->actingAs($utilizador)->get('/analise/cancro-retal')->assertInertia(fn (Assert $p) => $p->where('de', $esperado)->where('ate', $esperado));
+    $this->actingAs($utilizador)->get('/analise/cancro-retal')->assertInertia(fn (Assert $p) => $p->where('de', $esperadoDe)->where('ate', $esperadoAte));
 });
 
 test('a qualidade dos dados lista as cirurgias de doentes do CR com dados em falta', function () {

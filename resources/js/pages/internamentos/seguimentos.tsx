@@ -1,4 +1,4 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
@@ -9,6 +9,7 @@ import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { Botao, BotaoLigacao, SelecaoResponsavel } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { Paginacao } from '../../components/clinico/paginacao';
+import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import { ModalSeguimento } from '../../components/internamentos/modal-seguimento';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
@@ -35,10 +36,12 @@ type Props = {
     contagens: { em_atraso: number; a_decorrer: number; cr: number | null };
     podeVerCr: boolean;
     podeRegistar: boolean;
+    modal: ModalInternamentoDados | null;
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
 
-export default function Seguimentos({ seguimentos, trimestres, filtros, responsaveis, contagens, podeVerCr, podeRegistar, dominios }: Props) {
+export default function Seguimentos({ seguimentos, trimestres, filtros, responsaveis, contagens, podeVerCr, podeRegistar, dominios, modal }: Props) {
+    const consultaAtual = usePage().url.includes('?') ? usePage().url.slice(usePage().url.indexOf('?')) : '';
     const [termo, setTermo] = useState(filtros.q);
     const [abertoId, setAbertoId] = useState<number | null>(null);
     const indice = seguimentos.data.findIndex((l) => l.id === abertoId);
@@ -56,12 +59,6 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
         router.get(rotas.internamentos.seguimentos, consulta, { preserveState: true, preserveScroll: true });
     };
 
-    const anos = [...new Set(trimestres.map((t) => t.slice(0, 4)))];
-    const anoSelecionado =
-        anos.find((a) => {
-            const doAno = trimestres.filter((t) => t.startsWith(a));
-            return anos.length > 1 && filtros.de === doAno[0] && filtros.ate === doAno[doAno.length - 1];
-        }) ?? '';
     const extra: Record<string, string> = {};
     if (filtros.estado !== 'todos') extra.estado = filtros.estado;
     if (filtros.responsavel_id) extra.responsavel_id = String(filtros.responsavel_id);
@@ -131,26 +128,6 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
 
             {trimestres.length > 0 && (
                 <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-                    <label className="flex items-center gap-2 text-sm">
-                        Ano
-                        <select
-                            value={anoSelecionado}
-                            onChange={(e) => {
-                                const ano = e.target.value;
-                                if (ano === '') return aplicar({ de: trimestres[0], ate: trimestres[trimestres.length - 1] });
-                                const doAno = trimestres.filter((t) => t.startsWith(ano));
-                                aplicar({ de: doAno[0], ate: doAno[doAno.length - 1] });
-                            }}
-                            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
-                        >
-                            <option value="">Todos</option>
-                            {anos.map((a) => (
-                                <option key={a} value={a}>
-                                    {a}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
                     <FiltroTrimestres url={rotas.internamentos.seguimentos} trimestres={trimestres} de={filtros.de} ate={filtros.ate} extra={extra} />
                 </div>
             )}
@@ -189,7 +166,7 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
                             <tr key={l.id}>
                                 <td className="px-4 py-2.5">
                                     {l.utente.id ? (
-                                        <Link href={rotas.utentes.ficha(l.utente.id)} className="font-medium hover:underline">
+                                        <Link href={rotas.internamentos.nosSeguimentos(l.id, consultaAtual)} className="font-medium hover:underline">
                                             {l.utente.nome}
                                         </Link>
                                     ) : (
@@ -252,6 +229,8 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
                 </table>
                 <Paginacao pagina={seguimentos} nome="seguimentos" />
             </div>
+
+            <ModalInternamento modal={modal} />
 
             {aberto && (
                 <ModalSeguimento

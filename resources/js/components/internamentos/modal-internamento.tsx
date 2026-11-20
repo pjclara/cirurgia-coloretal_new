@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { router } from '@inertiajs/react';
 import { FormularioInternamento, type PropsFormulario } from '../../pages/internamentos/formulario';
 
-export type ModalInternamentoDados = PropsFormulario & { fechar_url: string; origem?: 'quadro' | 'lista' | 'qualidade' | 'referenciacao' };
+export type ModalInternamentoDados = PropsFormulario & { fechar_url: string; origem?: 'quadro' | 'lista' | 'qualidade' | 'referenciacao' | 'seguimentos' };
 
 /** Formulário do internamento (registo ou edição) numa modal por cima da página que a abriu. */
 export function ModalInternamento({ modal }: { modal: ModalInternamentoDados | null }) {

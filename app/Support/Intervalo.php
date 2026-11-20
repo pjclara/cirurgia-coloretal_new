@@ -16,7 +16,7 @@ class Intervalo
 
     /**
      * Intervalo por trimestres, lido de `de` e `ate` ("2023 T1"). Os trimestres disponíveis vão do da `$primeiraData`
-     * ao em curso. Por omissão, o último trimestre completo (o em curso só se for o único); valores inválidos ignoram-se
+     * ao em curso. Por omissão, o ano em curso (do seu primeiro trimestre ao trimestre em curso); valores inválidos ignoram-se
      * e, se invertidos, trocam. `desde`/`fim` são os limites do intervalo e `anteriorDesde` o início do período anterior,
      * com o mesmo número de trimestres.
      *
@@ -35,9 +35,12 @@ class Intervalo
             return ['trimestres' => [], 'de' => null, 'ate' => null, 'desde' => null, 'fim' => null, 'anteriorDesde' => null];
         }
 
-        $ultimo = count($trimestres) > 1 ? $trimestres[count($trimestres) - 2] : $trimestres[0];
-        $de = in_array($request->query('de'), $trimestres, true) ? $request->query('de') : $ultimo;
-        $ate = in_array($request->query('ate'), $trimestres, true) ? $request->query('ate') : $ultimo;
+        // Por omissão, o ano em curso: do seu primeiro trimestre ao trimestre em curso.
+        $doAno = array_values(array_filter($trimestres, fn ($t) => str_starts_with($t, $hoje->format('Y'))));
+        $deOmissao = $doAno[0] ?? $trimestres[count($trimestres) - 1];
+        $ateOmissao = $trimestres[count($trimestres) - 1];
+        $de = in_array($request->query('de'), $trimestres, true) ? $request->query('de') : $deOmissao;
+        $ate = in_array($request->query('ate'), $trimestres, true) ? $request->query('ate') : $ateOmissao;
         if ($de > $ate) {
             [$de, $ate] = [$ate, $de];
         }
