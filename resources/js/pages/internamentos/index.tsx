@@ -30,6 +30,7 @@ type Filtros = {
     ano: number | null;
     localizacao_id: number | null;
     responsavel_id: number | null;
+    cr: boolean;
 };
 
 type Props = {
@@ -51,10 +52,11 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
         if (novos.ano) consulta.ano = novos.ano;
         if (novos.localizacao_id) consulta.localizacao_id = novos.localizacao_id;
         if (novos.responsavel_id) consulta.responsavel_id = novos.responsavel_id;
+        if (novos.cr) consulta.cr = '1';
         router.get(rotas.internamentos.lista, consulta, { preserveState: true, preserveScroll: true });
     };
 
-    const comFiltros = !!filtros.q || !!filtros.ano || !!filtros.localizacao_id || !!filtros.responsavel_id;
+    const comFiltros = !!filtros.q || !!filtros.ano || !!filtros.localizacao_id || !!filtros.responsavel_id || filtros.cr;
 
     return (
         <ClinicoLayout
@@ -106,6 +108,19 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                         vazio="Responsável"
                     />
                 </div>
+
+                <button
+                    type="button"
+                    aria-pressed={filtros.cr}
+                    onClick={() => aplicar({ cr: !filtros.cr })}
+                    className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                        filtros.cr
+                            ? 'border-violet-700 bg-violet-100 text-violet-900 ring-1 ring-violet-700'
+                            : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
+                    }`}
+                >
+                    Só centro de referência
+                </button>
 
                 {comFiltros && (
                     <Link href={rotas.internamentos.lista} className="py-2 text-sm font-medium text-teal-800 hover:underline">

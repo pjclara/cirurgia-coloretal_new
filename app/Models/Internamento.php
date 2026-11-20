@@ -62,6 +62,16 @@ class Internamento extends Model
         return $this->belongsTo(User::class, 'responsavel_id');
     }
 
+    /** Só o responsável pelo internamento e os administradores o podem alterar; um registo bloqueado só os administradores. */
+    public function bloqueadoPara(User $utilizador): bool
+    {
+        if ($utilizador->eAdministrador()) {
+            return false;
+        }
+
+        return $this->bloquear_tabela || $this->responsavel_id !== $utilizador->id;
+    }
+
     public function diagnosticos(): BelongsToMany
     {
         return $this->belongsToMany(Diagnostico::class, 'diagnostico_internamento', 'internamento_id', 'diagnostico_id');

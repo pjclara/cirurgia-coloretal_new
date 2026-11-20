@@ -119,7 +119,7 @@ class CirurgiaController extends Controller
 
     private function garantirEdicao(Request $request, Internamento $internamento): void
     {
-        abort_if($internamento->bloquear_tabela && ! $request->user()->eAdministrador(), 403, 'Internamento bloqueado.');
+        abort_if($internamento->bloqueadoPara($request->user()), 403, 'Só o responsável pelo internamento ou um administrador pode alterar este registo.');
     }
 
     /** Dados do formulário; usados na página própria e na modal do quadro. */
@@ -127,7 +127,7 @@ class CirurgiaController extends Controller
     {
         $internamento->load('utente');
         $utilizador = $request->user();
-        $bloqueado = $internamento->bloquear_tabela && ! $utilizador->eAdministrador();
+        $bloqueado = $internamento->bloqueadoPara($utilizador);
 
         return [
             'cirurgia' => $bloco ? [

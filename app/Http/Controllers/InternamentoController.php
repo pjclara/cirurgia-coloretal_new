@@ -35,9 +35,11 @@ class InternamentoController extends Controller
             'localizacao_id' => ctype_digit((string) $request->query('localizacao_id')) ? (int) $request->query('localizacao_id') : null,
             'responsavel_id' => ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null,
         ];
+        $filtros['cr'] = $request->boolean('cr'); // só os doentes sinalizados para o centro de referência
 
         $internamentos = Internamento::query()
             ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
+            ->when($filtros['cr'], fn ($q) => $q->whereHas('utente.referenciacoesAtivas'))
             ->comAlta() // esta lista é só para gerir altas; os internados estão no quadro
             ->when($filtros['ano'], fn ($q, $ano) => $q->whereYear('data_de_entrada', $ano))
             ->when($filtros['localizacao_id'], fn ($q, $id) => $q->where('localizacao_id', $id))
@@ -95,7 +97,7 @@ class InternamentoController extends Controller
         $verCr = $request->user()->can('show referenciacao');
         $soCr = $verCr && $request->boolean('cr');
         $q = trim((string) $request->query('q', ''));
-        $administrador = $request->user()->eAdministrador();
+        $utilizador = $request->user();
         $hoje = now()->startOfDay();
         $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
 
@@ -123,7 +125,7 @@ class InternamentoController extends Controller
             ->orderBy('id')
             ->paginate(25)
             ->withQueryString()
-            ->through(function (Internamento $i) use ($hoje, $administrador) {
+            ->through(function (Internamento $i) use ($hoje, $utilizador) {
                 $prevista = $i->data_de_alta->copy()->addDays(30);
 
                 return [
@@ -136,7 +138,7 @@ class InternamentoController extends Controller
                     'dias_de_atraso' => (int) $prevista->startOfDay()->diffInDays($hoje, false),
                     'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
                     'cr' => (bool) $i->doente_cr,
-                    'bloqueado' => $i->bloquear_tabela && ! $administrador,
+                    'bloqueado' => $i->bloqueadoPara($utilizador),
                 ];
             });
 
@@ -219,7 +221,7 @@ class InternamentoController extends Controller
         $internamento->load(['utente', 'diagnosticos:id', 'morbilidades.complicacoes:id']);
         $utilizador = $request->user();
 
-        $bloqueadoParaMim = $internamento->bloquear_tabela && ! $utilizador->eAdministrador();
+        $bloqueadoParaMim = $internamento->bloqueadoPara($utilizador);
 
         return [
             'internamento' => [
@@ -368,9 +370,9 @@ class InternamentoController extends Controller
     private function impedirSeBloqueado(Request $request, Internamento $internamento): void
     {
         abort_if(
-            $internamento->bloquear_tabela && ! $request->user()->eAdministrador(),
+            $internamento->bloqueadoPara($request->user()),
             403,
-            'Este registo está bloqueado. Peça a um administrador para o desbloquear.'
+            'Só o responsável pelo internamento ou um administrador pode alterar este registo (e, se estiver bloqueado, só um administrador).'
         );
     }
 

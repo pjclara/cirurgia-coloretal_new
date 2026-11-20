@@ -132,6 +132,7 @@ Route::prefix('agendamento')->name('agendamento.')->group(function () {
     Route::middleware('can:update agendamento')->group(function () {
         Route::put('lista-de-espera/{espera}', [AgendamentoController::class, 'atualizarInscricao'])->whereNumber('espera')->name('espera.update');
         Route::post('lista-de-espera/{espera}/cancelar', [AgendamentoController::class, 'cancelarInscricao'])->whereNumber('espera')->name('espera.cancel');
+        Route::post('ambulatorio/operados', [AgendamentoController::class, 'validarAmbulatorios'])->name('ambulatorio.operados');
         Route::patch('{agendamento}/mover', [AgendamentoController::class, 'moverAgendamento'])->whereNumber('agendamento')->name('move');
         Route::put('{agendamento}', [AgendamentoController::class, 'atualizarAgendamento'])->whereNumber('agendamento')->name('update');
     });

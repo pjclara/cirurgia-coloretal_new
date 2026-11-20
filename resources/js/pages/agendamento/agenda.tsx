@@ -4,6 +4,7 @@ import { CATEGORIAS, COR_ESTADO, NOMES_DIA, nomeEstado, type Categoria } from '.
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
+import { ModalValidarAmbulatorios, type AmbulatorioPorValidar } from '../../components/agendamento/modal-validar-ambulatorios';
 import { NovaInscricao } from '../../components/agendamento/nova-inscricao';
 import { PainelEspera, type Espera } from '../../components/agendamento/painel-espera';
 import { Botao, BotaoLigacao } from '../../components/clinico/campos';
@@ -39,6 +40,7 @@ type Props = {
     estados: Opcao[];
     modal: Modal | null;
     espera: Espera;
+    ambulatoriosPorValidar: AmbulatorioPorValidar[];
 };
 
 /** Quantos itens cabem numa célula do mês antes do "+ N mais". */
@@ -47,12 +49,26 @@ const MAX_NO_DIA = 3;
 /** Operado: riscado (já está feito); cancelado: esbatido, para não se confundirem. */
 const estiloDoEstado = (estado: number | null) => (estado === 5 ? 'line-through decoration-2 opacity-70' : estado === 4 ? 'opacity-50 italic' : '');
 
-export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, hoje, cancelados, estados, modal, espera }: Props) {
+export default function Agenda({
+    dias,
+    vista,
+    mes,
+    semana,
+    anterior,
+    seguinte,
+    hoje,
+    cancelados,
+    estados,
+    modal,
+    espera,
+    ambulatoriosPorValidar,
+}: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const ir = (parametros: Record<string, string | boolean>) => router.get('/agendamento', parametros, { preserveScroll: true });
     // O que se está a arrastar: um agendamento (mover) ou um doente da lista de espera (agendar).
     const [arrastado, setArrastado] = useState<{ tipo: 'agendamento' | 'espera'; id: number } | null>(null);
     const [sobre, setSobre] = useState<string | null>(null);
+    const [validarAmbulatorios, setValidarAmbulatorios] = useState(false);
     const podeMover = permissoes.includes('update agendamento');
     const podeCriar = permissoes.includes('create agendamento');
     /** Pode-se largar neste dia? Mover agendamentos vale para qualquer dia; agendar a partir da lista só de hoje em diante. */
@@ -112,6 +128,11 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
             largura="larga"
             acoes={
                 <>
+                    {ambulatoriosPorValidar.length > 0 && (
+                        <Botao variante="secundario" onClick={() => setValidarAmbulatorios(true)}>
+                            Validar ambulatórios ({ambulatoriosPorValidar.length})
+                        </Botao>
+                    )}
                     <BotaoLigacao
                         href={`/agendamento/mapa?vista=semana&data=${eMes ? (mes.slice(0, 7) === hoje.slice(0, 7) ? hoje : mes) : semana}`}
                         variante="secundario"
@@ -125,6 +146,8 @@ export default function Agenda({ dias, vista, mes, semana, anterior, seguinte, h
                 </>
             }
         >
+            {validarAmbulatorios && <ModalValidarAmbulatorios lista={ambulatoriosPorValidar} aoFechar={() => setValidarAmbulatorios(false)} />}
+
             <NovaInscricao />
 
             <div className="mb-4 flex flex-wrap items-center gap-2">

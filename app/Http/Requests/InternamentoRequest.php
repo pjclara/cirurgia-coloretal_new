@@ -14,7 +14,10 @@ class InternamentoRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // a permissão é verificada na rota
+        // A permissão é verificada na rota; ao editar, só o responsável ou um administrador podem gravar.
+        $internamento = $this->route('internamento');
+
+        return ! ($internamento instanceof \App\Models\Internamento) || ! $internamento->bloqueadoPara($this->user());
     }
 
     protected function prepareForValidation(): void

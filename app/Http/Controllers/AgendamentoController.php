@@ -20,6 +20,8 @@ use Inertia\Response;
 /** Agendamento cirúrgico: agenda semanal, lista de espera e respetivos registos. */
 class AgendamentoController extends Controller
 {
+    private const LOCAL_AMBULATORIO = 2;
+
     public function agenda(Request $request): Response
     {
         return $this->montarAgenda($request, null);
@@ -73,6 +75,9 @@ class AgendamentoController extends Controller
             'hoje' => now()->format('Y-m-d'),
             'cancelados' => $mostrarCancelados,
             'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
+            'ambulatoriosPorValidar' => $request->user()->can('update agendamento')
+                ? $this->ambulatoriosPorValidar()->limit(300)->get()->map(fn (Agendamento $a) => $this->resumo($a))->values()
+                : [],
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
     }
@@ -319,6 +324,31 @@ class AgendamentoController extends Controller
         $agendamento->delete();
 
         return redirect()->route('agendamento.agenda')->with('sucesso', 'Agendamento apagado.');
+    }
+
+    /** Ambulatórios (sem internamento) já passados que continuam por marcar como operados. */
+    private function ambulatoriosPorValidar()
+    {
+        return Agendamento::query()
+            ->with(['espera.utente:id,nome,numero_processo', 'espera.utente.referenciacoesAtivas', 'espera.intervencoes:id,nome,abrev', 'responsavel:id,name,abrev'])
+            ->where('local_de_agendamento_id', self::LOCAL_AMBULATORIO)
+            ->whereDate('start', '<', now()->format('Y-m-d'))
+            ->whereIn(DB::raw('COALESCE(estado_de_agendamento_id, CAST(estado_de_agendamento AS UNSIGNED))'), [
+                ListaDeEspera::ESTADO_PROPOSTO, ListaDeEspera::ESTADO_PENDENTE, ListaDeEspera::ESTADO_AGENDADO,
+            ])
+            ->orderByDesc('start')->orderByDesc('id');
+    }
+
+    /** Valida de uma vez os ambulatórios escolhidos: passam a operados (sem cirurgia registada, porque não há internamento). */
+    public function validarAmbulatorios(Request $request, SincronizarOperados $operados): RedirectResponse
+    {
+        $dados = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:300'], 'ids.*' => ['integer']]);
+
+        // Só os que ainda estão por validar: ignora ids de outros locais, futuros ou já fechados.
+        $agendamentos = $this->ambulatoriosPorValidar()->whereIn('id', $dados['ids'])->get();
+        $operados->marcarOperados($agendamentos);
+
+        return back()->with('sucesso', $agendamentos->count() === 1 ? '1 ambulatório marcado como operado.' : $agendamentos->count().' ambulatórios marcados como operados.');
     }
 
     /** Move um agendamento para outra data (arrastar no calendário). */
