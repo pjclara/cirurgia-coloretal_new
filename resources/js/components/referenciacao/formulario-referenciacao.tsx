@@ -2,6 +2,7 @@ import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/di
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
 import { formatarData } from '../../clinico/formato';
+import { useResponsavelPorOmissao } from '../../clinico/responsavel';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
 import { Botao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
@@ -108,6 +109,7 @@ export function FormularioReferenciacao({
     const [separador, setSeparador] = useState<Separador>('dados');
     const [confirmarApagar, setConfirmarApagar] = useState(false);
 
+    const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         data_de_referenciacao: referenciacao?.data_de_referenciacao ?? hoje,
         data_de_diagnostico: referenciacao?.data_de_diagnostico ?? '',
@@ -115,7 +117,7 @@ export function FormularioReferenciacao({
         data_de_entrada: referenciacao?.data_de_entrada ?? '',
         data_de_saida: referenciacao?.data_de_saida ?? '',
         destino_id: (referenciacao?.destino_id ?? '') as number | '',
-        responsavel_id: (referenciacao?.responsavel_id ?? '') as number | '',
+        responsavel_id: (referenciacao?.responsavel_id ?? euResponsavel) as number | '',
         comentarios: referenciacao?.comentarios ?? '',
         diagnosticos: (referenciacao
             ? referenciacao.diagnosticos.map((d) => ({

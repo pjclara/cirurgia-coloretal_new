@@ -3,6 +3,7 @@ import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { COR_ESTADO, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
+import { useResponsavelPorOmissao } from '../../clinico/responsavel';
 import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { EscolhaMultipla } from '../clinico/escolha-multipla';
@@ -33,10 +34,11 @@ export type PropsInscricao = {
 type Props = PropsInscricao & { fechar: () => void };
 
 export function FormularioInscricao({ espera, utente, sinalizacao, diagnosticos_cr_do_utente, dominios, hoje, estados, fechar }: Props) {
+    const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         prioridade_id: (espera?.prioridade_id ?? 1) as number | '',
         data_de_lista: espera?.data_de_lista ?? hoje,
-        responsavel_id: (espera?.responsavel_id ?? '') as number | '',
+        responsavel_id: (espera?.responsavel_id ?? euResponsavel) as number | '',
         comentarios: espera?.comentarios ?? '',
         intervencoes: espera?.intervencoes ?? ([] as number[]),
         diagnosticos: espera?.diagnosticos ?? [...(diagnosticos_cr_do_utente ?? [])],

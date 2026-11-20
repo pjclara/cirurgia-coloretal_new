@@ -1,6 +1,7 @@
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
+import { useResponsavelPorOmissao } from '../../clinico/responsavel';
 import type { Opcao, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
@@ -35,6 +36,7 @@ export type PropsAgendar = {
 type Props = PropsAgendar & { fechar: () => void };
 
 export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, hoje, dataSugerida, fechar }: Props) {
+    const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         data: agendamento?.data ?? dataSugerida ?? '',
         hora: agendamento?.hora ?? '',
@@ -42,7 +44,7 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, 
         local_id: (agendamento?.local_id ?? 1) as number | '',
         sala_id: (agendamento?.sala_id ?? '') as number | '',
         tipo_id: (agendamento?.tipo_id ?? 1) as number | '',
-        responsavel_id: (agendamento?.responsavel_id ?? espera.responsavel_id ?? '') as number | '',
+        responsavel_id: (agendamento?.responsavel_id ?? espera.responsavel_id ?? euResponsavel) as number | '',
         estado: (agendamento?.estado ?? 3) as number | '',
         reserva_sangue: agendamento?.reserva_sangue ?? false,
         comentarios: agendamento?.comentarios ?? '',

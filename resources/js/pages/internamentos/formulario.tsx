@@ -3,6 +3,7 @@ import { Link, router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { corDaCirurgia } from '../../clinico/cor-cirurgia';
 import { diasEntre, formatarData, idade, plural } from '../../clinico/formato';
+import { useResponsavelPorOmissao } from '../../clinico/responsavel';
 import { rotas } from '../../clinico/rotas';
 import {
     ALTA_CONCLUIDA,
@@ -171,13 +172,14 @@ export function FormularioInternamento({
     const [utente, setUtente] = useState<ResumoUtente | null>(utenteInicial);
     const [confirmarApagar, setConfirmarApagar] = useState(false);
 
+    const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm<Dados>({
         utente_id: internamento?.utente_id ?? utenteInicial?.id ?? '',
         cama: internamento?.cama ?? '',
         localizacao_id: internamento?.localizacao_id ?? '',
         data_de_entrada: internamento?.data_de_entrada ?? limites.hoje,
         origem_do_internamento_id: internamento?.origem_do_internamento_id ?? '',
-        responsavel_id: internamento?.responsavel_id ?? '',
+        responsavel_id: internamento?.responsavel_id ?? euResponsavel,
         motivo_internamento: internamento?.motivo_internamento ?? '',
         caso_social_id: internamento?.caso_social_id ?? 1,
         comentarios: internamento?.comentarios ?? '',
@@ -590,7 +592,12 @@ export function FormularioInternamento({
                 </div>
             )}
 
-            <div data-tour="separadores" role="tablist" aria-label="Secções do internamento" className="mb-5 flex flex-wrap gap-1 border-b border-slate-200">
+            <div
+                data-tour="separadores"
+                role="tablist"
+                aria-label="Secções do internamento"
+                className="mb-5 flex flex-wrap gap-1 border-b border-slate-200"
+            >
                 {(
                     [
                         ['dados', internamento ? 'Dados do internamento' : 'Dados'],
@@ -987,7 +994,10 @@ export function FormularioInternamento({
                     )}
                 </fieldset>
 
-                <div data-tour="guardar" className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 py-3">
+                <div
+                    data-tour="guardar"
+                    className="sticky bottom-0 mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 py-3"
+                >
                     {podeEditar && (
                         <Botao type="submit" disabled={processing}>
                             {internamento ? 'Guardar alterações' : 'Registar internamento'}
