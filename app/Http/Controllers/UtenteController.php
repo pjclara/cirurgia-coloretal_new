@@ -102,6 +102,11 @@ class UtenteController extends Controller
             return redirect('/referenciacao?referenciar='.$utente->id)->with('sucesso', 'Utente criado. Indique agora a origem e a data da referenciação.');
         }
 
+        // Criado a partir do Agendamento: segue para a inscrição deste utente em lista de espera.
+        if ($request->input('origem') === 'agendamento') {
+            return redirect()->route('agendamento.espera.create', $utente)->with('sucesso', 'Utente criado. Preencha agora a inscrição em lista de espera.');
+        }
+
         // Criado a partir da modal do quadro: segue para o registo do internamento deste utente.
         if ($request->input('origem') === 'quadro') {
             return redirect('/quadro/novo?utente='.$utente->id)->with('sucesso', 'Utente criado. Registe agora o internamento.');

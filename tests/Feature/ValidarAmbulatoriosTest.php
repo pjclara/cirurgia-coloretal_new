@@ -51,3 +51,13 @@ test('quem não pode alterar agendamentos não valida ambulatórios', function (
     $this->actingAs($leitor)->post('/agendamento/ambulatorio/operados', ['ids' => [$a->id]])->assertForbidden();
     $this->actingAs($leitor)->get('/agendamento')->assertInertia(fn (Assert $p) => $p->where('ambulatoriosPorValidar', []));
 });
+
+test('criar um utente a partir do agendamento segue para a inscrição em lista de espera, não para o internamento', function () {
+    $this->actingAs($this->utilizador)->get('/quadro/novo-utente?origem=agendamento')
+        ->assertInertia(fn (Assert $p) => $p->where('modalUtente.origem', 'agendamento')->where('modalUtente.fechar_url', '/agendamento'));
+
+    $this->actingAs($this->utilizador)->post('/utentes', [
+        'nome' => 'Utente Novo Agenda', 'numero_processo' => 8123456, 'data_nascimento' => '1960-05-05',
+        'sexo_id' => 1, 'concelho_id' => DB::table('concelhos')->value('id'), 'origem' => 'agendamento',
+    ])->assertRedirect(route('agendamento.espera.create', App\Models\Utente::where('numero_processo', 8123456)->first()));
+});

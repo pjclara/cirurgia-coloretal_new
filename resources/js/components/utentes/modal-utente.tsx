@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { router } from '@inertiajs/react';
 import { CorpoFormularioUtente, type PropsUtente } from '../../pages/utentes/formulario';
 
-export type ModalUtenteDados = PropsUtente & { fechar_url: string; origem?: 'quadro' | 'referenciacao' };
+export type ModalUtenteDados = PropsUtente & { fechar_url: string; origem?: 'quadro' | 'referenciacao' | 'agendamento' };
 
 /** Criação de utente numa modal por cima da página que a abriu. */
 export function ModalUtente({ modal }: { modal: ModalUtenteDados | null }) {

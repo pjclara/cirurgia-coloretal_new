@@ -42,12 +42,12 @@ class QuadroController extends Controller
     /** O quadro com o formulário de novo utente numa modal por cima. */
     public function novoUtente(Request $request, UtenteController $formulario): Response
     {
-        // Vindo da Referenciação, o utente criado segue para a referenciação rápida em vez do internamento.
-        $daReferenciacao = $request->query('origem') === 'referenciacao';
+        // Vindo da Referenciação ou do Agendamento, o utente criado segue para o passo respetivo em vez do internamento.
+        $origem = in_array($request->query('origem'), ['referenciacao', 'agendamento'], true) ? $request->query('origem') : 'quadro';
 
         return $this->montar($request, null, $formulario->propsCriacao($request) + [
-            'fechar_url' => $daReferenciacao ? '/referenciacao' : '/quadro',
-            'origem' => $daReferenciacao ? 'referenciacao' : 'quadro',
+            'fechar_url' => ['referenciacao' => '/referenciacao', 'agendamento' => '/agendamento'][$origem] ?? '/quadro',
+            'origem' => $origem,
         ]);
     }
 
