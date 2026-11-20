@@ -31,3 +31,7 @@ yarn-error.log
 
 # Dados de doentes: nunca no git
 /excels/
+
+# Dados de doentes: nunca no repositório
+/bloco_*.xlsx
+/*.xlsx
