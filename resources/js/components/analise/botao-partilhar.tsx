@@ -33,6 +33,12 @@ export function BotaoPartilhar({ ficheiro, periodo }: Props) {
         const copia = origem.cloneNode(true) as HTMLElement;
         copia.querySelectorAll('[data-sem-exportar], script, [role="status"], [role="alert"]').forEach((e) => e.remove());
         // Ligações e botões da aplicação não fazem sentido fora dela.
+        // Os valores que a página só mostra ao passar o rato, ou na vista de tabela, ficam visíveis: gráfico e tabela.
+        copia.querySelectorAll('[data-grafico], [data-tabela]').forEach((e) => {
+            e.classList.remove('hidden', 'max-h-64', 'overflow-auto');
+            if (e.hasAttribute('data-tabela')) e.classList.add('mt-3');
+        });
+        copia.querySelectorAll('[role="status"]').forEach((e) => e.remove());
         copia.querySelectorAll('a').forEach((a) => a.replaceWith(...Array.from(a.childNodes)));
         copia.querySelectorAll('button').forEach((b) => b.removeAttribute('onclick'));
         copia.querySelectorAll('[class*="transition-opacity"]').forEach((e) => e.classList.remove('opacity-50'));

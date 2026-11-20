@@ -46,40 +46,41 @@ export function Cartao({
                 </div>
                 <button
                     type="button"
+                    data-sem-exportar
                     onClick={() => setTabela(!tabela)}
                     className="shrink-0 rounded px-2 py-1 text-xs text-[var(--ink2)] hover:bg-black/5 dark:hover:bg-white/10"
                 >
                     {tabela ? 'Ver gráfico' : 'Ver tabela'}
                 </button>
             </header>
-            {tabela ? (
-                <div className="max-h-64 overflow-auto">
-                    <table className="w-full text-left text-xs text-[var(--ink)]">
-                        <thead>
-                            <tr className="border-b text-[var(--ink2)]" style={{ borderColor: 'var(--grid)' }}>
-                                {colunas.map((c) => (
-                                    <th key={c} className="py-1 pr-3 font-medium">
+            {/* Gráfico e tabela estão sempre no HTML (só um visível): a exportação mostra os dois. */}
+            <div data-grafico className={tabela ? 'hidden' : undefined}>
+                {children}
+            </div>
+            <div data-tabela className={`max-h-64 overflow-auto ${tabela ? '' : 'hidden'}`}>
+                <table className="w-full text-left text-xs text-[var(--ink)]">
+                    <thead>
+                        <tr className="border-b text-[var(--ink2)]" style={{ borderColor: 'var(--grid)' }}>
+                            {colunas.map((c) => (
+                                <th key={c} className="py-1 pr-3 font-medium">
+                                    {c}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {linhas.map((l, i) => (
+                            <tr key={i} className="border-b" style={{ borderColor: 'var(--grid)' }}>
+                                {l.map((c, j) => (
+                                    <td key={j} className="py-1 pr-3 tabular-nums">
                                         {c}
-                                    </th>
+                                    </td>
                                 ))}
                             </tr>
-                        </thead>
-                        <tbody>
-                            {linhas.map((l, i) => (
-                                <tr key={i} className="border-b" style={{ borderColor: 'var(--grid)' }}>
-                                    {l.map((c, j) => (
-                                        <td key={j} className="py-1 pr-3 tabular-nums">
-                                            {c}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            ) : (
-                children
-            )}
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </section>
     );
 }

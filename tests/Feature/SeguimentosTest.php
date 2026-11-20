@@ -43,14 +43,15 @@ test('não inclui falecidos nem quem já tem o seguimento registado', function (
         ->where('contagens.a_decorrer', 0));
 });
 
-test('por defeito mostra todas as altas e filtra por trimestres', function () {
+test('por defeito mostra o ano em curso e filtra por trimestres', function () {
     $recente = internamentoComAlta($this, 200);
     $antigo = internamentoComAlta($this, 500);
     $rotulo = fn ($i) => urlencode(\App\Support\Intervalo::rotuloTrimestre($i->data_de_alta));
     $contagem = fn (string $url, int $esperado) => $this->actingAs($this->utilizador)->get($url)
         ->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', $esperado));
 
-    $contagem('/internamentos/seguimentos', 2);
+    $contagem('/internamentos/seguimentos', now()->subDays(200)->year === now()->year ? 1 : 0);
+    $contagem('/internamentos/seguimentos?de='.$rotulo($antigo).'&ate='.$rotulo($recente), 2);
     $contagem('/internamentos/seguimentos?de='.$rotulo($recente).'&ate='.$rotulo($recente), 1);
     $contagem('/internamentos/seguimentos?de='.$rotulo($antigo).'&ate='.$rotulo($antigo), 1);
 });

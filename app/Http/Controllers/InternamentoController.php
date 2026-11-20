@@ -116,13 +116,12 @@ class InternamentoController extends Controller
         $hoje = now()->startOfDay();
         $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
 
-        // Período por trimestres, como nas análises; sem `de`/`ate` não há limite (todas as altas por registar).
+        // Período por trimestres, como nas análises: por omissão, o ano em curso.
         $primeiraAlta = Internamento::query()->comAlta()->min('data_de_alta');
         $intervalo = Intervalo::trimestres($request, $primeiraAlta, $hoje);
-        $filtraPeriodo = $request->filled('de') || $request->filled('ate');
         $trimestres = $intervalo['trimestres'];
-        $de = $filtraPeriodo ? $intervalo['de'] : ($trimestres[0] ?? null);
-        $ate = $filtraPeriodo ? $intervalo['ate'] : ($trimestres ? end($trimestres) : null);
+        $de = $intervalo['de'];
+        $ate = $intervalo['ate'];
 
         $base = Internamento::query()
             ->comAlta()
@@ -134,7 +133,7 @@ class InternamentoController extends Controller
             ->when($responsavelId, fn ($q, $id) => $q->where('responsavel_id', $id))
             ->when($soCr, fn ($q) => $q->whereRaw(self::doenteCr()))
             ->when($q !== '', fn ($consulta) => $consulta->whereHas('utente', fn ($u) => $u->pesquisar($q)))
-            ->when($filtraPeriodo && $intervalo['desde'], fn ($q) => $q->whereDate('data_de_alta', '>=', $intervalo['desde'])->whereDate('data_de_alta', '<=', $intervalo['fim']));
+            ->when($intervalo['desde'], fn ($q) => $q->whereDate('data_de_alta', '>=', $intervalo['desde'])->whereDate('data_de_alta', '<=', $intervalo['fim']));
 
         $emAtraso = (clone $base)->whereDate('data_de_alta', '<', $limiteAtraso)->count();
         $aDecorrer = (clone $base)->whereDate('data_de_alta', '>=', $limiteAtraso)->count();
