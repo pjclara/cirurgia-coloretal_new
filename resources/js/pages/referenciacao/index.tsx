@@ -12,6 +12,7 @@ import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import { FormularioReferenciacao, type PropsReferenciacao } from '../../components/referenciacao/formulario-referenciacao';
 import { SinalizarCentro } from '../../components/referenciacao/sinalizar-centro';
+import { ModalUtente, type ModalUtenteDados } from '../../components/utentes/modal-utente';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Linha = {
@@ -35,6 +36,7 @@ type Props = {
     anos: string[];
     modal: PropsReferenciacao | null;
     modalInternamento: ModalInternamentoDados | null;
+    modalUtente: ModalUtenteDados | null;
     origens: { id: number; nome: string }[];
     responsaveis: { id: number; nome: string; equipa: string | null }[];
     /** Utente a sinalizar de imediato (acabado de criar). */
@@ -51,7 +53,7 @@ const SITUACOES: { valor: Situacao; rotulo: string }[] = [
 const COR = { referenciado: 'bg-sky-100 text-sky-900', no_centro: 'bg-amber-100 text-amber-900', saida: 'bg-teal-100 text-teal-900' } as const;
 const ROTULO = { referenciado: 'Referenciado', no_centro: 'No centro', saida: 'Saída registada' } as const;
 
-export default function Referenciacao({ lista, filtros, anos, modal, modalInternamento, origens, responsaveis, referenciar }: Props) {
+export default function Referenciacao({ lista, filtros, anos, modal, modalInternamento, modalUtente, origens, responsaveis, referenciar }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [termo, setTermo] = useState(filtros.q);
     const podeReferenciar = permissoes.includes('create referenciacao');
@@ -89,7 +91,7 @@ export default function Referenciacao({ lista, filtros, anos, modal, modalIntern
                     <p className="mb-2 text-sm font-medium text-slate-900">Referenciar um doente</p>
                     <PesquisaUtente
                         podeCriar={permissoes.includes('create internamento')}
-                        criarHref="/quadro/novo-utente?origem=referenciacao"
+                        criarHref="/referenciacao/novo-utente"
                         placeholder="Procurar o doente por nome ou processo"
                         aoEscolher={(u) => (u.referenciado ? router.visit(rotas.utentes.ficha(u.id)) : setAlvo({ id: u.id, nome: u.nome }))}
                     />
@@ -239,6 +241,7 @@ export default function Referenciacao({ lista, filtros, anos, modal, modalIntern
                 </DialogContent>
             </Dialog>
             <ModalInternamento modal={modalInternamento} />
+            <ModalUtente modal={modalUtente} />
         </ClinicoLayout>
     );
 }

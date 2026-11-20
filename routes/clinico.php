@@ -141,6 +141,8 @@ Route::prefix('agendamento')->name('agendamento.')->group(function () {
 });
 
 // Referenciação ao centro de referência
+Route::get('referenciacao/novo-utente', [ReferenciacaoController::class, 'novoUtente'])->middleware(['can:create internamento', 'can:create referenciacao'])->name('referenciacao.novo-utente');
+
 Route::prefix('referenciacao')->name('referenciacao.')->group(function () {
     Route::middleware('can:show referenciacao')->group(function () {
         Route::get('/', [ReferenciacaoController::class, 'index'])->name('index');

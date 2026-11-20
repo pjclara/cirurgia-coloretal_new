@@ -61,3 +61,10 @@ test('criar um utente a partir do agendamento segue para a inscrição em lista 
         'sexo_id' => 1, 'concelho_id' => DB::table('concelhos')->value('id'), 'origem' => 'agendamento',
     ])->assertRedirect(route('agendamento.espera.create', App\Models\Utente::where('numero_processo', 8123456)->first()));
 });
+
+test('criar um utente a partir da referenciação abre em modal sobre a lista de referenciação', function () {
+    $gestor = utilizadorClinico(Spatie\Permission\Models\Permission::where('name', 'like', '%internamento%')->orWhere('name', 'like', '%referenciacao%')->pluck('name')->all());
+
+    $this->actingAs($gestor)->get('/referenciacao/novo-utente?processo=555')
+        ->assertInertia(fn (Assert $p) => $p->component('referenciacao/index')->where('modalUtente.origem', 'referenciacao')->where('modalUtente.fechar_url', '/referenciacao')->where('modalUtente.processoSugerido', '555'));
+});

@@ -24,6 +24,15 @@ class ReferenciacaoController extends Controller
         return $this->montarLista($request, null);
     }
 
+    /** A lista de referenciação com o formulário de novo utente numa modal por cima; ao criar, segue para a referenciação rápida. */
+    public function novoUtente(Request $request, UtenteController $formulario): Response
+    {
+        return $this->montarLista($request, null, null, $formulario->propsCriacao($request) + [
+            'fechar_url' => '/referenciacao',
+            'origem' => 'referenciacao',
+        ]);
+    }
+
     public function criar(Request $request, Utente $utente): Response
     {
         return $this->montarLista($request, $this->formulario($utente, null));
@@ -110,7 +119,7 @@ class ReferenciacaoController extends Controller
         ]);
     }
 
-    private function montarLista(Request $request, ?array $modal, ?array $modalInternamento = null): Response
+    private function montarLista(Request $request, ?array $modal, ?array $modalInternamento = null, ?array $modalUtente = null): Response
     {
         $situacoes = ['referenciado', 'no_centro', 'saida', 'todas'];
         $situacao = in_array($request->query('situacao'), $situacoes, true) ? $request->query('situacao') : 'todas';
@@ -156,6 +165,7 @@ class ReferenciacaoController extends Controller
             'anos' => $anos,
             'modal' => $modal,
             'modalInternamento' => $modalInternamento,
+            'modalUtente' => $modalUtente,
             'origens' => $podeReferenciar ? Dominios::lista('origem_da_referenciacaos') : [],
             'responsaveis' => $podeReferenciar ? Dominios::responsaveis() : [],
             'referenciar' => $referenciar,
