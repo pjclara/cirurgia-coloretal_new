@@ -93,19 +93,23 @@ class LeitorDeFolha
         }
 
         $leitor = new XMLReader;
-        $leitor->XML($zip->getFromName($folha));
+        $leitor->XML(self::semPrefixo((string) $zip->getFromName($folha)));
         while ($leitor->read()) {
             if ($leitor->nodeType !== XMLReader::ELEMENT || $leitor->name !== 'row') {
                 continue;
             }
             $linha = [];
+            $posicao = 0;
             $celulas = new XMLReader;
             $celulas->XML($leitor->readOuterXml());
             while ($celulas->read()) {
                 if ($celulas->nodeType !== XMLReader::ELEMENT || $celulas->name !== 'c') {
                     continue;
                 }
-                $coluna = self::indiceDaColuna((string) $celulas->getAttribute('r'));
+                // Alguns exportadores não põem a referência (r="A1") nas células: contam-se pela ordem.
+                $referencia = (string) $celulas->getAttribute('r');
+                $coluna = $referencia !== '' ? self::indiceDaColuna($referencia) : $posicao;
+                $posicao = $coluna + 1;
                 $tipo = (string) $celulas->getAttribute('t');
                 $no = simplexml_load_string($celulas->readOuterXml());
                 $valor = match ($tipo) {
@@ -124,6 +128,17 @@ class LeitorDeFolha
         }
         $leitor->close();
         $zip->close();
+    }
+
+    /** Alguns exportadores escrevem o XML com prefixo (<x:row>); tira-o para o resto do leitor não depender dele. */
+    private static function semPrefixo(string $xml): string
+    {
+        $xml = preg_replace('/^\xEF\xBB\xBF/', '', $xml); // BOM
+        if (preg_match('/<(\w+):worksheet\b/', substr($xml, 0, 2000), $m)) {
+            $xml = preg_replace(['/<(\/?)'.$m[1].':/', '/\sxmlns:'.$m[1].'="[^"]*"/'], ['<$1', ''], $xml);
+        }
+
+        return $xml;
     }
 
     /** @return array<int, string> */

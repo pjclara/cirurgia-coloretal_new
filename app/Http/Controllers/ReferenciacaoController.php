@@ -247,9 +247,32 @@ class ReferenciacaoController extends Controller
             // Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem.
             'diagnosticos_do_utente' => DiagnosticosCr::doUtente($utente->id)
                 ->reject(fn ($d) => $referenciacao?->diagnosticos->contains('id', $d->id))->values(),
+            // Decisões terapêuticas (reunião DT) do utente, de todas as suas referenciações; só ao editar uma referenciação.
+            'decisoes' => $referenciacao ? $this->decisoesDoUtente($utente) : null,
             'hoje' => now()->format('Y-m-d'),
             'fechar_url' => '/referenciacao',
         ];
+    }
+
+    /** Decisões terapêuticas do utente, da mais recente para a mais antiga. */
+    private function decisoesDoUtente(Utente $utente): array
+    {
+        return DB::table('reuniao_decisao_terapeuticas as d')
+            ->join('referenciacao_centro_de_referencias as r', 'r.id', '=', 'd.referenciacao_id')
+            ->leftJoin('estado_consultas as e', 'e.id', '=', 'd.estado_consulta_id')
+            ->leftJoin('timmings as t', 't.id', '=', 'd.timming_id')
+            ->where('r.utente_id', $utente->id)->whereNull('d.deleted_at')
+            ->orderByDesc('d.data_de_decisao_terapeutica')->orderByDesc('d.id')
+            ->get(['d.id', 'd.data_de_decisao_terapeutica as data', 'e.nome as estado', 't.nome as timming', 'd.resumo', 'd.recados', 'd.comentarios'])
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'data' => substr((string) $d->data, 0, 10),
+                'estado' => $d->estado,
+                'timming' => $d->timming,
+                'resumo' => $d->resumo,
+                'recados' => $d->recados,
+                'comentarios' => $d->comentarios,
+            ])->all();
     }
 
     /**

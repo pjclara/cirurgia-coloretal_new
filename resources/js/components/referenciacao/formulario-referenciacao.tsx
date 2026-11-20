@@ -35,6 +35,8 @@ export type PropsReferenciacao = {
     utente: { id: number; nome: string; numero_processo: number };
     /** Internamentos do utente (null sem permissão para os ver). */
     internamentos?: InternamentoDoUtente[] | null;
+    /** Decisões terapêuticas (reunião DT) do utente; só ao editar uma referenciação existente. */
+    decisoes?: DecisaoTerapeutica[] | null;
     /** Diagnósticos CR já registados nos internamentos do utente e que a referenciação ainda não tem. */
     diagnosticos_do_utente: { id: number; nome: string }[];
     dominios: {
@@ -49,7 +51,17 @@ export type PropsReferenciacao = {
     fechar_url: string;
 };
 
-type Separador = 'dados' | 'diagnosticos' | 'internamentos';
+type DecisaoTerapeutica = {
+    id: number;
+    data: string;
+    estado: string | null;
+    timming: string | null;
+    resumo: string | null;
+    recados: string | null;
+    comentarios: string | null;
+};
+
+type Separador = 'dados' | 'diagnosticos' | 'internamentos' | 'decisoes';
 
 /** Escolha de diagnóstico agrupada por grupo de diagnóstico. */
 function SelecaoDiagnostico({
@@ -100,6 +112,7 @@ export function FormularioReferenciacao({
     referenciacao,
     utente,
     internamentos,
+    decisoes,
     diagnosticos_do_utente,
     dominios,
     hoje,
@@ -172,6 +185,7 @@ export function FormularioReferenciacao({
                         ['dados', 'Referenciação'],
                         ['diagnosticos', `Diagnósticos${data.diagnosticos.length > 0 ? ` (${data.diagnosticos.length})` : ''}`],
                         ...(internamentos ? [['internamentos', `Internamentos (${internamentos.length})`] as [Separador, string]] : []),
+                        ...(decisoes ? [['decisoes', `Decisões terapêuticas (${decisoes.length})`] as [Separador, string]] : []),
                     ] as [Separador, string][]
                 ).map(([id, rotulo]) => (
                     <button
@@ -342,6 +356,33 @@ export function FormularioReferenciacao({
                                                 ))}
                                             </ul>
                                         )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </Seccao>
+                )}
+
+                {separador === 'decisoes' && decisoes && (
+                    <Seccao titulo="Decisões terapêuticas" descricao="Reuniões de decisão terapêutica do utente, da mais recente para a mais antiga.">
+                        {decisoes.length === 0 ? (
+                            <p className="text-sm text-slate-600">Este utente não tem decisões terapêuticas registadas.</p>
+                        ) : (
+                            <ul className="space-y-3">
+                                {decisoes.map((d) => (
+                                    <li key={d.id} className="rounded-md border border-slate-200 p-3 text-sm">
+                                        <p className="font-medium text-slate-900 tabular-nums">
+                                            {formatarData(d.data)}
+                                            {d.estado && <span className="ml-2 font-normal text-slate-600">{d.estado}</span>}
+                                            {d.timming && (
+                                                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-700">
+                                                    {d.timming}
+                                                </span>
+                                            )}
+                                        </p>
+                                        {d.resumo && <p className="mt-1 whitespace-pre-line text-slate-800">{d.resumo}</p>}
+                                        {d.recados && <p className="mt-1 whitespace-pre-line text-slate-700">Recados: {d.recados}</p>}
+                                        {d.comentarios && <p className="mt-1 text-xs whitespace-pre-line text-slate-600">{d.comentarios}</p>}
                                     </li>
                                 ))}
                             </ul>
