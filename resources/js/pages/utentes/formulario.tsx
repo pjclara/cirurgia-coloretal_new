@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import type { FormEvent, ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { hojeIso } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao } from '../../clinico/tipos';
@@ -39,6 +39,23 @@ type Dados = {
 
 type Props = PropsUtente;
 
+type DadosColados = { numero_processo?: string; numero_utente?: string; nome?: string; sexo?: string; data_nascimento?: string };
+
+/** Lê o texto copiado do processo clínico («Nº Processo: … Nº Utente: … Nome: … - Masculino Data de Nascimento: dd-mm-aaaa …»). */
+function lerTextoDoProcesso(texto: string): DadosColados {
+    const t = texto.replace(/\s+/g, ' ');
+    const nascimento = t.match(/Data de Nascimento:?\s*(\d{2})[-/.](\d{2})[-/.](\d{4})/i);
+    // O nome vai de «Nome:» até ao primeiro « - » (ou «;»).
+    const nome = t.match(/Nome:?\s*(.+?)\s*(?:\s[-–]\s|;|$)/i);
+    return {
+        numero_processo: t.match(/N[ºo°.]*\s*Processo:?\s*(\d+)/i)?.[1],
+        numero_utente: t.match(/N[ºo°.]*\s*Utente:?\s*(\d+)/i)?.[1],
+        nome: nome?.[1].trim(),
+        sexo: t.match(/(Masculino|Feminino)/i)?.[1],
+        data_nascimento: nascimento ? `${nascimento[3]}-${nascimento[2]}-${nascimento[1]}` : undefined,
+    };
+}
+
 /** O formulário do utente, sem página à volta; usado na página de edição e na modal de criação. */
 export function CorpoFormularioUtente({
     utente,
@@ -46,7 +63,8 @@ export function CorpoFormularioUtente({
     dominios,
     origem,
     aoCancelar,
-}: PropsUtente & { origem?: 'quadro' | 'referenciacao'; aoCancelar?: () => void }) {
+    aoGuardar,
+}: PropsUtente & { origem?: 'quadro' | 'referenciacao'; aoCancelar?: () => void; aoGuardar?: () => void }) {
     const form = useForm<Dados>({
         nome: utente?.nome ?? '',
         numero_processo: utente ? String(utente.numero_processo) : processoSugerido,
@@ -61,15 +79,66 @@ export function CorpoFormularioUtente({
 
     const guardar = (evento: FormEvent) => {
         evento.preventDefault();
-        form.transform((atual) => (origem ? { ...atual, origem } : atual));
-        if (utente) form.put(rotas.utentes.ficha(utente.id));
+        form.transform((atual) => ({ ...atual, ...(origem ? { origem } : {}), ...(aoGuardar ? { voltar: true } : {}) }));
+        if (utente) form.put(rotas.utentes.ficha(utente.id), aoGuardar ? { preserveScroll: true, onSuccess: aoGuardar } : undefined);
         else form.post(rotas.utentes.lista);
     };
 
     const { data, errors, setData } = form;
 
+    const [colado, setColado] = useState('');
+    const [resultadoColado, setResultadoColado] = useState<string | null>(null);
+
+    /** Pré-preenche a identificação a partir do texto colado; o que não for reconhecido fica como está. */
+    const preencherDoTexto = (texto: string) => {
+        setColado(texto);
+        if (texto.trim() === '') return setResultadoColado(null);
+        const lido = lerTextoDoProcesso(texto);
+        const sexo = dominios.sexos.find((o) => o.nome.toLowerCase() === lido.sexo?.toLowerCase());
+        const preenchidos = [
+            lido.nome && 'nome',
+            lido.numero_processo && 'nº de processo',
+            lido.numero_utente && 'nº de utente',
+            lido.data_nascimento && 'data de nascimento',
+            sexo && 'sexo',
+        ].filter(Boolean);
+        setData((atual) => ({
+            ...atual,
+            nome: lido.nome ?? atual.nome,
+            numero_processo: lido.numero_processo ?? atual.numero_processo,
+            numero_utente: lido.numero_utente ? lido.numero_utente.slice(0, 9) : atual.numero_utente,
+            data_nascimento: lido.data_nascimento ?? atual.data_nascimento,
+            sexo_id: sexo ? sexo.id : atual.sexo_id,
+        }));
+        setResultadoColado(
+            preenchidos.length > 0
+                ? `Preenchido: ${preenchidos.join(', ')}. Confirme os dados e indique o concelho.`
+                : 'Não foi possível reconhecer dados neste texto.',
+        );
+    };
+
     return (
         <form onSubmit={guardar} className="max-w-3xl space-y-5" noValidate>
+            {!utente && (
+                <Seccao titulo="Colar dados do processo">
+                    <Campo
+                        rotulo="Texto copiado do processo clínico"
+                        para="colar_processo"
+                        ajuda={resultadoColado ?? 'Cole aqui o texto para pré-preencher a identificação.'}
+                        opcional
+                    >
+                        <textarea
+                            id="colar_processo"
+                            rows={3}
+                            value={colado}
+                            onChange={(e) => preencherDoTexto(e.target.value)}
+                            className={estiloEntrada}
+                            placeholder="Nº Processo: … Nº Utente: … Nome: … - Masculino Data de Nascimento: …"
+                        />
+                    </Campo>
+                </Seccao>
+            )}
+
             <Seccao titulo="Identificação">
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Campo rotulo="Nome completo" para="nome" erro={errors.nome} className="sm:col-span-2">
@@ -136,38 +205,6 @@ export function CorpoFormularioUtente({
                             valor={data.concelho_id}
                             aoMudar={(v) => setData('concelho_id', v)}
                             invalido={!!errors.concelho_id}
-                        />
-                    </Campo>
-                </div>
-            </Seccao>
-
-            <Seccao titulo="Dados sociais">
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Campo rotulo="Estado civil" para="estado_civil_id" erro={errors.estado_civil_id} opcional>
-                        <Selecao
-                            id="estado_civil_id"
-                            opcoes={dominios.estados_civis}
-                            valor={data.estado_civil_id}
-                            aoMudar={(v) => setData('estado_civil_id', v)}
-                            vazio="Sem informação"
-                        />
-                    </Campo>
-                    <Campo rotulo="Etnia" para="etnia_id" erro={errors.etnia_id} opcional>
-                        <Selecao
-                            id="etnia_id"
-                            opcoes={dominios.etnias}
-                            valor={data.etnia_id}
-                            aoMudar={(v) => setData('etnia_id', v)}
-                            vazio="Sem informação"
-                        />
-                    </Campo>
-                    <Campo rotulo="Classe social" para="classe_social_id" erro={errors.classe_social_id} opcional>
-                        <Selecao
-                            id="classe_social_id"
-                            opcoes={dominios.classes_sociais}
-                            valor={data.classe_social_id}
-                            aoMudar={(v) => setData('classe_social_id', v)}
-                            vazio="Sem informação"
                         />
                     </Campo>
                 </div>

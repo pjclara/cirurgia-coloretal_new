@@ -12,6 +12,7 @@ export const rotas = {
         novo: '/quadro/novo-utente',
         ficha: (id: number) => `/utentes/${id}`,
         editar: (id: number) => `/utentes/${id}/editar`,
+        dados: (id: number) => `/utentes/${id}/dados`,
     },
     internamentos: {
         lista: '/internamentos',

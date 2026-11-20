@@ -158,9 +158,24 @@ class UtenteController extends Controller
         ]);
     }
 
+    /** Dados do utente e domínios, para o editar numa modal a partir de outra página (por exemplo o internamento). */
+    public function dados(Utente $utente): JsonResponse
+    {
+        return response()->json([
+            'utente' => $this->paraFormulario($utente),
+            'dominios' => $this->dominios(),
+            'processoSugerido' => '',
+        ]);
+    }
+
     public function update(UtenteRequest $request, Utente $utente): RedirectResponse
     {
         $utente->update($request->validated());
+
+        // Editado a partir de outra página (internamento): fica nela.
+        if ($request->boolean('voltar')) {
+            return back()->with('sucesso', 'Dados do utente guardados.');
+        }
 
         return redirect()
             ->route('utentes.show', $utente)

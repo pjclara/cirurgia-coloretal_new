@@ -1,4 +1,4 @@
-import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link, router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { corDaCirurgia } from '../../clinico/cor-cirurgia';
@@ -21,6 +21,7 @@ import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { PesquisaUtente } from '../../components/clinico/pesquisa-utente';
 import { PerguntaCentroReferencia } from '../../components/referenciacao/pergunta-centro';
 import ClinicoLayout from '../../layouts/clinico-layout';
+import { CorpoFormularioUtente, type PropsUtente } from '../utentes/formulario';
 
 type RegistoMorbilidade = Record<
     Momento,
@@ -201,6 +202,17 @@ export function FormularioInternamento({
     const [separador, setSeparador] = useState<Separador>('dados');
     const [momentoAtivo, setMomentoAtivo] = useState<Momento>('alta');
     const [tentouAlta, setTentouAlta] = useState(false);
+    const [editarUtente, setEditarUtente] = useState<PropsUtente | 'a-carregar' | 'erro' | null>(null);
+
+    const abrirEdicaoDoUtente = () => {
+        if (!utente) return;
+        setEditarUtente('a-carregar');
+        fetch(rotas.utentes.dados(utente.id), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then((r) => (r.ok ? (r.json() as Promise<PropsUtente>) : Promise.reject(new Error())))
+            .then(setEditarUtente)
+            .catch(() => setEditarUtente('erro'));
+    };
+    const [confirmaSemCirurgia, setConfirmaSemCirurgia] = useState<{ semCirurgia: boolean; naoSocial: boolean } | null>(null);
     const registado = (m: Momento) => data.morbilidade[m].complicacoes.length > 0;
     /** Com cirurgia, a alta fica pendente até à revisão aos 30 dias. */
     const aguardaRevisao = listaCirurgias.length > 0 && !registado('30_dias');
@@ -266,6 +278,15 @@ export function FormularioInternamento({
             setSeparador(pendenciasDeAlta[0].separador);
             return;
         }
+        // Ao dar alta (e não ao editar uma alta já registada), pede confirmação num modal: sem cirurgias, que não foi operado; com cirurgias, que estão todas registadas.
+        if (internamento && data.data_de_alta && !internamento.data_de_alta) {
+            setConfirmaSemCirurgia({ semCirurgia: false, naoSocial: false });
+            return;
+        }
+        gravar();
+    };
+
+    const gravar = () => {
         form.transform((atual) => ({
             ...atual,
             ...(aguardaRevisao ? { estado_da_alta_id: ALTA_PENDENTE } : {}),
@@ -327,6 +348,81 @@ export function FormularioInternamento({
         </div>
     );
 
+    const temCirurgias = listaCirurgias.length > 0;
+    const modalUtente = editarUtente && (
+        <Dialog open onOpenChange={(aberto) => !aberto && setEditarUtente(null)}>
+            <DialogContent
+                className="max-h-[90vh] max-w-3xl overflow-y-auto bg-white text-slate-900"
+                onInteractOutside={(e) => e.preventDefault()}
+                aria-describedby={undefined}
+            >
+                <DialogHeader>
+                    <DialogTitle>Editar utente</DialogTitle>
+                </DialogHeader>
+                {editarUtente === 'a-carregar' && <p className="text-sm text-slate-600">A carregar…</p>}
+                {editarUtente === 'erro' && <p className="text-sm text-rose-700">Não foi possível carregar os dados do utente.</p>}
+                {typeof editarUtente === 'object' && (
+                    <CorpoFormularioUtente {...editarUtente} aoCancelar={() => setEditarUtente(null)} aoGuardar={() => setEditarUtente(null)} />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+
+    const modalSemCirurgia = confirmaSemCirurgia && (
+        <Dialog open onOpenChange={(aberto) => !aberto && setConfirmaSemCirurgia(null)}>
+            <DialogContent className="max-w-md bg-white text-slate-900" aria-describedby={undefined}>
+                <DialogHeader>
+                    <DialogTitle>{temCirurgias ? 'Confirmar cirurgias' : 'Confirmar alta sem cirurgia'}</DialogTitle>
+                    <DialogDescription>
+                        {temCirurgias
+                            ? `Este internamento tem ${plural(listaCirurgias.length, 'cirurgia registada', 'cirurgias registadas')}. Confirme antes de dar alta.`
+                            : 'Este internamento não tem cirurgias registadas. Confirme antes de dar alta.'}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 text-sm">
+                    <label className="flex items-start gap-2">
+                        <input
+                            type="checkbox"
+                            className="mt-0.5 size-4"
+                            checked={confirmaSemCirurgia.semCirurgia}
+                            onChange={(e) => setConfirmaSemCirurgia({ ...confirmaSemCirurgia, semCirurgia: e.target.checked })}
+                        />
+                        <span>
+                            {temCirurgias
+                                ? 'Confirmo que todas as cirurgias deste internamento estão registadas.'
+                                : 'Confirmo que o doente não foi operado neste internamento.'}
+                        </span>
+                    </label>
+                    {!temCirurgias && (
+                        <label className="flex items-start gap-2">
+                            <input
+                                type="checkbox"
+                                className="mt-0.5 size-4"
+                                checked={confirmaSemCirurgia.naoSocial}
+                                onChange={(e) => setConfirmaSemCirurgia({ ...confirmaSemCirurgia, naoSocial: e.target.checked })}
+                            />
+                            <span>Confirmo que não se trata de um caso social.</span>
+                        </label>
+                    )}
+                </div>
+                <div className="mt-2 flex justify-end gap-2">
+                    <Botao variante="secundario" onClick={() => setConfirmaSemCirurgia(null)}>
+                        Voltar
+                    </Botao>
+                    <Botao
+                        disabled={!confirmaSemCirurgia.semCirurgia || (!temCirurgias && !confirmaSemCirurgia.naoSocial)}
+                        onClick={() => {
+                            setConfirmaSemCirurgia(null);
+                            gravar();
+                        }}
+                    >
+                        Confirmar e dar alta
+                    </Botao>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+
     const numeroDeErros = Object.keys(erros).length;
 
     return (
@@ -343,6 +439,9 @@ export function FormularioInternamento({
                 ) : undefined
             }
         >
+            {modalSemCirurgia}
+            {modalUtente}
+
             {internamento && !podeEditar && (
                 <p className="mb-4 rounded-md border border-slate-300 bg-slate-100 px-4 py-2.5 text-sm text-slate-800">
                     {bloqueadoAntes
@@ -367,6 +466,15 @@ export function FormularioInternamento({
                         {anos !== null && `${anos} anos`}
                         {utente.sexo && `${anos !== null ? ', ' : ''}${utente.sexo.toLowerCase()}`}
                     </span>
+                    {internamento && podeEditar && (
+                        <button
+                            type="button"
+                            onClick={abrirEdicaoDoUtente}
+                            className="ml-auto text-xs text-slate-700 underline underline-offset-2 hover:text-slate-900"
+                        >
+                            Editar utente
+                        </button>
+                    )}
                 </p>
             )}
 
@@ -383,6 +491,8 @@ export function FormularioInternamento({
                     ] as [Separador, string][]
                 )
                     .filter(([id]) => internamento || id === 'dados' || id === 'notas')
+                    // Sem cirurgias não há morbilidade a registar.
+                    .filter(([id]) => id !== 'morbilidade' || listaCirurgias.length > 0)
                     .map(([id, rotulo]) => (
                         <button
                             key={id}
@@ -429,11 +539,6 @@ export function FormularioInternamento({
                             })}
                         </ul>
                         <div className="mt-3 flex flex-wrap gap-2">
-                            {utente && (
-                                <BotaoLigacao href={`/utentes/${utente.id}/cirurgias`} variante="secundario">
-                                    Ver cirurgias do utente
-                                </BotaoLigacao>
-                            )}
                             {podeNovaCirurgia && (
                                 <BotaoLigacao
                                     href={
@@ -615,7 +720,7 @@ export function FormularioInternamento({
                         </Seccao>
                     )}
 
-                    {internamento && separador === 'morbilidade' && (
+                    {internamento && separador === 'morbilidade' && listaCirurgias.length > 0 && (
                         <Seccao titulo="Morbilidade" descricao="Escolha “Sem complicações” ou “Com complicações”.">
                             <div role="tablist" aria-label="Momento da morbilidade" className="mb-3 flex gap-1 border-b border-slate-200">
                                 {MOMENTOS.map((m) => {
@@ -697,8 +802,18 @@ export function FormularioInternamento({
                                     </Botao>
                                 </div>
                             )}
-                            <div className="grid gap-4 sm:grid-cols-6">
-                                <Campo rotulo="Data de alta" para="data_de_alta" erro={erros.data_de_alta} className="sm:col-span-2">
+                            <div className="grid gap-4 sm:grid-cols-4">
+                                <Campo rotulo="Destino" para="destino" erro={erros.destino_id}>
+                                    <Selecao
+                                        id="destino"
+                                        opcoes={dominios.destinos}
+                                        valor={data.destino_id}
+                                        aoMudar={(v) => setData('destino_id', v)}
+                                        vazio={data.data_de_alta ? 'Escolher…' : 'Ainda internado'}
+                                        invalido={!!erros.destino_id}
+                                    />
+                                </Campo>
+                                <Campo rotulo="Data de alta" para="data_de_alta" erro={erros.data_de_alta}>
                                     <input
                                         id="data_de_alta"
                                         type="date"
@@ -715,7 +830,6 @@ export function FormularioInternamento({
                                     para="data_de_saida"
                                     erro={erros.data_de_saida}
                                     ajuda="Se for diferente da alta, por exemplo num caso social."
-                                    className="sm:col-span-2"
                                 >
                                     <input
                                         id="data_de_saida"
@@ -734,7 +848,6 @@ export function FormularioInternamento({
                                     para="estado"
                                     erro={erros.estado_da_alta_id}
                                     ajuda={aguardaRevisao ? 'Com cirurgia, fica pendente até à revisão aos 30 dias.' : undefined}
-                                    className="sm:col-span-2"
                                 >
                                     <select
                                         id="estado"
@@ -755,16 +868,6 @@ export function FormularioInternamento({
                                                 </option>
                                             ))}
                                     </select>
-                                </Campo>
-                                <Campo rotulo="Destino" para="destino" erro={erros.destino_id} className="sm:col-span-6">
-                                    <Selecao
-                                        id="destino"
-                                        opcoes={dominios.destinos}
-                                        valor={data.destino_id}
-                                        aoMudar={(v) => setData('destino_id', v)}
-                                        vazio={data.data_de_alta ? 'Escolher…' : 'Ainda internado'}
-                                        invalido={!!erros.destino_id}
-                                    />
                                 </Campo>
                             </div>
                         </Seccao>

@@ -62,7 +62,9 @@ export function MomentoMorbilidade({
             onClick={() => escolher(valor)}
             className={`flex-1 rounded-lg border px-4 py-2.5 text-left text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
                 modo === valor
-                    ? 'border-slate-900 bg-white text-slate-900 ring-1 ring-slate-900'
+                    ? valor === 'sem'
+                        ? 'border-emerald-700 bg-emerald-600 text-white ring-2 ring-emerald-600/30'
+                        : 'border-rose-700 bg-rose-600 text-white ring-2 ring-rose-600/30'
                     : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
             }`}
         >
