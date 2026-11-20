@@ -142,8 +142,8 @@ export function CorpoFormularioUtente({
             )}
 
             <Seccao titulo="Identificação">
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Campo rotulo="Nome completo" para="nome" erro={errors.nome} className="sm:col-span-2">
+                <div className="grid gap-4 sm:grid-cols-6">
+                    <Campo rotulo="Nome completo" para="nome" erro={errors.nome} className="sm:col-span-6">
                         <input
                             id="nome"
                             value={data.nome}
@@ -154,7 +154,7 @@ export function CorpoFormularioUtente({
                         />
                     </Campo>
 
-                    <Campo rotulo="Número de processo" para="numero_processo" erro={errors.numero_processo}>
+                    <Campo rotulo="Número de processo" para="numero_processo" erro={errors.numero_processo} className="sm:col-span-3">
                         <input
                             id="numero_processo"
                             inputMode="numeric"
@@ -165,7 +165,14 @@ export function CorpoFormularioUtente({
                         />
                     </Campo>
 
-                    <Campo rotulo="Número de utente" para="numero_utente" erro={errors.numero_utente} ajuda="9 dígitos." opcional>
+                    <Campo
+                        rotulo="Número de utente"
+                        para="numero_utente"
+                        erro={errors.numero_utente}
+                        ajuda="9 dígitos."
+                        className="sm:col-span-3"
+                        opcional
+                    >
                         <input
                             id="numero_utente"
                             inputMode="numeric"
@@ -177,7 +184,7 @@ export function CorpoFormularioUtente({
                         />
                     </Campo>
 
-                    <Campo rotulo="Data de nascimento" para="data_nascimento" erro={errors.data_nascimento}>
+                    <Campo rotulo="Data de nascimento" para="data_nascimento" erro={errors.data_nascimento} className="sm:col-span-2">
                         <input
                             id="data_nascimento"
                             type="date"
@@ -190,7 +197,7 @@ export function CorpoFormularioUtente({
                         />
                     </Campo>
 
-                    <Campo rotulo="Sexo" para="sexo_id" erro={errors.sexo_id}>
+                    <Campo rotulo="Sexo" para="sexo_id" erro={errors.sexo_id} className="sm:col-span-2">
                         <Selecao
                             id="sexo_id"
                             opcoes={dominios.sexos}
@@ -200,7 +207,7 @@ export function CorpoFormularioUtente({
                         />
                     </Campo>
 
-                    <Campo rotulo="Concelho" para="concelho_id" erro={errors.concelho_id}>
+                    <Campo rotulo="Concelho" para="concelho_id" erro={errors.concelho_id} className="sm:col-span-2">
                         <Selecao
                             id="concelho_id"
                             opcoes={dominios.concelhos}

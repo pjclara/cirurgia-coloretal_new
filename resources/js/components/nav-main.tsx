@@ -52,10 +52,17 @@ export function NavMain({ grupos = [] }: { grupos: NavGroup[] }) {
                                             {item.filhos.map((filho) => (
                                                 <SidebarMenuSubItem key={filho.url}>
                                                     <SidebarMenuSubButton asChild isActive={filho === activa}>
-                                                        <Link href={filho.url} prefetch aria-current={filho === activa ? 'page' : undefined}>
-                                                            {filho.icon && <filho.icon />}
-                                                            <span>{filho.title}</span>
-                                                        </Link>
+                                                        {filho.novoSeparador ? (
+                                                            <a href={filho.url} target="_blank" rel="noopener noreferrer">
+                                                                {filho.icon && <filho.icon />}
+                                                                <span>{filho.title}</span>
+                                                            </a>
+                                                        ) : (
+                                                            <Link href={filho.url} prefetch aria-current={filho === activa ? 'page' : undefined}>
+                                                                {filho.icon && <filho.icon />}
+                                                                <span>{filho.title}</span>
+                                                            </Link>
+                                                        )}
                                                     </SidebarMenuSubButton>
                                                 </SidebarMenuSubItem>
                                             ))}

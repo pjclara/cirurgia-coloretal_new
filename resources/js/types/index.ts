@@ -23,6 +23,8 @@ export interface NavItem {
     alias?: string[];
     /** Ligações secundárias, mostradas quando a secção está activa. */
     filhos?: NavItem[];
+    /** Abre noutro separador do browser (por exemplo, páginas para imprimir). */
+    novoSeparador?: boolean;
 }
 
 export interface SharedData {

@@ -43,6 +43,8 @@ type Props = {
     ambulatoriosPorValidar: AmbulatorioPorValidar[];
 };
 
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 /** Quantos itens cabem numa célula do mês antes do "+ N mais". */
 const MAX_NO_DIA = 3;
 
@@ -118,6 +120,14 @@ export default function Agenda({
     const visiveis = dias.filter((d, n) => n < 5 || d.agendamentos.length > 0);
     const nomeMes = new Date(mes + 'T00:00:00').toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
     const referencia = eMes ? mes : semana;
+    /** Salta para o mês e ano escolhidos (na vista semanal, para a primeira semana desse mês). */
+    const irParaMesAno = (m: number, a: number) => ir({ vista, semana: `${a}-${String(m).padStart(2, '0')}-01`, cancelados });
+    const anoAtual = Number(hoje.slice(0, 4));
+    const anoDaPagina = Number(referencia.slice(0, 4));
+    const anos = Array.from(
+        { length: Math.max(anoAtual + 2, anoDaPagina) - Math.min(2022, anoDaPagina) + 1 },
+        (_, n) => Math.min(2022, anoDaPagina) + n,
+    );
     const mesAtual = new Date(mes + 'T00:00:00').getMonth();
     const total = dias.reduce((soma, d) => soma + d.agendamentos.length, 0);
 
@@ -172,6 +182,32 @@ export default function Agenda({
                 <Botao variante="secundario" onClick={() => ir({ vista, semana: seguinte, cancelados })}>
                     {eMes ? 'Mês seguinte' : 'Semana seguinte'} ›
                 </Botao>
+                <div className="flex items-center gap-1">
+                    <select
+                        aria-label="Mês"
+                        value={Number(referencia.slice(5, 7))}
+                        onChange={(e) => irParaMesAno(Number(e.target.value), Number(referencia.slice(0, 4)))}
+                        className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                    >
+                        {MESES.map((nome, n) => (
+                            <option key={nome} value={n + 1}>
+                                {nome}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        aria-label="Ano"
+                        value={Number(referencia.slice(0, 4))}
+                        onChange={(e) => irParaMesAno(Number(referencia.slice(5, 7)), Number(e.target.value))}
+                        className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm tabular-nums"
+                    >
+                        {anos.map((a) => (
+                            <option key={a} value={a}>
+                                {a}
+                            </option>
+                        ))}
+                    </select>
+                </div>
                 <label className="ml-auto flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={cancelados} onChange={(e) => ir({ vista, semana: referencia, cancelados: e.target.checked })} />
                     Mostrar cancelados
@@ -181,6 +217,8 @@ export default function Agenda({
             <ul className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm" aria-label="Legenda das cores">
                 {(Object.keys(CATEGORIAS) as Categoria[]).map((c) => {
                     const n = dias.reduce((soma, d) => soma + d.agendamentos.filter((a) => a.categoria === c).length, 0);
+                    // «Urgência / outro» não se usa na agenda: só entra na legenda se houver algum.
+                    if (c === 'outra' && n === 0) return null;
                     return (
                         <li key={c} className="flex items-center gap-2 text-slate-700">
                             <span

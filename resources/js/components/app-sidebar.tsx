@@ -55,7 +55,7 @@ export function AppSidebar() {
                                         icon: CalendarDays,
                                         filhos: [
                                             { title: 'Lista de espera', url: '/agendamento/lista-de-espera', icon: ClipboardList },
-                                            { title: 'Mapa operatório', url: '/agendamento/mapa', icon: Map },
+                                            { title: 'Mapa operatório', url: '/agendamento/mapa', icon: Map, novoSeparador: true },
                                         ],
                                     },
                                 ]
