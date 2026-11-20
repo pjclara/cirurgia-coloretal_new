@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao, OpcaoAgrupada, Paginado, Responsavel } from '../../clinico/tipos';
+import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
 import type { ResolucaoComGrau } from '../../components/clinico/bloco-morbilidade';
 import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { Botao, BotaoLigacao, SelecaoResponsavel } from '../../components/clinico/campos';
@@ -25,11 +26,11 @@ type Linha = {
 };
 
 type Estado = 'todos' | 'em_atraso' | 'a_decorrer';
-type Periodo = '90' | '365' | 'todos';
 
 type Props = {
     seguimentos: Paginado<Linha>;
-    filtros: { estado: Estado; periodo: Periodo; responsavel_id: number | null; cr: boolean; q: string };
+    trimestres: string[];
+    filtros: { estado: Estado; de: string | null; ate: string | null; responsavel_id: number | null; cr: boolean; q: string };
     responsaveis: Responsavel[];
     contagens: { em_atraso: number; a_decorrer: number; cr: number | null };
     podeVerCr: boolean;
@@ -37,13 +38,7 @@ type Props = {
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
 
-const PERIODOS: { valor: Periodo; rotulo: string }[] = [
-    { valor: '90', rotulo: 'Altas dos últimos 90 dias' },
-    { valor: '365', rotulo: 'Último ano' },
-    { valor: 'todos', rotulo: 'Todas as altas' },
-];
-
-export default function Seguimentos({ seguimentos, filtros, responsaveis, contagens, podeVerCr, podeRegistar, dominios }: Props) {
+export default function Seguimentos({ seguimentos, trimestres, filtros, responsaveis, contagens, podeVerCr, podeRegistar, dominios }: Props) {
     const [termo, setTermo] = useState(filtros.q);
     const [abertoId, setAbertoId] = useState<number | null>(null);
     const indice = seguimentos.data.findIndex((l) => l.id === abertoId);
@@ -53,12 +48,25 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
         const novos = { ...filtros, q: termo.trim(), ...alteracoes };
         const consulta: Record<string, string> = {};
         if (novos.estado !== 'todos') consulta.estado = novos.estado;
-        if (novos.periodo !== '90') consulta.periodo = novos.periodo;
+        if (novos.de) consulta.de = novos.de;
+        if (novos.ate) consulta.ate = novos.ate;
         if (novos.responsavel_id) consulta.responsavel_id = String(novos.responsavel_id);
         if (novos.cr) consulta.cr = '1';
         if (novos.q) consulta.q = novos.q;
         router.get(rotas.internamentos.seguimentos, consulta, { preserveState: true, preserveScroll: true });
     };
+
+    const anos = [...new Set(trimestres.map((t) => t.slice(0, 4)))];
+    const anoSelecionado =
+        anos.find((a) => {
+            const doAno = trimestres.filter((t) => t.startsWith(a));
+            return anos.length > 1 && filtros.de === doAno[0] && filtros.ate === doAno[doAno.length - 1];
+        }) ?? '';
+    const extra: Record<string, string> = {};
+    if (filtros.estado !== 'todos') extra.estado = filtros.estado;
+    if (filtros.responsavel_id) extra.responsavel_id = String(filtros.responsavel_id);
+    if (filtros.cr) extra.cr = '1';
+    if (filtros.q) extra.q = filtros.q;
 
     const cartoes: { estado: Estado; rotulo: string; valor: number; cor: string }[] = [
         { estado: 'todos', rotulo: 'Por registar', valor: contagens.em_atraso + contagens.a_decorrer, cor: 'text-slate-900' },
@@ -118,22 +126,34 @@ export default function Seguimentos({ seguimentos, filtros, responsaveis, contag
                             className="w-56"
                         />
                     </label>
-                    <label className="text-sm">
-                        <span className="sr-only">Período</span>
+                </div>
+            </div>
+
+            {trimestres.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <label className="flex items-center gap-2 text-sm">
+                        Ano
                         <select
-                            value={filtros.periodo}
-                            onChange={(e) => aplicar({ periodo: e.target.value as Periodo })}
-                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                            value={anoSelecionado}
+                            onChange={(e) => {
+                                const ano = e.target.value;
+                                if (ano === '') return aplicar({ de: trimestres[0], ate: trimestres[trimestres.length - 1] });
+                                const doAno = trimestres.filter((t) => t.startsWith(ano));
+                                aplicar({ de: doAno[0], ate: doAno[doAno.length - 1] });
+                            }}
+                            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
                         >
-                            {PERIODOS.map((p) => (
-                                <option key={p.valor} value={p.valor}>
-                                    {p.rotulo}
+                            <option value="">Todos</option>
+                            {anos.map((a) => (
+                                <option key={a} value={a}>
+                                    {a}
                                 </option>
                             ))}
                         </select>
                     </label>
+                    <FiltroTrimestres url={rotas.internamentos.seguimentos} trimestres={trimestres} de={filtros.de} ate={filtros.ate} extra={extra} />
                 </div>
-            </div>
+            )}
 
             <CaixaPesquisa
                 id="q"

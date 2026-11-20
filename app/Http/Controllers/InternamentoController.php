@@ -10,6 +10,7 @@ use App\Models\Utente;
 use App\Services\GuardarInternamento;
 use App\Support\Cirurgias;
 use App\Support\Dominios;
+use App\Support\Intervalo;
 use App\Support\ReferenciadoAoCentro;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -89,8 +90,6 @@ class InternamentoController extends Controller
 
     public function seguimentos(Request $request): Response
     {
-        $periodos = ['90' => 90, '365' => 365, 'todos' => null];
-        $periodo = array_key_exists($request->query('periodo'), $periodos) ? $request->query('periodo') : '90';
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
         $responsavelId = ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null;
         // A identificação dos doentes do CR só é visível a quem pode ver referenciações.
@@ -100,6 +99,14 @@ class InternamentoController extends Controller
         $utilizador = $request->user();
         $hoje = now()->startOfDay();
         $limiteAtraso = $hoje->copy()->subDays(30); // alta anterior a esta data: 30 dias já passaram
+
+        // Período por trimestres, como nas análises; sem `de`/`ate` não há limite (todas as altas por registar).
+        $primeiraAlta = Internamento::query()->comAlta()->min('data_de_alta');
+        $intervalo = Intervalo::trimestres($request, $primeiraAlta, $hoje);
+        $filtraPeriodo = $request->filled('de') || $request->filled('ate');
+        $trimestres = $intervalo['trimestres'];
+        $de = $filtraPeriodo ? $intervalo['de'] : ($trimestres[0] ?? null);
+        $ate = $filtraPeriodo ? $intervalo['ate'] : ($trimestres ? end($trimestres) : null);
 
         $base = Internamento::query()
             ->comAlta()
@@ -111,7 +118,7 @@ class InternamentoController extends Controller
             ->when($responsavelId, fn ($q, $id) => $q->where('responsavel_id', $id))
             ->when($soCr, fn ($q) => $q->whereRaw(self::doenteCr()))
             ->when($q !== '', fn ($consulta) => $consulta->whereHas('utente', fn ($u) => $u->pesquisar($q)))
-            ->when($periodos[$periodo], fn ($q, $dias) => $q->whereDate('data_de_alta', '>=', $hoje->copy()->subDays($dias)));
+            ->when($filtraPeriodo && $intervalo['desde'], fn ($q) => $q->whereDate('data_de_alta', '>=', $intervalo['desde'])->whereDate('data_de_alta', '<=', $intervalo['fim']));
 
         $emAtraso = (clone $base)->whereDate('data_de_alta', '<', $limiteAtraso)->count();
         $aDecorrer = (clone $base)->whereDate('data_de_alta', '>=', $limiteAtraso)->count();
@@ -150,7 +157,8 @@ class InternamentoController extends Controller
                 'clavien' => Dominios::lista('clavien_dindos'),
             ],
             'seguimentos' => $lista,
-            'filtros' => ['estado' => $estado, 'periodo' => $periodo, 'responsavel_id' => $responsavelId, 'cr' => $soCr, 'q' => $q],
+            'trimestres' => $trimestres,
+            'filtros' => ['estado' => $estado, 'de' => $de, 'ate' => $ate, 'responsavel_id' => $responsavelId, 'cr' => $soCr, 'q' => $q],
             'responsaveis' => Dominios::responsaveis($responsavelId),
             'contagens' => ['em_atraso' => $emAtraso, 'a_decorrer' => $aDecorrer, 'cr' => $verCr ? (clone $base)->when(! $soCr, fn ($q) => $q->whereRaw(self::doenteCr()))->count() : null],
             'podeVerCr' => $verCr,

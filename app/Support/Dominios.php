@@ -29,6 +29,8 @@ class Dominios
         'origem_da_referenciacaos',
         'diagnostico_referenciacao_modos',
         'histologias',
+        'estado_consultas',
+        'timmings',
     ];
 
     /** @var array<string, array<int, array{id:int, nome:string}>> */

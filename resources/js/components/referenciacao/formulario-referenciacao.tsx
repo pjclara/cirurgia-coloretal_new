@@ -3,9 +3,10 @@ import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { useResponsavelPorOmissao } from '../../clinico/responsavel';
-import type { Opcao, OpcaoAgrupada, Responsavel } from '../../clinico/tipos';
+import type { Opcao, OpcaoAgrupada, PropsPartilhadas, Responsavel } from '../../clinico/tipos';
 import { Botao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
+import { EditorDecisao, type DecisaoTerapeutica } from './editor-decisao';
 
 type Linha = { diagnostico_id: number | ''; modo_id: number | ''; histologia_id: number | ''; data_diagnostico: string };
 
@@ -46,19 +47,11 @@ export type PropsReferenciacao = {
         histologias: Opcao[];
         diagnosticos: OpcaoAgrupada[];
         responsaveis: Responsavel[];
+        estados_consulta: Opcao[];
+        timmings: Opcao[];
     };
     hoje: string;
     fechar_url: string;
-};
-
-type DecisaoTerapeutica = {
-    id: number;
-    data: string;
-    estado: string | null;
-    timming: string | null;
-    resumo: string | null;
-    recados: string | null;
-    comentarios: string | null;
 };
 
 type Separador = 'dados' | 'diagnosticos' | 'internamentos' | 'decisoes';
@@ -121,6 +114,9 @@ export function FormularioReferenciacao({
     const paginaAtual = usePage().url; // a referenciação aberta: é para onde se volta ao fechar o internamento
     const [separador, setSeparador] = useState<Separador>('dados');
     const [confirmarApagar, setConfirmarApagar] = useState(false);
+    /** Decisão a editar (null = nova; undefined = nenhuma aberta). */
+    const [decisaoAberta, setDecisaoAberta] = useState<DecisaoTerapeutica | null | undefined>(undefined);
+    const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
 
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
@@ -365,6 +361,26 @@ export function FormularioReferenciacao({
 
                 {separador === 'decisoes' && decisoes && (
                     <Seccao titulo="Decisões terapêuticas" descricao="Reuniões de decisão terapêutica do utente, da mais recente para a mais antiga.">
+                        {referenciacao && permissoes.includes('create referenciacao') && decisaoAberta === undefined && (
+                            <div className="mb-3">
+                                <Botao variante="secundario" onClick={() => setDecisaoAberta(null)}>
+                                    Nova decisão
+                                </Botao>
+                            </div>
+                        )}
+                        {referenciacao && decisaoAberta !== undefined && (
+                            <div className="mb-3">
+                                <EditorDecisao
+                                    key={decisaoAberta?.id ?? 'nova'}
+                                    decisao={decisaoAberta}
+                                    referenciacaoId={referenciacao.id}
+                                    estados={dominios.estados_consulta}
+                                    timmings={dominios.timmings}
+                                    hoje={hoje}
+                                    aoFechar={() => setDecisaoAberta(undefined)}
+                                />
+                            </div>
+                        )}
                         {decisoes.length === 0 ? (
                             <p className="text-sm text-slate-600">Este utente não tem decisões terapêuticas registadas.</p>
                         ) : (
@@ -383,6 +399,15 @@ export function FormularioReferenciacao({
                                         {d.resumo && <p className="mt-1 whitespace-pre-line text-slate-800">{d.resumo}</p>}
                                         {d.recados && <p className="mt-1 whitespace-pre-line text-slate-700">Recados: {d.recados}</p>}
                                         {d.comentarios && <p className="mt-1 text-xs whitespace-pre-line text-slate-600">{d.comentarios}</p>}
+                                        {permissoes.includes('update referenciacao') && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setDecisaoAberta(d)}
+                                                className="mt-2 text-xs font-medium text-[#7d1830] hover:underline"
+                                            >
+                                                Editar
+                                            </button>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

@@ -84,6 +84,49 @@ class ReferenciacaoController extends Controller
         return back()->with('sucesso', 'Utente sinalizado para o centro de referência.');
     }
 
+    /** Regista uma decisão terapêutica (reunião DT) nesta referenciação. */
+    public function guardarDecisao(Request $request, Referenciacao $referenciacao): RedirectResponse
+    {
+        $agora = now();
+        DB::table('reuniao_decisao_terapeuticas')->insert($this->validarDecisao($request) + [
+            'referenciacao_id' => $referenciacao->id,
+            'created_by_id' => $request->user()->id,
+            'updated_by_id' => $request->user()->id,
+            'created_at' => $agora,
+            'updated_at' => $agora,
+        ]);
+
+        return back()->with('sucesso', 'Decisão terapêutica registada.');
+    }
+
+    public function atualizarDecisao(Request $request, int $decisao): RedirectResponse
+    {
+        $existe = DB::table('reuniao_decisao_terapeuticas')->where('id', $decisao)->whereNull('deleted_at')->exists();
+        abort_unless($existe, 404);
+
+        DB::table('reuniao_decisao_terapeuticas')->where('id', $decisao)->update($this->validarDecisao($request) + [
+            'updated_by_id' => $request->user()->id,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('sucesso', 'Decisão terapêutica atualizada.');
+    }
+
+    private function validarDecisao(Request $request): array
+    {
+        $minima = config('clinico.data_minima');
+        $dados = $request->validate([
+            'data_de_decisao_terapeutica' => ['required', 'date_format:Y-m-d', "after_or_equal:$minima", 'before_or_equal:'.now()->addYear()->format('Y-m-d')],
+            'estado_consulta_id' => ['required', 'integer', Rule::exists('estado_consultas', 'id')],
+            'timming_id' => ['nullable', 'integer', Rule::exists('timmings', 'id')],
+            'resumo' => ['nullable', 'string', 'max:5000'],
+            'recados' => ['nullable', 'string', 'max:5000'],
+            'comentarios' => ['nullable', 'string', 'max:5000'],
+        ], ['required' => 'Preencha este campo.', 'date_format' => 'Data inválida.']);
+
+        return collect($dados)->map(fn ($v) => is_string($v) && trim($v) === '' ? null : $v)->all();
+    }
+
     public function atualizar(Request $request, Referenciacao $referenciacao): RedirectResponse
     {
         $dados = $this->validar($request);
@@ -241,6 +284,8 @@ class ReferenciacaoController extends Controller
                 // Só os diagnósticos do centro de referência, mais «Outro Colorectal» (e os que esta referenciação já tem).
                 'diagnosticos' => collect(Dominios::diagnosticos())->whereIn('id', $this->diagnosticosPermitidos($referenciacao))->values()->all(),
                 'responsaveis' => Dominios::responsaveis($referenciacao?->responsavel_id),
+                'estados_consulta' => Dominios::lista('estado_consultas'),
+                'timmings' => Dominios::lista('timmings'),
             ],
             // Os internamentos do utente, para ter o contexto clínico à vista (só com permissão para os ver).
             'internamentos' => request()->user()->can('show internamento') ? $this->internamentosDoUtente($utente) : null,
@@ -263,12 +308,14 @@ class ReferenciacaoController extends Controller
             ->leftJoin('timmings as t', 't.id', '=', 'd.timming_id')
             ->where('r.utente_id', $utente->id)->whereNull('d.deleted_at')
             ->orderByDesc('d.data_de_decisao_terapeutica')->orderByDesc('d.id')
-            ->get(['d.id', 'd.data_de_decisao_terapeutica as data', 'e.nome as estado', 't.nome as timming', 'd.resumo', 'd.recados', 'd.comentarios'])
+            ->get(['d.id', 'd.data_de_decisao_terapeutica as data', 'd.estado_consulta_id as estado_id', 'e.nome as estado', 'd.timming_id', 't.nome as timming', 'd.resumo', 'd.recados', 'd.comentarios'])
             ->map(fn ($d) => [
                 'id' => $d->id,
                 'data' => substr((string) $d->data, 0, 10),
                 'estado' => $d->estado,
+                'estado_id' => $d->estado_id,
                 'timming' => $d->timming,
+                'timming_id' => $d->timming_id,
                 'resumo' => $d->resumo,
                 'recados' => $d->recados,
                 'comentarios' => $d->comentarios,

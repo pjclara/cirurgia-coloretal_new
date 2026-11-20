@@ -55,7 +55,74 @@ class ReferenciacaoAnaliseController extends Controller
             sum(exists (select 1 from internamentos i join bloco_operatorios b on b.internamento_id = i.id
                 where i.utente_id = r.utente_id and i.deleted_at is null and b.deleted_at is null and b.data_de_inicio >= r.data_de_referenciacao)) as operados')->first();
 
+        // Decisões terapêuticas (reunião DT) do período, pela data da decisão.
+        $decisoes = fn () => DB::table('reuniao_decisao_terapeuticas as d')
+            ->join('referenciacao_centro_de_referencias as r', 'r.id', '=', 'd.referenciacao_id')
+            ->whereNull('d.deleted_at')->whereNull('r.deleted_at');
+        $decisoesNoPeriodo = fn () => $decisoes()->when($desde, fn ($q) => $q->where('d.data_de_decisao_terapeutica', '>=', $desde))
+            ->when($ate, fn ($q) => $q->where('d.data_de_decisao_terapeutica', '<=', $ate));
+        $totalDt = $decisoesNoPeriodo()->count();
+        $anteriorDt = $desde
+            ? $decisoes()->where('d.data_de_decisao_terapeutica', '>=', $anteriorDesde)->where('d.data_de_decisao_terapeutica', '<', $desde)->count()
+            : null;
+        $doentesDt = $decisoesNoPeriodo()->distinct()->count('r.utente_id');
+        // Doentes cuja primeira decisão de sempre cai neste período (os restantes já vinham de antes).
+        $primeirasDt = DB::query()->fromSub(
+            $decisoes()->selectRaw('r.utente_id, min(d.data_de_decisao_terapeutica) as primeira')->groupBy('r.utente_id'),
+            'p'
+        )->when($desde, fn ($q) => $q->where('p.primeira', '>=', $desde))->when($ate, fn ($q) => $q->where('p.primeira', '<=', $ate))->count();
+        // Dias da referenciação à primeira decisão dessa referenciação, para as referenciadas no período.
+        $diasAteDt = DB::query()->fromSub(
+            $noPeriodo()->join('reuniao_decisao_terapeuticas as d', 'd.referenciacao_id', '=', 'r.id')->whereNull('d.deleted_at')
+                ->selectRaw('r.id, datediff(min(d.data_de_decisao_terapeutica), r.data_de_referenciacao) as dias')->groupBy('r.id', 'r.data_de_referenciacao'),
+            'x'
+        )->where('x.dias', '>=', 0)->pluck('dias')->map(fn ($d) => (int) $d);
+        // Da decisão à cirurgia: cada cirurgia conta uma vez, para a última decisão (do período) que a precede, até um ano depois.
+        $diasAteCirurgia = collect();
+        $operadosDepois = 0;
+        $decisoesPorUtente = $decisoesNoPeriodo()->orderBy('d.data_de_decisao_terapeutica')
+            ->get(['r.utente_id', 'd.data_de_decisao_terapeutica as data'])
+            ->groupBy('utente_id')->map(fn ($l) => $l->map(fn ($x) => substr((string) $x->data, 0, 10))->unique()->values());
+        $cirurgiasPorUtente = DB::table('bloco_operatorios as b')->join('internamentos as i', 'i.id', '=', 'b.internamento_id')
+            ->whereNull('b.deleted_at')->whereNull('i.deleted_at')->whereIn('i.utente_id', $decisoesPorUtente->keys())
+            ->orderBy('b.data_de_inicio')->get(['i.utente_id', 'b.data_de_inicio as data'])
+            ->groupBy('utente_id')->map(fn ($l) => $l->map(fn ($x) => substr((string) $x->data, 0, 10))->values());
+        foreach ($decisoesPorUtente as $utenteId => $datas) {
+            $operado = false;
+            foreach ($cirurgiasPorUtente->get($utenteId, collect()) as $cirurgia) {
+                $decisao = $datas->last(fn ($d) => $d <= $cirurgia);
+                $dias = $decisao ? (int) Carbon::parse($decisao)->diffInDays(Carbon::parse($cirurgia)) : null;
+                if ($dias !== null && $dias <= 365) {
+                    $diasAteCirurgia->push($dias);
+                    $operado = true;
+                }
+            }
+            $operadosDepois += $operado ? 1 : 0;
+        }
+        $comDt = $noPeriodo()->whereExists(fn ($q) => $q->selectRaw('1')->from('reuniao_decisao_terapeuticas as d')
+            ->whereColumn('d.referenciacao_id', 'r.id')->whereNull('d.deleted_at'))->count();
+
         return Inertia::render('referenciacao/analise', [
+            'dt' => [
+                'decisoes' => ['valor' => $totalDt, 'anterior' => $anteriorDt],
+                'doentes' => $doentesDt,
+                'primeiras' => $primeirasDt,
+                'por_doente' => $doentesDt > 0 ? round($totalDt / $doentesDt, 1) : null,
+                'referenciadas_com_dt' => ['valor' => $comDt, 'de' => $total],
+                'dias_ate_primeira' => $this->mediana($diasAteDt),
+                'media_ate_primeira' => $diasAteDt->isNotEmpty() ? round($diasAteDt->avg(), 1) : null,
+                'tempos_ate_dt' => $this->faixasEmDias($diasAteDt),
+                'n_ate_dt' => $diasAteDt->count(),
+                'dias_dt_cirurgia' => $this->mediana($diasAteCirurgia),
+                'media_dt_cirurgia' => $diasAteCirurgia->isNotEmpty() ? round($diasAteCirurgia->avg(), 1) : null,
+                'tempos_dt_cirurgia' => $this->faixasEmDias($diasAteCirurgia),
+                'n_dt_cirurgia' => $diasAteCirurgia->count(),
+                'operados_depois' => ['valor' => $operadosDepois, 'de' => $doentesDt],
+                'mensal' => $this->porMes($decisoes, $hoje, $desde, $ate, 'd.data_de_decisao_terapeutica'),
+                'anual' => $this->porAno($decisoes, 'd.data_de_decisao_terapeutica', 2021),
+                'estados' => $this->contagem($decisoesNoPeriodo()->join('estado_consultas as e', 'e.id', '=', 'd.estado_consulta_id'), 'e.nome'),
+                'timmings' => $this->contagem($decisoesNoPeriodo()->join('timmings as t', 't.id', '=', 'd.timming_id'), 't.nome'),
+            ],
             'trimestres' => $trimestres,
             'de' => $de,
             'ate' => $ateTrimestre,
@@ -98,21 +165,21 @@ class ReferenciacaoAnaliseController extends Controller
     }
 
     /** Referenciações por ano (a partir de ANO_INICIAL), com os anos sem registos a zero. */
-    private function porAno(callable $referenciacoes): array
+    private function porAno(callable $referenciacoes, string $coluna = 'r.data_de_referenciacao', int $anoInicial = self::ANO_INICIAL): array
     {
-        $porAno = $referenciacoes()->selectRaw('year(r.data_de_referenciacao) as ano, count(*) as n')->groupBy('ano')->pluck('n', 'ano');
+        $porAno = $referenciacoes()->selectRaw("year($coluna) as ano, count(*) as n")->groupBy('ano')->pluck('n', 'ano');
         $atual = (int) now()->format('Y');
 
-        return collect(range(self::ANO_INICIAL, $atual))->map(fn ($ano) => ['rotulo' => (string) $ano, 'valor' => (int) ($porAno[$ano] ?? 0)])->all();
+        return collect(range($anoInicial, $atual))->map(fn ($ano) => ['rotulo' => (string) $ano, 'valor' => (int) ($porAno[$ano] ?? 0)])->all();
     }
 
     /** Referenciações por mês nos trimestres escolhidos (24 meses sem período), com os meses sem registos a zero. */
-    private function porMes(callable $referenciacoes, Carbon $hoje, ?Carbon $desde, ?Carbon $ate): array
+    private function porMes(callable $referenciacoes, Carbon $hoje, ?Carbon $desde, ?Carbon $ate, string $coluna = 'r.data_de_referenciacao'): array
     {
         $inicio = $desde ? $desde->copy()->startOfMonth() : $hoje->copy()->startOfMonth()->subMonths(23);
         $fim = $ate ?? $hoje;
-        $contagens = $referenciacoes()->where('r.data_de_referenciacao', '>=', $inicio)->where('r.data_de_referenciacao', '<=', $fim)
-            ->selectRaw("date_format(r.data_de_referenciacao, '%Y-%m') as ym, count(*) as n")->groupBy('ym')->pluck('n', 'ym');
+        $contagens = $referenciacoes()->where($coluna, '>=', $inicio)->where($coluna, '<=', $fim)
+            ->selectRaw("date_format($coluna, '%Y-%m') as ym, count(*) as n")->groupBy('ym')->pluck('n', 'ym');
 
         $meses = [];
         for ($mes = $inicio->copy(); $mes->lte($fim); $mes->addMonthNoOverflow()) {
@@ -120,6 +187,15 @@ class ReferenciacaoAnaliseController extends Controller
         }
 
         return $meses;
+    }
+
+    /** Dias entre dois momentos (referenciação, decisão, cirurgia), por faixas. */
+    private function faixasEmDias(Collection $dias): array
+    {
+        $faixas = ['Até 7 dias' => fn ($d) => $d <= 7, '8 a 14 dias' => fn ($d) => $d >= 8 && $d <= 14, '15 a 30 dias' => fn ($d) => $d >= 15 && $d <= 30,
+            '31 a 60 dias' => fn ($d) => $d >= 31 && $d <= 60, '61 a 90 dias' => fn ($d) => $d >= 61 && $d <= 90, 'Mais de 90 dias' => fn ($d) => $d > 90];
+
+        return collect($faixas)->map(fn ($regra, $rotulo) => ['rotulo' => $rotulo, 'valor' => $dias->filter($regra)->count()])->values()->all();
     }
 
     /** Dias entre a referenciação e a entrada no centro, por faixas. */

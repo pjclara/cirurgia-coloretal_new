@@ -43,11 +43,16 @@ test('não inclui falecidos nem quem já tem o seguimento registado', function (
         ->where('contagens.a_decorrer', 0));
 });
 
-test('por defeito só mostra altas dos últimos 90 dias', function () {
-    internamentoComAlta($this, 200);
+test('por defeito mostra todas as altas e filtra por trimestres', function () {
+    $i = internamentoComAlta($this, 200);
+    $trimestre = \App\Support\Intervalo::rotuloTrimestre($i->data_de_alta);
+    $outro = \App\Support\Intervalo::rotuloTrimestre($i->data_de_alta->copy()->subMonths(6));
 
-    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 0));
-    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?periodo=365')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 1));
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 1));
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?de='.urlencode($trimestre).'&ate='.urlencode($trimestre))
+        ->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 1));
+    $this->actingAs($this->utilizador)->get('/internamentos/seguimentos?de='.urlencode($outro).'&ate='.urlencode($outro))
+        ->assertInertia(fn (Assert $p) => $p->where('contagens.em_atraso', 0));
 });
 
 test('a lista não mostra o grau da alta: o grau definitivo só existe depois dos 30 dias', function () {

@@ -7,7 +7,29 @@ import ClinicoLayout from '../../layouts/clinico-layout';
 
 type Grupo = { internamentos: number; demora: number | null; complicacoes: number | null; mortalidade: number | null; operados: number | null };
 
+type DadosDt = {
+    decisoes: { valor: number; anterior: number | null };
+    doentes: number;
+    primeiras: number;
+    por_doente: number | null;
+    referenciadas_com_dt: { valor: number; de: number };
+    dias_ate_primeira: number | null;
+    media_ate_primeira: number | null;
+    tempos_ate_dt: Ponto[];
+    n_ate_dt: number;
+    dias_dt_cirurgia: number | null;
+    media_dt_cirurgia: number | null;
+    tempos_dt_cirurgia: Ponto[];
+    n_dt_cirurgia: number;
+    operados_depois: { valor: number; de: number };
+    mensal: Ponto[];
+    anual: Ponto[];
+    estados: Ponto[];
+    timmings: Ponto[];
+};
+
 type Props = {
+    dt: DadosDt;
     trimestres: string[];
     de: string | null;
     ate: string | null;
@@ -38,6 +60,7 @@ const pc = (parte: number, todo: number) => (todo > 0 ? `${formatar(Math.round((
 const valor = (v: number | null, sufixo = '') => (v === null ? '—' : formatar(v, sufixo));
 
 export default function AnaliseCR({
+    dt,
     trimestres,
     de,
     ate,
@@ -56,6 +79,7 @@ export default function AnaliseCR({
     const [aCarregar, setACarregar] = useState(false);
     const periodo = nomePeriodo(de, ate);
     const { referenciacoes: ref } = ind;
+    const variacaoDt = dt.decisoes.anterior ? Math.round(((dt.decisoes.valor - dt.decisoes.anterior) / dt.decisoes.anterior) * 100) : null;
     const variacao = ref.anterior ? Math.round(((ref.valor - ref.anterior) / ref.anterior) * 100) : null;
 
     const linhasComparacao: { rotulo: string; cr: string; restantes: string }[] = [
@@ -213,6 +237,98 @@ export default function AnaliseCR({
                                 operadas, por isso não permite concluir que o CR melhora ou piora os resultados.
                             </p>
                         </section>
+                    </div>
+
+                    <h2 className="pt-2 text-base font-semibold text-[var(--ink)]">Decisão terapêutica (DT)</h2>
+                    <p className="-mt-3 text-xs text-[var(--ink2)]">
+                        Reuniões de decisão terapêutica dos doentes referenciados; os trimestres aplicam-se à data da decisão. Os dados mais recentes
+                        vêm do ficheiro do hospital (só data e estado).
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
+                        <Indicador
+                            rotulo={`Decisões DT (${periodo})`}
+                            valor={formatar(dt.decisoes.valor)}
+                            nota={
+                                variacaoDt !== null
+                                    ? `${variacaoDt > 0 ? '+' : ''}${variacaoDt}% face ao período anterior (${formatar(dt.decisoes.anterior ?? 0)})`
+                                    : `${formatar(dt.doentes)} doentes`
+                            }
+                            destaque
+                        />
+                        <Indicador rotulo="Doentes discutidos" valor={formatar(dt.doentes)} nota="Doentes distintos com decisão no período" />
+                        <Indicador rotulo="Primeira DT" valor={formatar(dt.primeiras)} nota="Doentes cuja 1.ª decisão é neste período" />
+                        <Indicador
+                            rotulo="Decisões por doente"
+                            valor={dt.por_doente !== null ? formatar(dt.por_doente) : '—'}
+                            nota="Média no período"
+                        />
+                        <Indicador
+                            rotulo="Referenciações com DT"
+                            valor={pc(dt.referenciadas_com_dt.valor, dt.referenciadas_com_dt.de)}
+                            nota={`${formatar(dt.referenciadas_com_dt.valor)} de ${formatar(dt.referenciadas_com_dt.de)} referenciadas no período`}
+                        />
+                        <Indicador
+                            rotulo="Da DT à cirurgia"
+                            valor={dt.dias_dt_cirurgia !== null ? `${formatar(dt.dias_dt_cirurgia)} d` : '—'}
+                            nota={`Mediana · ${pc(dt.operados_depois.valor, dt.operados_depois.de)} dos doentes operados depois`}
+                        />
+                        <Indicador
+                            rotulo="Da referenciação à 1.ª DT"
+                            valor={dt.dias_ate_primeira !== null ? `${formatar(dt.dias_ate_primeira)} d` : '—'}
+                            nota="Mediana, referenciações do período com DT"
+                        />
+                    </div>
+
+                    <div className="grid gap-5 lg:grid-cols-2">
+                        <Cartao
+                            titulo="Tempo da referenciação à 1.ª DT"
+                            nota={`Dias entre a referenciação e a 1.ª decisão (${periodo}) · ${formatar(dt.n_ate_dt)} referenciações · mediana ${valor(dt.dias_ate_primeira)} d, média ${valor(dt.media_ate_primeira)} d`}
+                            colunas={['Tempo', 'Referenciações']}
+                            linhas={tabela(dt.tempos_ate_dt)}
+                        >
+                            <Colunas dados={dt.tempos_ate_dt} passoRotulos={1} />
+                        </Cartao>
+                        <Cartao
+                            titulo="Tempo da DT à cirurgia"
+                            nota={`Dias entre a última DT e a cirurgia (até 1 ano), cirurgias dos doentes discutidos no período · ${formatar(dt.n_dt_cirurgia)} cirurgias · mediana ${valor(dt.dias_dt_cirurgia)} d, média ${valor(dt.media_dt_cirurgia)} d · ${pc(dt.operados_depois.valor, dt.operados_depois.de)} dos doentes operados depois`}
+                            colunas={['Tempo', 'Cirurgias']}
+                            linhas={tabela(dt.tempos_dt_cirurgia)}
+                        >
+                            <Colunas dados={dt.tempos_dt_cirurgia} passoRotulos={1} />
+                        </Cartao>
+                    </div>
+
+                    <Cartao
+                        titulo="Decisões DT por mês"
+                        nota={`Por data da decisão (${periodo}); o mês em curso está incompleto`}
+                        colunas={['Mês', 'Decisões']}
+                        linhas={tabela(dt.mensal.map((m) => ({ ...m, rotulo: nomeMes(m.rotulo) })))}
+                    >
+                        <Colunas dados={dt.mensal} etiqueta={(p) => nomeMes(p.rotulo)} passoRotulos={2} largura={1280} altura={210} />
+                    </Cartao>
+
+                    <div className="grid gap-5 lg:grid-cols-2">
+                        <Cartao
+                            titulo="Decisões DT por ano"
+                            nota="Desde 2021; o ano em curso está incompleto"
+                            colunas={['Ano', 'Decisões']}
+                            linhas={tabela(dt.anual)}
+                        >
+                            <Colunas dados={dt.anual} passoRotulos={1} />
+                        </Cartao>
+                        <Cartao titulo="Estado da decisão" nota={periodo} colunas={['Estado', 'Decisões']} linhas={tabela(dt.estados)}>
+                            <BarrasH dados={dt.estados} />
+                        </Cartao>
+                        {dt.timmings.length > 0 && (
+                            <Cartao
+                                titulo="Timming"
+                                nota={`Decisões com timming registado (${periodo})`}
+                                colunas={['Timming', 'Decisões']}
+                                linhas={tabela(dt.timmings)}
+                            >
+                                <BarrasH dados={dt.timmings} />
+                            </Cartao>
+                        )}
                     </div>
 
                     <p className="text-xs text-[var(--ink2)]">

@@ -62,3 +62,57 @@ test('a referenciação mostra as decisões terapêuticas do utente', function (
         ->where('modal.decisoes.0.data', '2025-04-01')
         ->where('modal.decisoes.0.resumo', 'Vigilância'));
 });
+
+test('regista e edita decisões terapêuticas na referenciação, só com as permissões certas', function () {
+    DB::table('estado_consultas')->insertOrIgnore(['id' => 3, 'nome' => 'Realizada']);
+    $gestor = utilizadorClinico(Spatie\Permission\Models\Permission::where('name', 'like', '%referenciacao%')->pluck('name')->all());
+    $leitor = utilizadorClinico(['show referenciacao']);
+    $utente = novoUtente();
+    $referenciacao = DB::table('referenciacao_centro_de_referencias')->insertGetId([
+        'uuid' => (string) Str::uuid(), 'responsavel_id' => $gestor->id, 'created_by_id' => $gestor->id, 'updated_by_id' => $gestor->id,
+        'utente_id' => $utente->id, 'data_de_referenciacao' => '2025-01-01', 'origem_id' => DB::table('origem_da_referenciacaos')->value('id'),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $corpo = ['data_de_decisao_terapeutica' => '2025-05-05', 'estado_consulta_id' => 3, 'timming_id' => '', 'resumo' => 'Cirurgia', 'recados' => '', 'comentarios' => ''];
+
+    $this->actingAs($leitor)->post("/referenciacao/$referenciacao/decisoes", $corpo)->assertForbidden();
+
+    $this->actingAs($gestor)->post("/referenciacao/$referenciacao/decisoes", $corpo)->assertSessionHasNoErrors();
+    $decisao = DB::table('reuniao_decisao_terapeuticas')->where('referenciacao_id', $referenciacao)->first();
+    expect($decisao->resumo)->toBe('Cirurgia')->and($decisao->timming_id)->toBeNull()->and($decisao->recados)->toBeNull();
+
+    $this->actingAs($gestor)->put("/referenciacao/decisoes/{$decisao->id}", ['resumo' => 'Vigilância'] + $corpo)->assertSessionHasNoErrors();
+    expect(DB::table('reuniao_decisao_terapeuticas')->find($decisao->id)->resumo)->toBe('Vigilância');
+
+    $this->actingAs($gestor)->post("/referenciacao/$referenciacao/decisoes", ['data_de_decisao_terapeutica' => 'x'] + $corpo)->assertSessionHasErrors('data_de_decisao_terapeutica');
+});
+
+test('a análise do centro de referência traz as estatísticas das decisões terapêuticas', function () {
+    DB::table('estado_consultas')->insertOrIgnore(['id' => 3, 'nome' => 'Realizada']);
+    $gestor = utilizadorClinico(Spatie\Permission\Models\Permission::where('name', 'like', '%referenciacao%')->pluck('name')->all());
+    $utente = novoUtente();
+    $referenciacao = DB::table('referenciacao_centro_de_referencias')->insertGetId([
+        'uuid' => (string) Str::uuid(), 'responsavel_id' => $gestor->id, 'created_by_id' => $gestor->id, 'updated_by_id' => $gestor->id,
+        'utente_id' => $utente->id, 'data_de_referenciacao' => now()->subDays(40)->format('Y-m-d'), 'origem_id' => DB::table('origem_da_referenciacaos')->value('id'),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    foreach ([30, 10] as $dias) {
+        DB::table('reuniao_decisao_terapeuticas')->insert(['referenciacao_id' => $referenciacao, 'data_de_decisao_terapeutica' => now()->subDays($dias)->format('Y-m-d'), 'estado_consulta_id' => 3, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    $this->actingAs($gestor)->get('/referenciacao/analise?de=2020-1&ate=2030-4')->assertInertia(fn ($p) => $p
+        ->where('dt.decisoes.valor', 2)->where('dt.doentes', 1)->where('dt.primeiras', 1)->where('dt.por_doente', 2)
+        ->where('dt.dias_ate_primeira', 10)->where('dt.estados.0.rotulo', 'Realizada')->where('dt.estados.0.valor', 2)
+        ->where('dt.n_ate_dt', 1)->where('dt.tempos_ate_dt.1.valor', 1)
+        ->where('dt.n_dt_cirurgia', 0)->where('dt.operados_depois.valor', 0));
+
+    // Uma cirurgia 5 dias depois da última decisão (há 10 dias) passa a contar.
+    $internamento = novoInternamento($utente, $gestor, ['data_de_entrada' => now()->subDays(8)->format('Y-m-d')]);
+    DB::table('bloco_operatorios')->insert([
+        'internamento_id' => $internamento->id, 'data_de_inicio' => now()->subDays(5)->format('Y-m-d'), 'tipo_de_cirurgia_id' => DB::table('tipo_de_cirurgias')->value('id'),
+        'tipo_de_abordagem_id' => DB::table('tipo_de_abordagems')->value('id'), 're_intervencao_nao_programada_id' => 1, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $this->actingAs($gestor)->get('/referenciacao/analise?de=2020-1&ate=2030-4')->assertInertia(fn ($p) => $p
+        ->where('dt.n_dt_cirurgia', 1)->where('dt.dias_dt_cirurgia', 5)->where('dt.tempos_dt_cirurgia.0.valor', 1)
+        ->where('dt.operados_depois.valor', 1)->where('dt.operados_depois.de', 1));
+});
