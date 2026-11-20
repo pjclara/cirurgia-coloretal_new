@@ -100,30 +100,32 @@ export function FormularioInscricao({ espera, utente, sinalizacao, diagnosticos_
                     </div>
                 </Seccao>
 
-                <Seccao titulo="Intervenções propostas" descricao="Escolha pelo menos uma.">
-                    <EscolhaMultipla
-                        opcoes={dominios.intervencoes}
-                        valor={data.intervencoes}
-                        aoMudar={(v) => setData('intervencoes', v)}
-                        procurar="Procurar intervenção"
-                        vazio="Nenhuma intervenção escolhida."
-                    />
-                    {erros.intervencoes && (
-                        <p className="mt-2 text-sm text-rose-700" role="alert">
-                            {erros.intervencoes}
-                        </p>
-                    )}
-                </Seccao>
+                <div className="grid items-start gap-5 md:grid-cols-2">
+                    <Seccao titulo="Diagnósticos">
+                        <EscolhaMultipla
+                            opcoes={dominios.diagnosticos}
+                            valor={data.diagnosticos}
+                            aoMudar={(v) => setData('diagnosticos', v)}
+                            procurar="Procurar diagnóstico"
+                            vazio="Nenhum diagnóstico escolhido."
+                        />
+                    </Seccao>
 
-                <Seccao titulo="Diagnósticos">
-                    <EscolhaMultipla
-                        opcoes={dominios.diagnosticos}
-                        valor={data.diagnosticos}
-                        aoMudar={(v) => setData('diagnosticos', v)}
-                        procurar="Procurar diagnóstico"
-                        vazio="Nenhum diagnóstico escolhido."
-                    />
-                </Seccao>
+                    <Seccao titulo="Intervenções propostas" descricao="Escolha pelo menos uma.">
+                        <EscolhaMultipla
+                            opcoes={dominios.intervencoes}
+                            valor={data.intervencoes}
+                            aoMudar={(v) => setData('intervencoes', v)}
+                            procurar="Procurar intervenção"
+                            vazio="Nenhuma intervenção escolhida."
+                        />
+                        {erros.intervencoes && (
+                            <p className="mt-2 text-sm text-rose-700" role="alert">
+                                {erros.intervencoes}
+                            </p>
+                        )}
+                    </Seccao>
+                </div>
 
                 <Seccao titulo="Comentários">
                     <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional>

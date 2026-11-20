@@ -12,7 +12,7 @@ export function ModalAgendamento({ modal }: { modal: Modal | null }) {
     return (
         <Dialog open={modal !== null} onOpenChange={(aberto) => !aberto && fechar()}>
             <DialogContent
-                className="max-h-[90vh] max-w-4xl overflow-y-auto bg-white text-slate-900"
+                className="max-h-[90vh] max-w-5xl overflow-y-auto bg-white text-slate-900"
                 onInteractOutside={(e) => e.preventDefault()}
                 aria-describedby={undefined}
             >
