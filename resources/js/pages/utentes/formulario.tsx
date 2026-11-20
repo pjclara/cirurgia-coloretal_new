@@ -51,7 +51,7 @@ function lerTextoDoProcesso(texto: string): DadosColados {
         numero_processo: t.match(/N[ºo°.]*\s*Processo:?\s*(\d+)/i)?.[1],
         numero_utente: t.match(/N[ºo°.]*\s*Utente:?\s*(\d+)/i)?.[1],
         nome: nome?.[1].trim(),
-        sexo: t.match(/(Masculino|Feminino)/i)?.[1],
+        sexo: t.match(/(Masculino|Feminino)/i)?.[1],
         data_nascimento: nascimento ? `${nascimento[3]}-${nascimento[2]}-${nascimento[1]}` : undefined,
     };
 }
@@ -94,7 +94,9 @@ export function CorpoFormularioUtente({
         setColado(texto);
         if (texto.trim() === '') return setResultadoColado(null);
         const lido = lerTextoDoProcesso(texto);
-        const sexo = dominios.sexos.find((o) => o.nome.toLowerCase() === lido.sexo?.toLowerCase());
+        // Pela inicial (M/F), para servir mesmo que a lista use «Masculino»/«M»/«Homem».
+        const inicial = lido.sexo?.charAt(0).toLowerCase();
+        const sexo = inicial ? dominios.sexos.find((o) => o.nome.trim().toLowerCase().startsWith(inicial)) : undefined;
         const preenchidos = [
             lido.nome && 'nome',
             lido.numero_processo && 'nº de processo',
