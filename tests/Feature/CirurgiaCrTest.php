@@ -151,3 +151,21 @@ test('a revisão de internamentos filtra os internamentos com cirurgia', functio
         ->where('internamentos.data', fn ($d) => collect($d)->pluck('id')->sort()->values()->all() === collect([$comResseccao->id, $semResseccao->id])->sort()->values()->all()));
     $this->actingAs($this->utilizador)->get('/internamentos')->assertInertia(fn (Assert $p) => $p->has('internamentos.data', 3));
 });
+
+test('as listas assinalam o CR incompleto até os dados e a descrição serem preenchidos', function () {
+    $utente = novoUtente();
+    referenciarParaCirurgiaCr($utente, $this->utilizador, now()->subDays(30)->format('Y-m-d'));
+    $internamento = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
+
+    $this->actingAs($this->utilizador)->post("/internamentos/{$internamento->id}/cirurgias", cirurgiaCrDados())->assertSessionHasNoErrors();
+    $falta = fn () => \App\Support\Cirurgias::porInternamento([$internamento->id])->get($internamento->id)->first()['cr_em_falta'];
+
+    expect($falta())->toBe(['cr', 'descricao']);
+
+    $bloco = BlocoOperatorio::first();
+    $this->actingAs($this->utilizador)->put("/cirurgias/{$bloco->id}", cirurgiaCrDados(['cr' => crDados()]))->assertSessionHasNoErrors();
+    expect($falta())->toBe(['descricao']);
+
+    $this->actingAs($this->utilizador)->put("/cirurgias/{$bloco->id}", cirurgiaCrDados(['cr' => crDados(), 'descricoes' => [1 => crDescricao()]]))->assertSessionHasNoErrors();
+    expect($falta())->toBe([]);
+});

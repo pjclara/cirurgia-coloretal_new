@@ -129,6 +129,9 @@ class CancroRetalAnaliseController extends Controller
             ->leftJoin('users as ur', 'ur.id', '=', 'i.responsavel_id')
             ->selectRaw("b.data_de_inicio as data, b.id as bloco_id, i.id as internamento_id, u.id as utente_id, u.nome as utente_nome,
                 u.numero_processo, i.responsavel_id, coalesce(nullif(ur.abrev, ''), ur.name) as responsavel_nome, i.data_de_entrada, i.data_de_alta, i.destino_id,
+                exists (select 1 from bloco_operatorio_c_r_s cr where cr.bloco_operatorio_id = b.id and cr.deleted_at is null) as tem_cr,
+                exists (select 1 from intervencao_descricaos d join bloco_operatorio_intervencao p on p.id = d.intervencao_id
+                    where p.bloco_operatorio_id = b.id and d.deleted_at is null) as tem_descricao,
                 ({$tem((string) $amputacao)}) as tem_amputacao, ({$tem((string) $retoSigmoideia)}) as tem_reto_sigmoideia,
                 exists (select 1 from morbilidades m where m.internamento_id = i.id and m.momento = 'alta') as morb_alta,
                 exists (select 1 from morbilidades m join complicacao_morbilidade c on c.morbilidade_id = m.id
@@ -165,7 +168,7 @@ class CancroRetalAnaliseController extends Controller
     }
 
     /** Colunas da tabela de qualidade dos dados, por ordem. */
-    public const CAMPOS = ['alta', 'destino', 'morbilidade_alta', 'seguimento_30', 'clavien_30', 'datas'];
+    public const CAMPOS = ['alta', 'destino', 'morbilidade_alta', 'seguimento_30', 'clavien_30', 'datas', 'cr', 'descricao_cr'];
 
     /**
      * Cirurgias do período a que falta algum dado necessário aos indicadores. `falta` lista os campos em falta;
@@ -197,6 +200,12 @@ class CancroRetalAnaliseController extends Controller
             if ($l->clavien_em_falta) {
                 $falta[] = 'clavien_30';
             }
+            if (! $l->tem_cr) {
+                $falta[] = 'cr';
+            }
+            if (! $l->tem_descricao) {
+                $falta[] = 'descricao_cr';
+            }
             $dia = substr($l->data, 0, 10);
             if ($dia < substr($l->data_de_entrada, 0, 10) || ($l->data_de_alta !== null && $dia > substr($l->data_de_alta, 0, 10))) {
                 $falta[] = 'datas';
@@ -211,7 +220,8 @@ class CancroRetalAnaliseController extends Controller
             } elseif (in_array('seguimento_30', $falta, true) && $diasDesdeAlta !== null && $diasDesdeAlta <= 90) {
                 [$prioridade, $motivo] = ['media', 'Seguimento em atraso, ainda dentro dos 90 dias da alta'];
             } elseif ($falta !== []) {
-                [$prioridade, $motivo] = ['baixa', in_array('seguimento_30', $falta, true) ? 'Seguimento em atraso há mais de 90 dias' : 'Registo incompleto'];
+                [$prioridade, $motivo] = ['baixa', in_array('seguimento_30', $falta, true) ? 'Seguimento em atraso há mais de 90 dias'
+                    : (array_diff($falta, ['cr', 'descricao_cr']) === [] ? 'Dados do centro de referência por preencher' : 'Registo incompleto')];
             } else {
                 [$prioridade, $motivo] = [null, null];
             }

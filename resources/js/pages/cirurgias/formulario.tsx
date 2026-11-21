@@ -119,7 +119,15 @@ export function CorpoFormularioCirurgia({
                             ['cr', 'Dados do centro de referência', ['cr.']],
                             ['descricao', `Descrição das intervenções (${resseccoesEscolhidas.length})`, ['descricoes.']],
                         ] as ['cirurgia' | 'cr' | 'descricao', string, string[]][]
-                    ).map(([id, rotulo, prefixos]) => (
+                    ).map(([id, rotulo, prefixos]) => {
+                        // Por preencher: nada escrito nos dados do CR, ou intervenções de ressecção sem descrição.
+                        const porPreencher =
+                            id === 'cr'
+                                ? !tocado(data.cr)
+                                : id === 'descricao'
+                                  ? resseccoesEscolhidas.filter((r) => !tocado(data.descricoes[String(r)] ?? {})).length
+                                  : 0;
+                        return (
                         <button
                             key={id}
                             type="button"
@@ -130,8 +138,14 @@ export function CorpoFormularioCirurgia({
                         >
                             {rotulo}
                             {temErro(prefixos) && <span className="text-rose-700">!</span>}
+                            {!!porPreencher && !temErro(prefixos) && (
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
+                                    {id === 'descricao' ? `${porPreencher} por preencher` : 'por preencher'}
+                                </span>
+                            )}
                         </button>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
             <fieldset disabled={!podeEditar} className="grid gap-x-6 gap-y-3 lg:grid-cols-2">

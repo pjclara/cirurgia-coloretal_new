@@ -24,7 +24,7 @@ type Internado = {
     utente: { id: number | null; nome: string | null; data_nascimento: string | null; sexo: string | null; numero_processo: number | null };
     responsavel: { nome: string; abrev: string | null; equipa: string | null } | null;
     diagnosticos: string[];
-    cirurgias: { id: number; data: string; tipo: string | null; intervencoes: string[] }[];
+    cirurgias: { id: number; data: string; tipo: string | null; intervencoes: string[]; cr_em_falta?: string[] }[];
 };
 
 type Props = {
@@ -100,6 +100,11 @@ function Cama({ internado, hoje, equipa, podeCriar }: { internado: Internado; ho
                         Cirurgia {c.data.split('-').reverse().join('/')}
                         {c.tipo ? ` (${c.tipo})` : ''}
                         {c.intervencoes.length > 0 ? `: ${c.intervencoes.join(', ')}` : ''}
+                        {!!c.cr_em_falta?.length && (
+                            <span title="Dados do centro de referência por preencher" className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-900">
+                                CR incompleto
+                            </span>
+                        )}
                     </Link>
                 ))}
                 {podeCriar && (
@@ -236,6 +241,11 @@ function Tabela({ lista, hoje, equipa, podeCriar }: { lista: Internado[]; hoje: 
                                         >
                                             {c.data.split('-').reverse().join('/')}
                                             {c.intervencoes.length > 0 ? `: ${c.intervencoes.join(', ')}` : ''}
+                                            {!!c.cr_em_falta?.length && (
+                                                <span title="Dados do centro de referência por preencher" className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-900">
+                                                    CR incompleto
+                                                </span>
+                                            )}
                                         </Link>
                                     ))}
                                     {i.cirurgias.length === 0 && !podeCriar && '–'}

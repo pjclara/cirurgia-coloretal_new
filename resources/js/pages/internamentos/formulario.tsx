@@ -108,7 +108,7 @@ export type PropsFormulario = {
     };
     cirurgias: number;
     podeNovaCirurgia: boolean;
-    listaCirurgias: { id?: number; data: string; tipo: string | null; intervencoes: string[] }[];
+    listaCirurgias: { id?: number; data: string; tipo: string | null; intervencoes: string[]; cr_em_falta?: string[] }[];
     podeEditar: boolean;
     podeDesbloquear: boolean;
     podeApagar: boolean;
@@ -666,6 +666,11 @@ export function FormularioInternamento({
                                             </Link>
                                         ) : (
                                             texto
+                                        )}
+                                        {!!c.cr_em_falta?.length && (
+                                            <span title="Dados do centro de referência por preencher" className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
+                                                CR incompleto
+                                            </span>
                                         )}
                                     </li>
                                 );

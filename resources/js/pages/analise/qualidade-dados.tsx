@@ -8,7 +8,7 @@ import { NumeroProcesso } from '../../components/clinico/numero-processo';
 import { ModalInternamento, type ModalInternamentoDados } from '../../components/internamentos/modal-internamento';
 import ClinicoLayout from '../../layouts/clinico-layout';
 
-type Campo = 'alta' | 'destino' | 'morbilidade_alta' | 'seguimento_30' | 'clavien_30' | 'datas';
+type Campo = 'alta' | 'destino' | 'morbilidade_alta' | 'seguimento_30' | 'clavien_30' | 'datas' | 'cr' | 'descricao_cr';
 type Prioridade = 'alta' | 'media' | 'baixa';
 type Qualidade = {
     cirurgias: number;
@@ -42,6 +42,8 @@ const CAMPOS: { campo: Campo; rotulo: string; ajuda: string }[] = [
     { campo: 'seguimento_30', rotulo: 'Seguimento 30 dias', ajuda: 'Doente vivo, alta há mais de 30 dias, sem registo aos 30 dias' },
     { campo: 'clavien_30', rotulo: 'Clavien-Dindo 30 dias', ajuda: 'Registo aos 30 dias sem grau de Clavien-Dindo' },
     { campo: 'datas', rotulo: 'Datas', ajuda: 'Cirurgia antes da entrada ou depois da alta' },
+    { campo: 'cr', rotulo: 'Dados do CR', ajuda: 'Dados do centro de referência da cirurgia por preencher' },
+    { campo: 'descricao_cr', rotulo: 'Descrição das intervenções', ajuda: 'Descrição das intervenções de ressecção por preencher' },
 ];
 
 type Props = {
