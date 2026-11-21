@@ -35,3 +35,6 @@ yarn-error.log
 # Dados de doentes: nunca no repositório
 /bloco_*.xlsx
 /*.xlsx
+
+# Dumps SQL de outras bases (dados de doentes): nunca para o repositorio
+/*.sql
