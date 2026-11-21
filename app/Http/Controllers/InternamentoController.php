@@ -334,6 +334,7 @@ class InternamentoController extends Controller
         $this->impedirSeBloqueado($request, $internamento);
 
         $guardar->executar($internamento, $request->validated());
+        \App\Support\Pendentes::esquecer($request->user()->id); // o menu refaz as contagens
 
         // Gravado a partir de uma modal: volta à página que a abriu.
         if ($request->input('origem') === 'quadro') {
@@ -430,6 +431,8 @@ class InternamentoController extends Controller
         }
 
         $guardar->registarSeguimento($internamento, $dados);
+        \App\Support\Pendentes::esquecer($request->user()->id);
+        \App\Support\Pendentes::esquecer($internamento->responsavel_id);
 
         return back()->with('sucesso', 'Seguimento aos 30 dias registado.');
     }

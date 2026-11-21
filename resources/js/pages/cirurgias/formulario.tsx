@@ -4,8 +4,10 @@ import { useAlteracoes } from '../../clinico/alteracoes';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, OpcaoAgrupada } from '../../clinico/tipos';
 import {
+    BotaoHabituais,
     SeccaoCr,
     SeccaoDescricao,
+    comHabituais,
     crInicial,
     descricaoInicial,
     tocado,
@@ -269,11 +271,33 @@ export function CorpoFormularioCirurgia({
 
                 {tab === 'cr' && (
                     <div className="lg:col-span-2">
+                        {podeEditar && (
+                            <BotaoHabituais
+                                habituais={propsCr.habituais}
+                                aoClicar={() => setData('cr', comHabituais(data.cr as DadosCr, propsCr.habituais.cr))}
+                            />
+                        )}
                         <SeccaoCr valor={data.cr as DadosCr} aoMudar={(v) => setData('cr', v)} listas={propsCr.listas} erros={erros} />
                     </div>
                 )}
                 {tab === 'descricao' && (
                     <div className="lg:col-span-2">
+                        {podeEditar && (
+                            <BotaoHabituais
+                                habituais={propsCr.habituais}
+                                aoClicar={() =>
+                                    setData(
+                                        'descricoes',
+                                        Object.fromEntries(
+                                            Object.entries(data.descricoes).map(([id, v]) => [
+                                                id,
+                                                resseccoesEscolhidas.includes(Number(id)) ? comHabituais(v, propsCr.habituais.descricao) : v,
+                                            ]),
+                                        ),
+                                    )
+                                }
+                            />
+                        )}
                         {resseccoesEscolhidas.map((id) => (
                             <SeccaoDescricao
                                 key={id}

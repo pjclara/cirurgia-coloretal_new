@@ -46,6 +46,7 @@ export type PropsCr = {
     resseccoes: number[];
     dados: Partial<Record<string, string | number | null>> | null;
     descricoes: Record<string, Partial<Record<string, string | number | null>>>;
+    habituais: { cr: Record<string, string | number>; descricao: Record<string, string | number>; de: 'suas' | 'equipa'; n: number };
     listas: Record<keyof DadosCr, Opcao[]>;
     listas_descricao: Record<keyof DescricaoIntervencao, Opcao[]>;
 };
@@ -90,6 +91,35 @@ export const descricaoInicial = (d?: Partial<Record<string, string | number | nu
     qualidade_peca_operatoria_id: lista(d?.qualidade_peca_operatoria_id),
     comentarios: texto(d?.comentarios),
 });
+
+/** Completa só os campos ainda vazios com os valores habituais (os já preenchidos não se mexem). */
+export const comHabituais = <T,>(atual: T, habituais: Record<string, string | number>): T => {
+    const novo = { ...atual } as Record<string, unknown>;
+    for (const [campo, valor] of Object.entries(habituais)) {
+        if (campo in novo && novo[campo] === '') novo[campo] = valor;
+    }
+    return novo as T;
+};
+
+/** Botão que pré-preenche os campos vazios com o que o utilizador (ou a equipa) mais usa. */
+export function BotaoHabituais({ habituais, aoClicar }: { habituais: PropsCr['habituais']; aoClicar: () => void }) {
+    if (habituais.n === 0) return null;
+    return (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <button
+                type="button"
+                onClick={aoClicar}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-teal-700"
+            >
+                Preencher com os valores habituais
+            </button>
+            <span className="text-xs text-slate-600">
+                Só os campos vazios, com o mais frequente nas {habituais.de === 'suas' ? 'suas últimas' : 'últimas'} cirurgias{' '}
+                {habituais.de === 'equipa' ? 'da equipa ' : ''}do CR. Confirme antes de gravar.
+            </span>
+        </div>
+    );
+}
 
 /** Só se envia o que o utilizador começou a preencher; o resto pode ficar para mais tarde. */
 export const tocado = (valores: object) => Object.values(valores).some((v) => v !== '');

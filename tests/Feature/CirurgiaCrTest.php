@@ -188,3 +188,30 @@ test('«o que me falta fazer» lista o CR incompleto e os seguimentos do respons
         ->where('cr.linhas.0.utente.id', $utente->id)
         ->where('seguimentos.total', 0));
 });
+
+test('os valores habituais do CR vêm do mais frequente nas últimas cirurgias', function () {
+    $utente = novoUtente();
+    referenciarParaCirurgiaCr($utente, $this->utilizador, now()->subDays(30)->format('Y-m-d'));
+    $internamento = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
+    $this->actingAs($this->utilizador)->post("/internamentos/{$internamento->id}/cirurgias", cirurgiaCrDados(['cr' => crDados(), 'descricoes' => [1 => crDescricao()]]))->assertSessionHasNoErrors();
+
+    $this->actingAs($this->utilizador)->get("/internamentos/{$internamento->id}/cirurgias/nova")->assertInertia(fn (Assert $p) => $p
+        ->where('cr.habituais.de', 'equipa')
+        ->where('cr.habituais.n', 1)
+        ->where('cr.habituais.cr.intencao_id', 1)
+        ->where('cr.habituais.cr.transfusao_intra_operatoria', '1')
+        ->where('cr.habituais.descricao.anastemose_modo_id', 1)
+        ->where('cr.habituais.descricao.libertacao_angulo', '99'));
+});
+
+test('o menu leva as contagens do que falta fazer', function () {
+    $utente = novoUtente();
+    referenciarParaCirurgiaCr($utente, $this->utilizador, now()->subDays(30)->format('Y-m-d'));
+    $internamento = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
+
+    $this->actingAs($this->utilizador)->get('/pendentes')->assertInertia(fn (Assert $p) => $p->where('clinico.pendentes.meus', 0));
+
+    // Gravar uma cirurgia do CR sem os dados passa a contar, logo no pedido seguinte.
+    $this->actingAs($this->utilizador)->post("/internamentos/{$internamento->id}/cirurgias", cirurgiaCrDados())->assertSessionHasNoErrors();
+    $this->actingAs($this->utilizador)->get('/pendentes')->assertInertia(fn (Assert $p) => $p->where('clinico.pendentes.meus', 1));
+});

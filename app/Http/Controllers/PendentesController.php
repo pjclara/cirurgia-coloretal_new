@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Internamento;
-use App\Models\Morbilidade;
-use App\Support\Cirurgias;
+use App\Support\Pendentes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,15 +18,7 @@ class PendentesController extends Controller
         $utilizador = $request->user();
         $hoje = now()->startOfDay();
 
-        $seguimentos = Internamento::query()
-            ->comAlta()
-            ->where('responsavel_id', $utilizador->id)
-            ->where(fn ($q) => $q->whereNull('destino_id')->orWhere('destino_id', '<>', Internamento::DESTINO_FALECIDO))
-            ->whereDoesntHave('morbilidades', fn ($q) => $q->where('momento', Morbilidade::AOS_30_DIAS))
-            ->whereExists(fn ($q) => $q->selectRaw('1')->from('bloco_operatorios as b')
-                ->whereColumn('b.internamento_id', 'internamentos.id')->whereNull('b.deleted_at'))
-            ->whereDate('data_de_alta', '>=', config('clinico.data_minima'))
-            ->with('utente:id,nome,numero_processo');
+        $seguimentos = Pendentes::seguimentos($utilizador->id)->with('utente:id,nome,numero_processo');
         $totalSeguimentos = (clone $seguimentos)->count();
         $seguimentos = $seguimentos->orderBy('data_de_alta')->orderBy('id')->limit(self::LIMITE)->get()->map(function (Internamento $i) use ($hoje) {
             $prevista = $i->data_de_alta->copy()->addDays(30);
@@ -44,9 +35,7 @@ class PendentesController extends Controller
         // Os dados do CR só se mostram a quem pode ver referenciações.
         $cr = ['total' => null, 'linhas' => []];
         if ($utilizador->can('show referenciacao')) {
-            $pendentes = Cirurgias::porInternamento(Internamento::query()->where('responsavel_id', $utilizador->id)->select('id'))
-                ->flatMap(fn ($cirurgias, $internamentoId) => $cirurgias->filter(fn ($c) => $c['cr_em_falta'] !== [])->map(fn ($c) => $c + ['internamento_id' => $internamentoId]))
-                ->sortByDesc('data')->values();
+            $pendentes = Pendentes::cr($utilizador->id);
             $internamentos = Internamento::with('utente:id,nome,numero_processo')->whereIn('id', $pendentes->take(self::LIMITE)->pluck('internamento_id'))->get()->keyBy('id');
             $cr = [
                 'total' => $pendentes->count(),

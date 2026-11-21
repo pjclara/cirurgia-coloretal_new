@@ -25,6 +25,8 @@ export interface NavItem {
     filhos?: NavItem[];
     /** Abre noutro separador do browser (por exemplo, páginas para imprimir). */
     novoSeparador?: boolean;
+    /** Número de pendentes a mostrar junto ao nome (não aparece se for 0). */
+    contagem?: number;
 }
 
 export interface SharedData {

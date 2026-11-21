@@ -14,10 +14,10 @@ import {
     ChartLine,
     ClipboardCheck,
     ClipboardList,
-    ListTodo,
     DatabaseZap,
     KeyRound,
     LayoutGrid,
+    ListTodo,
     Map,
     Network,
     Scissors,
@@ -29,8 +29,14 @@ import AppLogo from './app-logo';
 const footerNavItems: never[] = [];
 
 export function AppSidebar() {
-    const clinico = usePage<{ clinico?: { administrador?: boolean; permissoes?: string[]; utilizador?: { roles?: string[] } | null } }>().props
-        .clinico;
+    const clinico = usePage<{
+        clinico?: {
+            administrador?: boolean;
+            permissoes?: string[];
+            pendentes?: { meus: number; atraso: number } | null;
+            utilizador?: { roles?: string[] } | null;
+        };
+    }>().props.clinico;
     const superAdmin = !!clinico?.utilizador?.roles?.includes('superAdmin');
     const pode = (permissao: string) => !!clinico?.administrador || !!clinico?.permissoes?.includes(permissao);
 
@@ -41,9 +47,14 @@ export function AppSidebar() {
                       title: 'Clínica',
                       items: [
                           { title: 'Quadro', url: '/quadro', icon: LayoutGrid },
-                          { title: 'O que me falta fazer', url: '/pendentes', icon: ListTodo },
+                          { title: 'O que me falta fazer', url: '/pendentes', icon: ListTodo, contagem: clinico?.pendentes?.meus },
                           { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
-                          { title: 'Seguimentos aos 30 dias', url: '/internamentos/seguimentos', icon: ClipboardCheck },
+                          {
+                              title: 'Seguimentos aos 30 dias',
+                              url: '/internamentos/seguimentos',
+                              icon: ClipboardCheck,
+                              contagem: clinico?.pendentes?.atraso,
+                          },
                       ],
                   },
               ]

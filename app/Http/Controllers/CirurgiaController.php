@@ -327,14 +327,53 @@ class CirurgiaController extends Controller
             'resseccoes' => CirurgiaCr::RESSECCOES,
             'dados' => $cr?->only(array_merge(array_keys(self::LISTAS_CR), self::SIM_NAO_CR, ['asa', 'duracao', 'paleativa_causa', 'resseccao_multi_orgao_quais', 'unidades_globulos', 'complicacoes_quais'])),
             'descricoes' => (object) $descricoes,
+            'habituais' => $this->habituais(),
             'listas' => $listas(self::LISTAS_CR),
             'listas_descricao' => $listas(self::LISTAS_DESCRICAO) + ['qualidade_peca_operatoria_id' => Dominios::tabelaLista('qualidade_peca_operatorias')],
+        ];
+    }
+
+    /**
+     * Valores mais frequentes (escolhas e sim/não) nas últimas cirurgias do CR do utilizador, ou de toda a equipa se ele ainda tem poucas,
+     * para pré-preencher os campos vazios com um clique.
+     *
+     * @return array{cr: array<string, string|int>, descricao: array<string, string|int>, de: string, n: int}
+     */
+    private function habituais(): array
+    {
+        $eu = (int) auth()->id();
+        $cr = BlocoOperatorioCr::query()->where('created_by_id', $eu)->latest('id')->limit(200)->get();
+        $propria = $cr->count() >= 3;
+        if (! $propria) {
+            $cr = BlocoOperatorioCr::query()->latest('id')->limit(200)->get();
+        }
+        $descricoes = IntervencaoDescricao::query()->when($propria, fn ($q) => $q->where('created_by_id', $eu))->latest('id')->limit(200)->get();
+
+        // Escolhas de listas seguem como números; os sim/não (1, 2, 99) como texto, tal como os formulários os usam.
+        $textos = array_merge(self::SIM_NAO_CR, ['reforco_anastemose', 'libertacao_angulo']);
+        $moda = fn ($linhas, array $campos) => collect($campos)->mapWithKeys(function ($campo) use ($linhas, $textos) {
+            $valores = $linhas->pluck($campo)->filter(fn ($v) => $v !== null && $v !== '');
+
+            if ($valores->isEmpty()) {
+                return [];
+            }
+            $mais = $valores->countBy()->sortDesc()->keys()->first();
+
+            return [$campo => in_array($campo, $textos, true) ? (string) $mais : (int) $mais];
+        })->all();
+
+        return [
+            'cr' => $moda($cr, array_merge(array_keys(self::LISTAS_CR), self::SIM_NAO_CR)),
+            'descricao' => $moda($descricoes, array_merge(array_keys(self::LISTAS_DESCRICAO), ['reforco_anastemose', 'libertacao_angulo'])),
+            'de' => $propria ? 'suas' : 'equipa',
+            'n' => $cr->count(),
         ];
     }
 
     /** Gravado a partir do quadro: volta ao quadro. */
     private function destino(Request $request, int $utenteId, string $mensagem): RedirectResponse
     {
+        \App\Support\Pendentes::esquecer($request->user()?->id); // o menu refaz as contagens
         if ($request->input('origem', $request->query('origem')) === 'quadro') {
             return redirect()->route('quadro')->with('sucesso', $mensagem);
         }
