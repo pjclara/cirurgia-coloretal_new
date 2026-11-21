@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link, router, useForm } from '@inertiajs/react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { navegarSemAviso, useAlteracoes } from '../../clinico/alteracoes';
 import { corDaCirurgia } from '../../clinico/cor-cirurgia';
 import { diasEntre, formatarData, idade, plural } from '../../clinico/formato';
 import { useResponsavelPorOmissao } from '../../clinico/responsavel';
@@ -121,6 +122,8 @@ type Props = PropsFormulario & {
     aoFechar?: () => void;
     origem?: 'quadro' | 'lista' | 'qualidade' | 'referenciacao' | 'seguimentos';
     retorno?: string;
+    /** Endereço do próximo registo a completar (na lista de onde veio): ativa «Gravar e abrir próximo». */
+    seguinte?: string | null;
 };
 
 /** Página completa ou, com `modal`, apenas o cabeçalho e o conteúdo para uma janela modal. */
@@ -162,6 +165,7 @@ export function FormularioInternamento({
     aoFechar,
     origem,
     retorno,
+    seguinte,
     internamento,
     utente: utenteInicial,
     dominios,
@@ -277,8 +281,13 @@ export function FormularioInternamento({
     ];
     const pendenciasDeAlta = requisitosDeAlta.filter((r) => !r.feito);
 
+    const formulario = useRef<HTMLFormElement>(null);
+    const seguirParaOProximo = useRef(false);
+    useAlteracoes(form.isDirty, formulario, podeEditar);
+
     const guardar = (evento: FormEvent) => {
         evento.preventDefault();
+        seguirParaOProximo.current = (evento.nativeEvent as SubmitEvent).submitter?.getAttribute('data-seguinte') === '1';
         // Não se dá alta com campos obrigatórios por preencher: abre o separador do primeiro em falta.
         if (data.data_de_alta && pendenciasDeAlta.length > 0) {
             setTentouAlta(true);
@@ -305,6 +314,9 @@ export function FormularioInternamento({
         }));
         const opcoes = {
             preserveScroll: true,
+            onSuccess: () => {
+                if (seguirParaOProximo.current && seguinte) navegarSemAviso(seguinte, { preserveScroll: true });
+            },
             onError: (e: Record<string, string>) => {
                 const chaves = Object.keys(e);
                 if (chaves.length > 0 && !chaves.some((c) => separadorDoErro(c) === separador)) setSeparador(separadorDoErro(chaves[0]));
@@ -697,7 +709,7 @@ export function FormularioInternamento({
                 </div>
             )}
 
-            <form onSubmit={guardar} noValidate className={separador === 'cirurgias' ? 'hidden' : undefined}>
+            <form ref={formulario} onSubmit={guardar} noValidate className={separador === 'cirurgias' ? 'hidden' : undefined}>
                 <fieldset disabled={!podeEditar} className="space-y-5">
                     {separador === 'dados' && (
                         <div className="grid items-start gap-5 lg:grid-cols-2">
@@ -1025,6 +1037,11 @@ export function FormularioInternamento({
                     {podeEditar && (
                         <Botao type="submit" disabled={processing}>
                             {internamento ? 'Guardar alterações' : 'Registar internamento'}
+                        </Botao>
+                    )}
+                    {podeEditar && internamento && seguinte && (
+                        <Botao type="submit" variante="secundario" disabled={processing} data-seguinte="1" title="Grava e abre o próximo da lista">
+                            Gravar e abrir próximo
                         </Botao>
                     )}
                     {aoFechar ? (

@@ -76,6 +76,10 @@ export default function QualidadeDados({ modal, qualidade, trimestres, de, ate, 
         ...(qualidade.responsavel !== null ? { responsavel: String(qualidade.responsavel) } : {}),
     }).toString()}`;
     const selecionado = qualidade.responsaveis.find((r) => r.id === qualidade.responsavel);
+    // O próximo da lista (pela ordem de prioridade) depois do internamento aberto na modal.
+    const posicao = modal?.internamento ? qualidade.linhas.findIndex((l) => l.internamento === modal.internamento?.id) : -1;
+    const proximo = posicao >= 0 ? qualidade.linhas[posicao + 1] : undefined;
+    const seguinte = proximo ? `/analise/cancro-retal/qualidade/internamentos/${proximo.internamento}${consultaAtual}` : null;
 
     return (
         <ClinicoLayout titulo="Qualidade dos dados" subtitulo={`Cancro retal · doentes do CR · gerada a ${geradoEm}`} largura="larga">
@@ -263,7 +267,7 @@ export default function QualidadeDados({ modal, qualidade, trimestres, de, ate, 
                     </section>
                 </div>
             </div>
-            <ModalInternamento modal={modal} />
+            <ModalInternamento modal={modal} seguinte={seguinte} />
         </ClinicoLayout>
     );
 }

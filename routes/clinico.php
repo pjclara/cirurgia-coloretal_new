@@ -9,6 +9,7 @@ use App\Http\Controllers\CancroRetalAnaliseController;
 use App\Http\Controllers\CirurgiaController;
 use App\Http\Controllers\ContaController;
 use App\Http\Controllers\InternamentoController;
+use App\Http\Controllers\PendentesController;
 use App\Http\Controllers\QuadroController;
 use App\Http\Controllers\ReferenciacaoAnaliseController;
 use App\Http\Controllers\ReferenciacaoController;
@@ -28,6 +29,7 @@ Route::put('conta/password', [ContaController::class, 'atualizarPassword'])->nam
 
 Route::middleware('can:show internamento')->group(function () {
     Route::get('quadro', QuadroController::class)->name('quadro');
+    Route::get('pendentes', PendentesController::class)->name('pendentes');
     Route::get('dashboard', AnaliseController::class)->name('dashboard');
     Route::get('quadro/imprimir', [QuadroController::class, 'imprimir'])->name('quadro.imprimir');
     Route::get('quadro/novo', [QuadroController::class, 'novo'])->middleware('can:create internamento')->name('quadro.novo');

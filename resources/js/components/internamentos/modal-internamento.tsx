@@ -5,7 +5,7 @@ import { FormularioInternamento, type PropsFormulario } from '../../pages/intern
 export type ModalInternamentoDados = PropsFormulario & { fechar_url: string; origem?: 'quadro' | 'lista' | 'qualidade' | 'referenciacao' | 'seguimentos' };
 
 /** Formulário do internamento (registo ou edição) numa modal por cima da página que a abriu. */
-export function ModalInternamento({ modal }: { modal: ModalInternamentoDados | null }) {
+export function ModalInternamento({ modal, seguinte }: { modal: ModalInternamentoDados | null; seguinte?: string | null }) {
     const fechar = () => modal && router.visit(modal.fechar_url, { preserveScroll: true });
 
     return (
@@ -20,6 +20,7 @@ export function ModalInternamento({ modal }: { modal: ModalInternamentoDados | n
                         key={modal.internamento?.id ?? modal.utente?.id ?? 'novo'}
                         {...modal}
                         retorno={modal.fechar_url}
+                        seguinte={seguinte}
                         aoFechar={fechar}
                     />
                 )}

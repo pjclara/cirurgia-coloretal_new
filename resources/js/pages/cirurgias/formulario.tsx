@@ -1,5 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { useAlteracoes } from '../../clinico/alteracoes';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, OpcaoAgrupada } from '../../clinico/tipos';
 import {
@@ -76,6 +77,8 @@ export function CorpoFormularioCirurgia({
         >,
     });
     const { data, setData, processing } = form;
+    const formulario = useRef<HTMLFormElement>(null);
+    useAlteracoes(form.isDirty, formulario, podeEditar);
     const erros = form.errors as Record<string, string | undefined>;
 
     // Os dados do CR aplicam-se a doentes referenciados ao centro de referência (até à data da cirurgia) com uma ressecção.
@@ -110,7 +113,7 @@ export function CorpoFormularioCirurgia({
     };
 
     return (
-        <form onSubmit={guardar} noValidate>
+        <form ref={formulario} onSubmit={guardar} noValidate>
             {aplicaCr && (
                 <div role="tablist" aria-label="Secções da cirurgia" className="mb-3 flex gap-1 border-b border-slate-200">
                     {(
@@ -128,22 +131,22 @@ export function CorpoFormularioCirurgia({
                                   ? resseccoesEscolhidas.filter((r) => !tocado(data.descricoes[String(r)] ?? {})).length
                                   : 0;
                         return (
-                        <button
-                            key={id}
-                            type="button"
-                            role="tab"
-                            aria-selected={tab === id}
-                            onClick={() => setSeparador(id)}
-                            className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm ${tab === id ? 'border-[#a3213e] font-semibold text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
-                        >
-                            {rotulo}
-                            {temErro(prefixos) && <span className="text-rose-700">!</span>}
-                            {!!porPreencher && !temErro(prefixos) && (
-                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
-                                    {id === 'descricao' ? `${porPreencher} por preencher` : 'por preencher'}
-                                </span>
-                            )}
-                        </button>
+                            <button
+                                key={id}
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === id}
+                                onClick={() => setSeparador(id)}
+                                className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm ${tab === id ? 'border-[#a3213e] font-semibold text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+                            >
+                                {rotulo}
+                                {temErro(prefixos) && <span className="text-rose-700">!</span>}
+                                {!!porPreencher && !temErro(prefixos) && (
+                                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
+                                        {id === 'descricao' ? `${porPreencher} por preencher` : 'por preencher'}
+                                    </span>
+                                )}
+                            </button>
                         );
                     })}
                 </div>

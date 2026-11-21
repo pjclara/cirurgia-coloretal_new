@@ -169,3 +169,22 @@ test('as listas assinalam o CR incompleto até os dados e a descrição serem pr
     $this->actingAs($this->utilizador)->put("/cirurgias/{$bloco->id}", cirurgiaCrDados(['cr' => crDados(), 'descricoes' => [1 => crDescricao()]]))->assertSessionHasNoErrors();
     expect($falta())->toBe([]);
 });
+
+test('«o que me falta fazer» lista o CR incompleto e os seguimentos do responsável', function () {
+    $utente = novoUtente();
+    referenciarParaCirurgiaCr($utente, $this->utilizador, now()->subDays(30)->format('Y-m-d'));
+    $meu = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
+    $this->actingAs($this->utilizador)->post("/internamentos/{$meu->id}/cirurgias", cirurgiaCrDados())->assertSessionHasNoErrors();
+
+    // O de outro responsável não aparece.
+    $outro = utilizadorClinico(permissoesComReferenciacao());
+    $alheio = novoInternamento(novoUtente(), $outro, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
+    internamentoOperado($this, $alheio);
+
+    $this->actingAs($this->utilizador)->get('/pendentes')->assertInertia(fn (Assert $p) => $p
+        ->component('pendentes')
+        ->where('cr.total', 1)
+        ->where('cr.linhas.0.falta', ['cr', 'descricao'])
+        ->where('cr.linhas.0.utente.id', $utente->id)
+        ->where('seguimentos.total', 0));
+});

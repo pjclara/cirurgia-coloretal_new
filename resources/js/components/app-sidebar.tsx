@@ -14,6 +14,7 @@ import {
     ChartLine,
     ClipboardCheck,
     ClipboardList,
+    ListTodo,
     DatabaseZap,
     KeyRound,
     LayoutGrid,
@@ -40,6 +41,7 @@ export function AppSidebar() {
                       title: 'Clínica',
                       items: [
                           { title: 'Quadro', url: '/quadro', icon: LayoutGrid },
+                          { title: 'O que me falta fazer', url: '/pendentes', icon: ListTodo },
                           { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
                           { title: 'Seguimentos aos 30 dias', url: '/internamentos/seguimentos', icon: ClipboardCheck },
                       ],
