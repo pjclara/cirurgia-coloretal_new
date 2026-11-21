@@ -1,7 +1,5 @@
 <?php
 
-it('returns a successful response', function () {
-    $response = $this->get('/');
-
-    $response->assertStatus(200);
+it('a raiz da aplicação leva ao início de sessão', function () {
+    $this->get('/')->assertRedirect('/login');
 });

@@ -3,9 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->name('home');
+// A raiz da aplicação leva sempre ao início de sessão (quem já tem sessão segue daí para o início).
+Route::redirect('/', '/login')->name('home');
 
 Route::middleware(['auth'])->group(function () {
 });
