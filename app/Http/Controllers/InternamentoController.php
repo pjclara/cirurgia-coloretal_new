@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\InternamentoRequest;
 use App\Models\Complicacao;
+use App\Models\BlocoOperatorio;
 use App\Models\Internamento;
 use App\Models\Morbilidade;
 use App\Models\Utente;
@@ -28,7 +29,7 @@ class InternamentoController extends Controller
     }
 
     /** A lista de internamentos com alta, opcionalmente com o formulário de registo numa modal por cima. */
-    private function montarIndex(Request $request, ?array $modal): Response
+    private function montarIndex(Request $request, ?array $modal, ?array $modalCirurgia = null): Response
     {
         $filtros = [
             'q' => trim((string) $request->query('q', '')),
@@ -78,6 +79,7 @@ class InternamentoController extends Controller
             'responsaveis' => Dominios::responsaveis(),
             'anos' => range((int) now()->format('Y'), (int) substr(config('clinico.data_minima'), 0, 4)),
             'modal' => $modal,
+            'modalCirurgia' => $modalCirurgia,
         ]);
     }
 
@@ -104,7 +106,40 @@ class InternamentoController extends Controller
         ]);
     }
 
-    private function montarSeguimentos(Request $request, ?array $modal): Response
+    /** Uma cirurgia existente numa modal por cima da lista; ao fechar ou gravar volta ao internamento (também em modal). */
+    public function cirurgiaNaLista(Request $request, BlocoOperatorio $bloco, CirurgiaController $formulario): Response
+    {
+        return $this->montarIndex($request, null, $formulario->propsFormulario($request, $bloco->internamento, $bloco) + $this->voltarAoInternamento($request, $bloco->internamento_id, 'lista'));
+    }
+
+    /** O formulário de nova cirurgia deste internamento numa modal por cima da lista. */
+    public function novaCirurgiaNaLista(Request $request, Internamento $internamento, CirurgiaController $formulario): Response
+    {
+        return $this->montarIndex($request, null, $formulario->propsFormulario($request, $internamento, null) + $this->voltarAoInternamento($request, $internamento->id, 'lista'));
+    }
+
+    /** Uma cirurgia existente numa modal por cima dos seguimentos; ao fechar ou gravar volta ao internamento (também em modal). */
+    public function cirurgiaNosSeguimentos(Request $request, BlocoOperatorio $bloco, CirurgiaController $formulario): Response
+    {
+        return $this->montarSeguimentos($request, null, $formulario->propsFormulario($request, $bloco->internamento, $bloco) + $this->voltarAoInternamento($request, $bloco->internamento_id));
+    }
+
+    /** O formulário de nova cirurgia deste internamento numa modal por cima dos seguimentos. */
+    public function novaCirurgiaNosSeguimentos(Request $request, Internamento $internamento, CirurgiaController $formulario): Response
+    {
+        return $this->montarSeguimentos($request, null, $formulario->propsFormulario($request, $internamento, null) + $this->voltarAoInternamento($request, $internamento->id));
+    }
+
+    /** @return array{fechar_url: string, origem: string} */
+    private function voltarAoInternamento(Request $request, int $internamentoId, string $origem = 'seguimentos'): array
+    {
+        $consulta = $request->getQueryString();
+        $base = $origem === 'lista' ? "/internamentos/$internamentoId/editar" : "/internamentos/seguimentos/$internamentoId";
+
+        return ['fechar_url' => $base.($consulta ? '?'.$consulta : ''), 'origem' => $origem];
+    }
+
+    private function montarSeguimentos(Request $request, ?array $modal, ?array $modalCirurgia = null): Response
     {
         $estado = in_array($request->query('estado'), ['em_atraso', 'a_decorrer'], true) ? $request->query('estado') : 'todos';
         $responsavelId = ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null;
@@ -140,7 +175,7 @@ class InternamentoController extends Controller
 
         $lista = (clone $base)
             ->selectRaw('internamentos.*, '.($verCr ? '('.self::doenteCr().')' : '0').' as doente_cr')
-            ->with(['utente:id,nome,numero_processo', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
+            ->with(['utente:id,nome,numero_processo', 'diagnosticos:id,nome', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->when($estado === 'em_atraso', fn ($q) => $q->whereDate('data_de_alta', '<', $limiteAtraso))
             ->when($estado === 'a_decorrer', fn ($q) => $q->whereDate('data_de_alta', '>=', $limiteAtraso))
             ->orderBy('data_de_alta')
@@ -153,7 +188,7 @@ class InternamentoController extends Controller
                 return [
                     'id' => $i->id,
                     'utente' => ['id' => $i->utente?->id, 'nome' => $i->utente?->nome, 'numero_processo' => $i->utente?->numero_processo],
-                    'motivo' => $i->motivo_internamento,
+                    'diagnosticos' => $i->diagnosticos->pluck('nome')->map(fn ($n) => trim($n))->values()->all(),
                     'data_de_alta' => $i->data_de_alta->format('Y-m-d'),
                     'prevista' => $prevista->format('Y-m-d'),
                     // positivo = dias de atraso; negativo = dias que faltam
@@ -166,6 +201,7 @@ class InternamentoController extends Controller
 
         return Inertia::render('internamentos/seguimentos', [
             'modal' => $modal,
+            'modalCirurgia' => $modalCirurgia,
             'podeRegistar' => $request->user()->can('update internamento'),
             'dominios' => [
                 'complicacoes' => Dominios::complicacoes(),

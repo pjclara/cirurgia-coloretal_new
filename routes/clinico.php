@@ -42,6 +42,8 @@ Route::middleware('can:show internamento')->group(function () {
     Route::get('internamentos', [InternamentoController::class, 'index'])->name('internamentos.index');
     Route::get('internamentos/seguimentos', [InternamentoController::class, 'seguimentos'])->name('internamentos.seguimentos');
     Route::get('internamentos/seguimentos/{internamento}', [InternamentoController::class, 'abrirNosSeguimentos'])->whereNumber('internamento')->name('internamentos.seguimentos.abrir');
+    Route::get('internamentos/seguimentos/cirurgias/{bloco}', [InternamentoController::class, 'cirurgiaNosSeguimentos'])->whereNumber('bloco')->name('internamentos.seguimentos.cirurgia');
+    Route::get('internamentos/seguimentos/{internamento}/cirurgias/nova', [InternamentoController::class, 'novaCirurgiaNosSeguimentos'])->whereNumber('internamento')->middleware('can:create internamento')->name('internamentos.seguimentos.cirurgia.nova');
 });
 
 // Análise do cancro retal: doentes referenciados ao centro de referência, com nome e processo.
@@ -62,6 +64,8 @@ Route::middleware('can:create internamento')->group(function () {
 Route::middleware('can:show internamento')->group(function () {
     Route::get('utentes/{utente}', [UtenteController::class, 'show'])->whereNumber('utente')->name('utentes.show');
     Route::get('internamentos/{internamento}', [InternamentoController::class, 'edit'])->whereNumber('internamento')->name('internamentos.edit');
+    Route::get('internamentos/cirurgias/{bloco}/na-lista', [InternamentoController::class, 'cirurgiaNaLista'])->whereNumber('bloco')->name('internamentos.cirurgia-na-lista');
+    Route::get('internamentos/{internamento}/cirurgias/nova/na-lista', [InternamentoController::class, 'novaCirurgiaNaLista'])->whereNumber('internamento')->middleware('can:create internamento')->name('internamentos.cirurgia-nova-na-lista');
     Route::get('internamentos/{internamento}/editar', [InternamentoController::class, 'editarNaLista'])->whereNumber('internamento')->name('internamentos.editar-na-lista');
 });
 

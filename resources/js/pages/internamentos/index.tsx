@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { diasEntre, formatarData, hojeIso } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Paginado, Responsavel } from '../../clinico/tipos';
+import { ModalCirurgia, type ModalCirurgiaDados } from '../../components/cirurgias/modal-cirurgia';
 import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { BotaoLigacao, Selecao } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
@@ -39,9 +40,10 @@ type Props = {
     responsaveis: Responsavel[];
     anos: number[];
     modal: ModalInternamentoDados | null;
+    modalCirurgia: ModalCirurgiaDados | null;
 };
 
-export default function Internamentos({ internamentos, filtros, responsaveis, anos, modal }: Props) {
+export default function Internamentos({ internamentos, filtros, responsaveis, anos, modal, modalCirurgia }: Props) {
     const [termo, setTermo] = useState(filtros.q);
 
     const aplicar = (alteracoes: Partial<Filtros>) => {
@@ -227,6 +229,7 @@ export default function Internamentos({ internamentos, filtros, responsaveis, an
 
             <Paginacao pagina={internamentos} nome="internamentos" />
             <ModalInternamento modal={modal} />
+            <ModalCirurgia modal={modalCirurgia} />
         </ClinicoLayout>
     );
 }

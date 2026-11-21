@@ -4,6 +4,7 @@ import { formatarData } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
 import type { Opcao, OpcaoAgrupada, Paginado, Responsavel } from '../../clinico/tipos';
 import { FiltroTrimestres } from '../../components/analise/filtro-trimestres';
+import { ModalCirurgia, type ModalCirurgiaDados } from '../../components/cirurgias/modal-cirurgia';
 import type { ResolucaoComGrau } from '../../components/clinico/bloco-morbilidade';
 import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { Botao, BotaoLigacao, SelecaoResponsavel } from '../../components/clinico/campos';
@@ -16,7 +17,7 @@ import ClinicoLayout from '../../layouts/clinico-layout';
 type Linha = {
     id: number;
     utente: { id: number | null; nome: string | null; numero_processo: number | null };
-    motivo: string;
+    diagnosticos: string[];
     data_de_alta: string;
     prevista: string;
     dias_de_atraso: number;
@@ -37,10 +38,22 @@ type Props = {
     podeVerCr: boolean;
     podeRegistar: boolean;
     modal: ModalInternamentoDados | null;
+    modalCirurgia: ModalCirurgiaDados | null;
     dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
 
-export default function Seguimentos({ seguimentos, trimestres, filtros, responsaveis, contagens, podeVerCr, podeRegistar, dominios, modal }: Props) {
+export default function Seguimentos({
+    seguimentos,
+    trimestres,
+    filtros,
+    responsaveis,
+    contagens,
+    podeVerCr,
+    podeRegistar,
+    dominios,
+    modal,
+    modalCirurgia,
+}: Props) {
     const consultaAtual = usePage().url.includes('?') ? usePage().url.slice(usePage().url.indexOf('?')) : '';
     const [termo, setTermo] = useState(filtros.q);
     const [abertoId, setAbertoId] = useState<number | null>(null);
@@ -147,7 +160,7 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
                     <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600 uppercase">
                         <tr>
                             <th className="px-4 py-2.5 font-medium">Utente</th>
-                            <th className="px-4 py-2.5 font-medium">Motivo</th>
+                            <th className="px-4 py-2.5 font-medium">Diagnósticos</th>
                             <th className="px-4 py-2.5 font-medium">Alta</th>
                             <th className="px-4 py-2.5 font-medium">Seguimento previsto</th>
                             <th className="px-4 py-2.5 font-medium">Responsável</th>
@@ -185,7 +198,7 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
                                     </p>
                                 </td>
                                 <td className="max-w-xs px-4 py-2.5">
-                                    <span className="line-clamp-2">{l.motivo}</span>
+                                    <span className="line-clamp-2">{l.diagnosticos.length > 0 ? l.diagnosticos.join(' · ') : '—'}</span>
                                 </td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{formatarData(l.data_de_alta)}</td>
                                 <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">
@@ -231,6 +244,7 @@ export default function Seguimentos({ seguimentos, trimestres, filtros, responsa
             </div>
 
             <ModalInternamento modal={modal} />
+            <ModalCirurgia modal={modalCirurgia} />
 
             {aberto && (
                 <ModalSeguimento

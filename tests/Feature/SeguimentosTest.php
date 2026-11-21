@@ -115,3 +115,49 @@ test('o nome do utente abre o internamento numa modal por cima dos seguimentos',
         ->where('modal.internamento.id', $i->id));
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('modal', null));
 });
+
+test('a cirurgia abre em modal por cima dos seguimentos e, ao gravar, volta ao internamento', function () {
+    $i = internamentoComAlta($this, 40);
+    $bloco = \App\Models\BlocoOperatorio::where('internamento_id', $i->id)->first();
+
+    $this->actingAs($this->utilizador)->get("/internamentos/seguimentos/cirurgias/{$bloco->id}?estado=em_atraso")->assertInertia(fn (Assert $p) => $p
+        ->component('internamentos/seguimentos')
+        ->where('modal', null)
+        ->where('modalCirurgia.origem', 'seguimentos')
+        ->where('modalCirurgia.fechar_url', "/internamentos/seguimentos/{$i->id}?estado=em_atraso")
+        ->where('modalCirurgia.cirurgia.id', $bloco->id));
+    $this->actingAs($this->utilizador)->get("/internamentos/seguimentos/{$i->id}/cirurgias/nova")->assertInertia(fn (Assert $p) => $p
+        ->where('modalCirurgia.origem', 'seguimentos')->where('modalCirurgia.cirurgia', null));
+
+    $this->actingAs($this->utilizador)->put("/cirurgias/{$bloco->id}", [
+        'origem' => 'seguimentos', 'retorno' => "/internamentos/seguimentos/{$i->id}?estado=em_atraso",
+        'data_de_inicio' => now()->subDays(41)->format('Y-m-d'),
+        'tipo_de_cirurgia_id' => DB::table('tipo_de_cirurgias')->value('id'),
+        'tipo_de_abordagem_id' => DB::table('tipo_de_abordagems')->value('id'),
+        're_intervencao_nao_programada_id' => 1,
+        'intervencoes' => [33],
+    ])->assertRedirect("/internamentos/seguimentos/{$i->id}?estado=em_atraso");
+});
+
+test('na revisão de internamentos a cirurgia abre em modal e, ao gravar, volta ao internamento em modal', function () {
+    $i = internamentoComAlta($this, 40);
+    $bloco = \App\Models\BlocoOperatorio::where('internamento_id', $i->id)->first();
+
+    $this->actingAs($this->utilizador)->get("/internamentos/cirurgias/{$bloco->id}/na-lista?ano=2026")->assertInertia(fn (Assert $p) => $p
+        ->component('internamentos/index')
+        ->where('modal', null)
+        ->where('modalCirurgia.origem', 'lista')
+        ->where('modalCirurgia.fechar_url', "/internamentos/{$i->id}/editar?ano=2026")
+        ->where('modalCirurgia.cirurgia.id', $bloco->id));
+    $this->actingAs($this->utilizador)->get("/internamentos/{$i->id}/cirurgias/nova/na-lista")->assertInertia(fn (Assert $p) => $p
+        ->where('modalCirurgia.origem', 'lista')->where('modalCirurgia.cirurgia', null));
+
+    $this->actingAs($this->utilizador)->put("/cirurgias/{$bloco->id}", [
+        'origem' => 'lista', 'retorno' => "/internamentos/{$i->id}/editar?ano=2026",
+        'data_de_inicio' => now()->subDays(41)->format('Y-m-d'),
+        'tipo_de_cirurgia_id' => DB::table('tipo_de_cirurgias')->value('id'),
+        'tipo_de_abordagem_id' => DB::table('tipo_de_abordagems')->value('id'),
+        're_intervencao_nao_programada_id' => 1,
+        'intervencoes' => [33],
+    ])->assertRedirect("/internamentos/{$i->id}/editar?ano=2026");
+});

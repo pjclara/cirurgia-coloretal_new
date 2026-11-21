@@ -10,7 +10,7 @@ import { NumeroProcesso } from '../clinico/numero-processo';
 export type LinhaSeguimento = {
     id: number;
     utente: { id: number | null; nome: string | null; numero_processo: number | null };
-    motivo: string;
+    diagnosticos: string[];
     data_de_alta: string;
     prevista: string;
     clavien?: string | null;
@@ -76,7 +76,7 @@ export function ModalSeguimento({ linha, dominios, temSeguinte, aoFechar, aoGuar
                             <p>
                                 Alta a {formatarData(linha.data_de_alta)} · seguimento previsto a {formatarData(linha.prevista)}
                             </p>
-                            <p className="truncate">{linha.motivo}</p>
+                            <p className="truncate">{linha.diagnosticos.length > 0 ? linha.diagnosticos.join(' · ') : '—'}</p>
                         </div>
                     </DialogDescription>
                 </DialogHeader>

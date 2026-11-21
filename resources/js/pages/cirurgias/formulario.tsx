@@ -58,8 +58,9 @@ export function CorpoFormularioCirurgia({
     podeApagar,
     utente,
     origem,
+    fechar_url: retorno,
     aoFechar,
-}: PropsCirurgia & { origem?: 'quadro'; aoFechar?: () => void }) {
+}: PropsCirurgia & { origem?: 'quadro' | 'seguimentos' | 'lista'; fechar_url?: string; aoFechar?: () => void }) {
     const form = useForm({
         data_de_inicio: cirurgia?.data_de_inicio ?? hoje,
         tipo_de_cirurgia_id: (cirurgia?.tipo_de_cirurgia_id ?? '') as number | '',
@@ -95,13 +96,17 @@ export function CorpoFormularioCirurgia({
                 ? Object.fromEntries(Object.entries(d.descricoes).filter(([id, v]) => resseccoesEscolhidas.includes(Number(id)) && tocado(v)))
                 : undefined,
             ...(origem ? { origem } : {}),
+            ...((origem === 'seguimentos' || origem === 'lista') && retorno ? { retorno } : {}),
         }));
         if (cirurgia) form.put(`/cirurgias/${cirurgia.id}`, { preserveScroll: true });
         else form.post(`/internamentos/${internamento.id}/cirurgias`, { preserveScroll: true });
     };
 
     const apagar = () => {
-        if (cirurgia && window.confirm('Apagar esta cirurgia?')) router.delete(`/cirurgias/${cirurgia.id}${origem ? `?origem=${origem}` : ''}`);
+        if (cirurgia && window.confirm('Apagar esta cirurgia?'))
+            router.delete(
+                `/cirurgias/${cirurgia.id}${origem ? `?origem=${origem}` : ''}${(origem === 'seguimentos' || origem === 'lista') && retorno ? `&retorno=${encodeURIComponent(retorno)}` : ''}`,
+            );
     };
 
     return (

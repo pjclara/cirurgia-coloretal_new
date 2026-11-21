@@ -293,6 +293,9 @@ export function FormularioInternamento({
         gravar();
     };
 
+    // Os filtros dos seguimentos acompanham a ligação da cirurgia, para voltar à mesma lista.
+    const consultaDoRetorno = retorno?.includes('?') ? retorno.slice(retorno.indexOf('?')) : '';
+
     const gravar = () => {
         form.transform((atual) => ({
             ...atual,
@@ -648,7 +651,15 @@ export function FormularioInternamento({
                                     <li key={n} className={`text-sm font-medium ${corDaCirurgia(c.tipo).texto}`}>
                                         {c.id ? (
                                             <Link
-                                                href={origem === 'quadro' ? `/quadro/cirurgias/${c.id}` : `/cirurgias/${c.id}`}
+                                                href={
+                                                    origem === 'quadro'
+                                                        ? `/quadro/cirurgias/${c.id}`
+                                                        : origem === 'seguimentos'
+                                                          ? `/internamentos/seguimentos/cirurgias/${c.id}${consultaDoRetorno}`
+                                                          : origem === 'lista'
+                                                            ? `/internamentos/cirurgias/${c.id}/na-lista${consultaDoRetorno}`
+                                                            : `/cirurgias/${c.id}`
+                                                }
                                                 className="hover:underline"
                                             >
                                                 {texto}
@@ -666,7 +677,11 @@ export function FormularioInternamento({
                                     href={
                                         origem === 'quadro'
                                             ? `/quadro/${internamento.id}/cirurgias/nova`
-                                            : `/internamentos/${internamento.id}/cirurgias/nova`
+                                            : origem === 'seguimentos'
+                                              ? `/internamentos/seguimentos/${internamento.id}/cirurgias/nova${consultaDoRetorno}`
+                                              : origem === 'lista'
+                                                ? `/internamentos/${internamento.id}/cirurgias/nova/na-lista${consultaDoRetorno}`
+                                                : `/internamentos/${internamento.id}/cirurgias/nova`
                                     }
                                 >
                                     Nova cirurgia

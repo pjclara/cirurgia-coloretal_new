@@ -4,7 +4,7 @@ import { formatarData } from '../../clinico/formato';
 import { CorpoFormularioCirurgia, type PropsCirurgia } from '../../pages/cirurgias/formulario';
 import { NumeroProcesso } from '../clinico/numero-processo';
 
-export type ModalCirurgiaDados = PropsCirurgia & { fechar_url: string; origem?: 'quadro' };
+export type ModalCirurgiaDados = PropsCirurgia & { fechar_url: string; origem?: 'quadro' | 'seguimentos' | 'lista' };
 
 /** Registo ou edição de uma cirurgia numa modal por cima do quadro. */
 export function ModalCirurgia({ modal }: { modal: ModalCirurgiaDados | null }) {
