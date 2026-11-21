@@ -2,8 +2,8 @@ import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatarData } from '../../../clinico/formato';
 import { Botao, BotaoLigacao, estiloEntrada } from '../../../components/clinico/campos';
-import { FormularioConta } from './formulario';
 import ClinicoLayout from '../../../layouts/clinico-layout';
+import { FormularioConta } from './formulario';
 
 type Linha = {
     id: number;
@@ -99,7 +99,25 @@ export default function ListaUtilizadores({ utilizadores, filtros, perfis, perfi
                                         {u.activo ? 'Ativa' : 'Desativada'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2 text-right">
+                                <td className="space-x-2 px-4 py-2 text-right whitespace-nowrap">
+                                    <button
+                                        type="button"
+                                        disabled={u.proprio && u.activo}
+                                        title={u.proprio && u.activo ? 'Não pode desativar a sua própria conta' : undefined}
+                                        onClick={() => {
+                                            if (u.activo && !window.confirm(`Desativar a conta de ${u.name}? A pessoa deixa de poder entrar.`))
+                                                return;
+                                            router.put(`/admin/utilizadores/${u.id}/estado`, { activo: !u.activo }, { preserveScroll: true });
+                                        }}
+                                        className={`rounded-md border bg-white px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                                            u.activo
+                                                ? 'border-rose-300 text-rose-700 hover:bg-rose-50'
+                                                : 'border-teal-600 text-teal-800 hover:bg-teal-50'
+                                        }`}
+                                        aria-label={`${u.activo ? 'Desativar' : 'Ativar'} ${u.name}`}
+                                    >
+                                        {u.activo ? 'Desativar' : 'Ativar'}
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => setAEditar(u)}
@@ -142,7 +160,12 @@ export default function ListaUtilizadores({ utilizadores, filtros, perfis, perfi
                     onMouseDown={(e) => e.target === e.currentTarget && setAEditar(null)}
                     onKeyDown={(e) => e.key === 'Escape' && setAEditar(null)}
                 >
-                    <div role="dialog" aria-modal="true" aria-label={`Editar ${aEditar.name}`} className="my-8 w-full max-w-3xl rounded-lg bg-slate-50 p-5 shadow-xl">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Editar ${aEditar.name}`}
+                        className="my-8 w-full max-w-3xl rounded-lg bg-slate-50 p-5 shadow-xl"
+                    >
                         <h2 className="mb-4 text-lg font-semibold text-slate-900">Editar conta</h2>
                         <FormularioConta
                             key={aEditar.id}

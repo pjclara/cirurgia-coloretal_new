@@ -136,3 +136,18 @@ test('os dados do CR exigem os campos obrigatórios e ignoram-se fora do CR ou s
     $this->actingAs($this->utilizador)->post("/internamentos/{$i2->id}/cirurgias", cirurgiaCrDados(['cr' => crDados()]))->assertSessionHasNoErrors();
     expect(DB::table('bloco_operatorio_c_r_s')->count())->toBe(0);
 });
+
+test('a revisão de internamentos filtra os internamentos com cirurgia', function () {
+    $utente = novoUtente();
+    $comResseccao = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d'), 'data_de_alta' => now()->subDays(10)->format('Y-m-d')]);
+    $semResseccao = novoInternamento(novoUtente(), $this->utilizador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d'), 'data_de_alta' => now()->subDays(10)->format('Y-m-d')]);
+    $this->actingAs($this->utilizador)->post("/internamentos/{$comResseccao->id}/cirurgias", cirurgiaCrDados())->assertSessionHasNoErrors();
+    $this->actingAs($this->utilizador)->post("/internamentos/{$semResseccao->id}/cirurgias", cirurgiaCrDados(['intervencoes' => [33]]))->assertSessionHasNoErrors();
+    $semCirurgia = novoInternamento(novoUtente(), $this->utilizador, ['data_de_entrada' => now()->subDays(20)->format('Y-m-d'), 'data_de_alta' => now()->subDays(10)->format('Y-m-d')]);
+
+    $this->actingAs($this->utilizador)->get('/internamentos?cirurgia=1')->assertInertia(fn (Assert $p) => $p
+        ->where('filtros.cirurgia', true)
+        ->has('internamentos.data', 2)
+        ->where('internamentos.data', fn ($d) => collect($d)->pluck('id')->sort()->values()->all() === collect([$comResseccao->id, $semResseccao->id])->sort()->values()->all()));
+    $this->actingAs($this->utilizador)->get('/internamentos')->assertInertia(fn (Assert $p) => $p->has('internamentos.data', 3));
+});

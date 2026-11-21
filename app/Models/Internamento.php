@@ -62,14 +62,27 @@ class Internamento extends Model
         return $this->belongsTo(User::class, 'responsavel_id');
     }
 
-    /** Só o responsável pelo internamento e os administradores o podem alterar; um registo bloqueado só os administradores. */
+    /**
+     * Só o responsável pelo internamento, quem tem a permissão «update internamento de outros» e os administradores o
+     * podem alterar; um registo bloqueado só os administradores.
+     */
     public function bloqueadoPara(User $utilizador): bool
     {
         if ($utilizador->eAdministrador()) {
             return false;
         }
 
-        return $this->bloquear_tabela || $this->responsavel_id !== $utilizador->id;
+        if ($this->bloquear_tabela) {
+            return true;
+        }
+
+        return $this->responsavel_id !== $utilizador->id && ! $utilizador->can('update internamento de outros');
+    }
+
+    /** O seguimento aos 30 dias pode ser registado por qualquer utilizador com permissão de editar; só um registo bloqueado exige um administrador. */
+    public function seguimentoBloqueadoPara(User $utilizador): bool
+    {
+        return ! $utilizador->eAdministrador() && (bool) $this->bloquear_tabela;
     }
 
     public function diagnosticos(): BelongsToMany

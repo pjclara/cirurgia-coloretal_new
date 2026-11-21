@@ -28,20 +28,21 @@ class PerfilController extends Controller
      */
     public const CATALOGO = [
         'internamento' => ['rotulo' => 'Internamentos e cirurgias', 'permissoes' => [
-            'show internamento' => 'Ver o quadro, os internamentos, as cirurgias, os utentes, os seguimentos e a análise geral',
-            'create internamento' => 'Registar internamentos, utentes e cirurgias',
-            'update internamento' => 'Editar internamentos, utentes e cirurgias e registar seguimentos aos 30 dias',
+            'show internamento' => 'Ver o quadro, a revisão de internamentos, as cirurgias, os utentes, os seguimentos aos 30 dias e a análise global',
+            'create internamento' => 'Registar internamentos, utentes e cirurgias (incluindo os dados do centro de referência da cirurgia)',
+            'update internamento' => 'Editar internamentos, utentes e cirurgias e registar os seguimentos aos 30 dias',
+            'update internamento de outros' => 'Editar também os internamentos e as cirurgias de que não é o responsável (por omissão só o responsável e os administradores)',
             'delete internamento' => 'Apagar internamentos e cirurgias',
         ]],
         'referenciacao' => ['rotulo' => 'Centro de referência', 'permissoes' => [
-            'show referenciacao' => 'Ver as referenciações, a análise do centro de referência, o cancro retal, a qualidade dos dados e quem é doente do CR',
-            'create referenciacao' => 'Referenciar e sinalizar doentes para o centro de referência',
-            'update referenciacao' => 'Editar e apagar referenciações; os diagnósticos CR dos internamentos passam para a referenciação',
+            'show referenciacao' => 'Ver as referenciações e as decisões terapêuticas, a análise colorretal, o centro de referência (indicadores do cancro retal), a qualidade dos dados e quem é doente do CR',
+            'create referenciacao' => 'Referenciar e sinalizar doentes para o centro de referência e registar decisões terapêuticas',
+            'update referenciacao' => 'Editar e apagar referenciações e editar decisões terapêuticas; os diagnósticos CR dos internamentos passam para a referenciação',
         ]],
         'agendamento' => ['rotulo' => 'Agendamento cirúrgico', 'permissoes' => [
-            'show agendamento' => 'Ver a agenda, o mapa operatório e a lista de espera',
+            'show agendamento' => 'Ver a agenda, o mapa operatório (página própria) e a lista de espera',
             'create agendamento' => 'Inscrever na lista de espera e agendar cirurgias',
-            'update agendamento' => 'Editar, mover e cancelar inscrições e agendamentos',
+            'update agendamento' => 'Editar, mover e cancelar inscrições e agendamentos e validar os ambulatórios operados',
             'delete agendamento' => 'Apagar agendamentos',
         ]],
     ];

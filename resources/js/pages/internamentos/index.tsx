@@ -2,7 +2,7 @@ import { Link, router } from '@inertiajs/react';
 import { useState, type ReactNode } from 'react';
 import { diasEntre, formatarData, hojeIso } from '../../clinico/formato';
 import { rotas } from '../../clinico/rotas';
-import type { Opcao, Paginado, Responsavel } from '../../clinico/tipos';
+import type { Paginado, Responsavel } from '../../clinico/tipos';
 import { CaixaPesquisa } from '../../components/clinico/caixa-pesquisa';
 import { BotaoLigacao, Selecao } from '../../components/clinico/campos';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
@@ -17,7 +17,7 @@ type Linha = {
     localizacao: string | null;
     data_de_entrada: string | null;
     data_de_alta: string | null;
-    motivo: string;
+    diagnosticos: string[];
     responsavel: string | null;
     centro_referencia: boolean;
     destino: string | null;
@@ -28,21 +28,20 @@ type Linha = {
 type Filtros = {
     q: string;
     ano: number | null;
-    localizacao_id: number | null;
     responsavel_id: number | null;
     cr: boolean;
+    cirurgia: boolean;
 };
 
 type Props = {
     internamentos: Paginado<Linha>;
     filtros: Filtros;
-    localizacoes: Opcao[];
     responsaveis: Responsavel[];
     anos: number[];
     modal: ModalInternamentoDados | null;
 };
 
-export default function Internamentos({ internamentos, filtros, localizacoes, responsaveis, anos, modal }: Props) {
+export default function Internamentos({ internamentos, filtros, responsaveis, anos, modal }: Props) {
     const [termo, setTermo] = useState(filtros.q);
 
     const aplicar = (alteracoes: Partial<Filtros>) => {
@@ -50,13 +49,13 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
         const consulta: Record<string, string | number> = {};
         if (novos.q) consulta.q = novos.q;
         if (novos.ano) consulta.ano = novos.ano;
-        if (novos.localizacao_id) consulta.localizacao_id = novos.localizacao_id;
         if (novos.responsavel_id) consulta.responsavel_id = novos.responsavel_id;
         if (novos.cr) consulta.cr = '1';
+        if (novos.cirurgia) consulta.cirurgia = '1';
         router.get(rotas.internamentos.lista, consulta, { preserveState: true, preserveScroll: true });
     };
 
-    const comFiltros = !!filtros.q || !!filtros.ano || !!filtros.localizacao_id || !!filtros.responsavel_id || filtros.cr;
+    const comFiltros = !!filtros.q || !!filtros.ano || !!filtros.responsavel_id || filtros.cr || filtros.cirurgia;
 
     return (
         <ClinicoLayout
@@ -76,8 +75,8 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                     termo={termo}
                     aoEscrever={setTermo}
                     aoPesquisar={() => aplicar({})}
-                    rotulo="Procurar por utente, processo ou motivo"
-                    placeholder="Utente, processo ou motivo"
+                    rotulo="Procurar por utente, processo ou diagnóstico"
+                    placeholder="Utente, processo ou diagnóstico"
                     className="min-w-64 flex-1 sm:max-w-md"
                 />
 
@@ -88,15 +87,6 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                         valor={filtros.ano ?? ''}
                         aoMudar={(v) => aplicar({ ano: v === '' ? null : v })}
                         vazio="Ano"
-                    />
-                </div>
-                <div className="w-52">
-                    <Selecao
-                        aria-label="Localização"
-                        opcoes={localizacoes}
-                        valor={filtros.localizacao_id ?? ''}
-                        aoMudar={(v) => aplicar({ localizacao_id: v === '' ? null : v })}
-                        vazio="Localização"
                     />
                 </div>
                 <div className="w-52">
@@ -122,6 +112,19 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                     Só centro de referência
                 </button>
 
+                <button
+                    type="button"
+                    aria-pressed={filtros.cirurgia}
+                    onClick={() => aplicar({ cirurgia: !filtros.cirurgia })}
+                    className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                        filtros.cirurgia
+                            ? 'border-teal-700 bg-teal-100 text-teal-900 ring-1 ring-teal-700'
+                            : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
+                    }`}
+                >
+                    Com cirurgia
+                </button>
+
                 {comFiltros && (
                     <Link href={rotas.internamentos.lista} className="py-2 text-sm font-medium text-teal-800 hover:underline">
                         Limpar filtros
@@ -137,7 +140,7 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                                 Utente
                             </th>
                             <th scope="col" className="px-4 py-2.5 font-semibold">
-                                Motivo
+                                Diagnósticos
                             </th>
                             <th scope="col" className="px-4 py-2.5 font-semibold">
                                 Entrada
@@ -184,7 +187,7 @@ export default function Internamentos({ internamentos, filtros, localizacoes, re
                                         )}
                                     </td>
                                     <td className="max-w-xs px-4 py-2.5 text-slate-800">
-                                        <span className="line-clamp-2">{i.motivo}</span>
+                                        <span className="line-clamp-2">{i.diagnosticos.length > 0 ? i.diagnosticos.join(' · ') : '—'}</span>
                                         {i.clavien && <span className="text-xs text-rose-800">Clavien-Dindo: {i.clavien}</span>}
                                     </td>
                                     <td className={`px-4 py-2.5 tabular-nums ${diasValidos ? 'text-slate-700' : 'font-medium text-rose-700'}`}>

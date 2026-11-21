@@ -99,6 +99,7 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
     Route::post('utilizadores', [UtilizadorController::class, 'store'])->name('utilizadores.store');
     Route::get('utilizadores/{utilizador}', [UtilizadorController::class, 'edit'])->whereNumber('utilizador')->name('utilizadores.edit');
     Route::put('utilizadores/{utilizador}', [UtilizadorController::class, 'update'])->whereNumber('utilizador')->name('utilizadores.update');
+    Route::put('utilizadores/{utilizador}/estado', [UtilizadorController::class, 'alterarEstado'])->whereNumber('utilizador')->name('utilizadores.estado');
 
     // Catálogos de diagnósticos e de intervenções.
     Route::prefix('catalogos/{catalogo}')->where(['catalogo' => 'diagnosticos|intervencoes'])->name('catalogos.')->group(function () {

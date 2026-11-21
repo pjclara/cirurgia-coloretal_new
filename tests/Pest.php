@@ -63,7 +63,7 @@ use Spatie\Permission\Models\Permission;
 /** Utilizador com as permissões indicadas (por omissão, todas as de internamento e agendamento). */
 function utilizadorClinico(?array $permissoes = null): User
 {
-    $permissoes ??= Permission::where('name', 'like', '%internamento%')->orWhere('name', 'like', '%agendamento%')->pluck('name')->all();
+    $permissoes ??= Permission::where('name', 'like', '%internamento%')->orWhere('name', 'like', '%agendamento%')->pluck('name')->reject(fn ($n) => $n === 'update internamento de outros')->values()->all();
     $utilizador = User::factory()->create(['activo' => true]);
     $utilizador->givePermissionTo($permissoes);
 

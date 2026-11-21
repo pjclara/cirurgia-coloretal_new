@@ -111,3 +111,13 @@ test('um registo bloqueado aparece na lista como bloqueado para quem não é adm
 
     $this->actingAs($this->utilizador)->get('/internamentos/seguimentos')->assertOk()->assertInertia(fn (Assert $p) => $p->where('seguimentos.data.0.bloqueado', true));
 });
+
+test('o seguimento aos 30 dias pode ser registado por qualquer utilizador com permissão de editar, não só pelo responsável', function () {
+    $outro = utilizadorClinico();
+    expect($this->internamento->responsavel_id)->not->toBe($outro->id);
+
+    $this->actingAs($outro)->get('/internamentos/seguimentos')->assertInertia(fn (Assert $p) => $p->where('seguimentos.data.0.bloqueado', false));
+    $this->actingAs($outro)->post("/internamentos/{$this->internamento->id}/seguimento", ['data_registo' => now()->format('Y-m-d'), 'complicacoes' => [['id' => 1]]])
+        ->assertSessionHasNoErrors();
+    expect($this->internamento->morbilidades()->count())->toBe(1);
+});

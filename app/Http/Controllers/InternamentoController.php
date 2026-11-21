@@ -33,22 +33,23 @@ class InternamentoController extends Controller
         $filtros = [
             'q' => trim((string) $request->query('q', '')),
             'ano' => ctype_digit((string) $request->query('ano')) ? (int) $request->query('ano') : null,
-            'localizacao_id' => ctype_digit((string) $request->query('localizacao_id')) ? (int) $request->query('localizacao_id') : null,
             'responsavel_id' => ctype_digit((string) $request->query('responsavel_id')) ? (int) $request->query('responsavel_id') : null,
         ];
         $filtros['cr'] = $request->boolean('cr'); // só os doentes sinalizados para o centro de referência
+        $filtros['cirurgia'] = $request->boolean('cirurgia'); // só internamentos com cirurgia registada
 
         $internamentos = Internamento::query()
-            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
+            ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas:id,utente_id', 'diagnosticos:id,nome', 'responsavel:id,name,abrev', 'morbilidades:id,internamento_id,momento,clavien_dindo_id'])
             ->when($filtros['cr'], fn ($q) => $q->whereHas('utente.referenciacoesAtivas'))
+            ->when($filtros['cirurgia'], fn ($q) => $q->whereExists(fn ($c) => $c->selectRaw('1')->from('bloco_operatorios as b')
+                ->whereColumn('b.internamento_id', 'internamentos.id')->whereNull('b.deleted_at')))
             ->comAlta() // esta lista é só para gerir altas; os internados estão no quadro
             ->when($filtros['ano'], fn ($q, $ano) => $q->whereYear('data_de_entrada', $ano))
-            ->when($filtros['localizacao_id'], fn ($q, $id) => $q->where('localizacao_id', $id))
             ->when($filtros['responsavel_id'], fn ($q, $id) => $q->where('responsavel_id', $id))
             ->when($filtros['q'] !== '', function ($q) use ($filtros) {
                 $termo = $filtros['q'];
                 $q->where(function ($sub) use ($termo) {
-                    $sub->where('motivo_internamento', 'like', '%'.addcslashes($termo, '%_\\').'%')
+                    $sub->whereHas('diagnosticos', fn ($d) => $d->where('nome', 'like', '%'.addcslashes($termo, '%_\\').'%'))
                         ->orWhereHas('utente', fn ($u) => $u->pesquisar($termo));
                 });
             })
@@ -63,7 +64,7 @@ class InternamentoController extends Controller
                 'localizacao' => Dominios::nome('localizacaos', $i->localizacao_id),
                 'data_de_entrada' => $i->data_de_entrada?->format('Y-m-d'),
                 'data_de_alta' => $i->data_de_alta?->format('Y-m-d'),
-                'motivo' => $i->motivo_internamento,
+                'diagnosticos' => $i->diagnosticos->pluck('nome')->map(fn ($n) => trim($n))->values()->all(),
                 'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
                 'destino' => Dominios::nome('destinos', $i->destino_id),
                 'clavien' => Dominios::nome('clavien_dindos', $i->claviemMaisGrave()),
@@ -74,7 +75,6 @@ class InternamentoController extends Controller
         return Inertia::render('internamentos/index', [
             'internamentos' => $internamentos,
             'filtros' => $filtros,
-            'localizacoes' => Dominios::lista('localizacaos'),
             'responsaveis' => Dominios::responsaveis(),
             'anos' => range((int) now()->format('Y'), (int) substr(config('clinico.data_minima'), 0, 4)),
             'modal' => $modal,
@@ -160,7 +160,7 @@ class InternamentoController extends Controller
                     'dias_de_atraso' => (int) $prevista->startOfDay()->diffInDays($hoje, false),
                     'responsavel' => $i->responsavel?->abrev ?: $i->responsavel?->name,
                     'cr' => (bool) $i->doente_cr,
-                    'bloqueado' => $i->bloqueadoPara($utilizador),
+                    'bloqueado' => $i->seguimentoBloqueadoPara($utilizador),
                 ];
             });
 
@@ -364,7 +364,7 @@ class InternamentoController extends Controller
     /** Regista a morbilidade aos 30 dias a partir da lista de seguimentos (sem abrir o formulário completo). */
     public function registarSeguimento(Request $request, Internamento $internamento, GuardarInternamento $guardar): RedirectResponse
     {
-        $this->impedirSeBloqueado($request, $internamento);
+        abort_if($internamento->seguimentoBloqueadoPara($request->user()), 403, 'Este registo está bloqueado: só um administrador o pode alterar.');
         abort_if(! $internamento->data_de_alta, 422, 'Só é possível registar o seguimento aos 30 dias depois da alta.');
 
         $dados = $request->validate([

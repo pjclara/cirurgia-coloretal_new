@@ -102,6 +102,18 @@ class UtilizadorController extends Controller
         return redirect()->route('admin.utilizadores.index')->with('sucesso', 'Conta atualizada.');
     }
 
+    /** Ativa ou desativa a conta a partir da lista. */
+    public function alterarEstado(Request $request, User $utilizador): RedirectResponse
+    {
+        $ativar = $request->validate(['activo' => ['required', 'boolean']])['activo'];
+
+        abort_if($utilizador->is($request->user()) && ! $ativar, 422, 'Não pode desativar a sua própria conta.');
+
+        $utilizador->forceFill(['activo' => $ativar])->save();
+
+        return back()->with('sucesso', $ativar ? 'Conta ativada.' : 'Conta desativada.');
+    }
+
     private function formulario(Request $request, ?User $utilizador): Response
     {
         return Inertia::render('admin/utilizadores/formulario', [
