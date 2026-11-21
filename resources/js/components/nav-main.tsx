@@ -2,7 +2,6 @@ import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
-    SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarMenuSub,
@@ -48,11 +47,6 @@ export function NavMain({ grupos = [] }: { grupos: NavGroup[] }) {
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
-                                    {!!item.contagem && (
-                                        <SidebarMenuBadge aria-label={`${item.contagem} pendentes`}>
-                                            {item.contagem > 99 ? '99+' : item.contagem}
-                                        </SidebarMenuBadge>
-                                    )}
                                     {item.filhos && seccaoAberta && (
                                         <SidebarMenuSub>
                                             {item.filhos.map((filho) => (

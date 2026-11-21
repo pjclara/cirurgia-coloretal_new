@@ -33,68 +33,87 @@ export function AppSidebar() {
         clinico?: {
             administrador?: boolean;
             permissoes?: string[];
-            pendentes?: { meus: number; atraso: number } | null;
+
             utilizador?: { roles?: string[] } | null;
         };
     }>().props.clinico;
     const superAdmin = !!clinico?.utilizador?.roles?.includes('superAdmin');
     const pode = (permissao: string) => !!clinico?.administrador || !!clinico?.permissoes?.includes(permissao);
 
+    const verInternamentos = pode('show internamento');
+    const verReferenciacao = pode('show referenciacao');
+
     const grupos: NavGroup[] = [
-        ...(pode('show internamento')
+        // O que se usa todos os dias.
+        ...(verInternamentos
             ? [
                   {
-                      title: 'Clínica',
+                      title: 'Hoje',
                       items: [
                           { title: 'Quadro', url: '/quadro', icon: LayoutGrid },
-                          { title: 'O que me falta fazer', url: '/pendentes', icon: ListTodo, contagem: clinico?.pendentes?.meus },
-                          { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
+                          { title: 'O que me falta fazer', url: '/pendentes', icon: ListTodo },
+                      ],
+                  },
+              ]
+            : []),
+        // O percurso do doente: referenciação, internamento e seguimento.
+        ...(verInternamentos || verReferenciacao
+            ? [
+                  {
+                      title: 'Doentes',
+                      items: [
+                          ...(verReferenciacao ? [{ title: 'Referenciação', url: '/referenciacao', icon: Network }] : []),
+                          ...(verInternamentos
+                              ? [
+                                    { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
+                                    {
+                                        title: 'Seguimentos aos 30 dias',
+                                        url: '/internamentos/seguimentos',
+                                        icon: ClipboardCheck,
+                                    },
+                                ]
+                              : []),
+                      ],
+                  },
+              ]
+            : []),
+        ...(pode('show agendamento')
+            ? [
+                  {
+                      title: 'Bloco operatório',
+                      items: [
                           {
-                              title: 'Seguimentos aos 30 dias',
-                              url: '/internamentos/seguimentos',
-                              icon: ClipboardCheck,
-                              contagem: clinico?.pendentes?.atraso,
+                              title: 'Agendamento',
+                              url: '/agendamento',
+                              icon: CalendarDays,
+                              filhos: [
+                                  { title: 'Lista de espera', url: '/agendamento/lista-de-espera', icon: ClipboardList },
+                                  { title: 'Mapa operatório', url: '/agendamento/mapa', icon: Map, novoSeparador: true },
+                              ],
                           },
                       ],
                   },
               ]
             : []),
-        ...(pode('show agendamento') || pode('show referenciacao')
-            ? [
-                  {
-                      title: 'Planeamento',
-                      items: [
-                          ...(pode('show agendamento')
-                              ? [
-                                    {
-                                        title: 'Agendamento',
-                                        url: '/agendamento',
-                                        icon: CalendarDays,
-                                        filhos: [
-                                            { title: 'Lista de espera', url: '/agendamento/lista-de-espera', icon: ClipboardList },
-                                            { title: 'Mapa operatório', url: '/agendamento/mapa', icon: Map, novoSeparador: true },
-                                        ],
-                                    },
-                                ]
-                              : []),
-                          ...(pode('show referenciacao') ? [{ title: 'Referenciação', url: '/referenciacao', icon: Network }] : []),
-                      ],
-                  },
-              ]
-            : []),
-        ...(pode('show internamento')
+        // Indicadores gerais e, à parte, os do centro de referência e a qualidade dos dados.
+        ...(verInternamentos
             ? [
                   {
                       title: 'Análise',
                       items: [
                           { title: 'Análise global', url: '/dashboard', icon: BarChart3 },
-                          ...(pode('show referenciacao')
-                              ? [
-                                    { title: 'Análise colorretal', url: '/referenciacao/analise', icon: ChartLine },
-                                    { title: 'Centro de referência', url: '/analise/cancro-retal', icon: Activity },
-                                    { title: 'Qualidade dos dados', url: '/analise/cancro-retal/qualidade', icon: DatabaseZap },
-                                ]
-                              : []),
+                          ...(verReferenciacao ? [{ title: 'Análise colorretal', url: '/referenciacao/analise', icon: ChartLine }] : []),
+                      ],
+                  },
+              ]
+            : []),
+        ...(verInternamentos && verReferenciacao
+            ? [
+                  {
+                      title: 'Cancro retal',
+                      items: [
+                          { title: 'Centro de referência', url: '/analise/cancro-retal', icon: Activity },
+                          { title: 'Qualidade dos dados', url: '/analise/cancro-retal/qualidade', icon: DatabaseZap },
                       ],
                   },
               ]

@@ -59,7 +59,6 @@ class ClinicoServiceProvider extends ServiceProvider
                 ] : null,
                 'permissoes' => $utilizador ? $utilizador->getAllPermissions()->pluck('name')->values() : [],
                 'administrador' => $utilizador ? $utilizador->eAdministrador() : false,
-                'pendentes' => $utilizador && $utilizador->can('show internamento') ? \App\Support\Pendentes::contagens($utilizador) : null,
                 'flash' => [
                     'sucesso' => $pedido->hasSession() ? $pedido->session()->get('sucesso') : null,
                     'erro' => $pedido->hasSession() ? $pedido->session()->get('erro') : null,

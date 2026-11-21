@@ -203,15 +203,3 @@ test('os valores habituais do CR vêm do mais frequente nas últimas cirurgias',
         ->where('cr.habituais.descricao.anastemose_modo_id', 1)
         ->where('cr.habituais.descricao.libertacao_angulo', '99'));
 });
-
-test('o menu leva as contagens do que falta fazer', function () {
-    $utente = novoUtente();
-    referenciarParaCirurgiaCr($utente, $this->utilizador, now()->subDays(30)->format('Y-m-d'));
-    $internamento = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
-
-    $this->actingAs($this->utilizador)->get('/pendentes')->assertInertia(fn (Assert $p) => $p->where('clinico.pendentes.meus', 0));
-
-    // Gravar uma cirurgia do CR sem os dados passa a contar, logo no pedido seguinte.
-    $this->actingAs($this->utilizador)->post("/internamentos/{$internamento->id}/cirurgias", cirurgiaCrDados())->assertSessionHasNoErrors();
-    $this->actingAs($this->utilizador)->get('/pendentes')->assertInertia(fn (Assert $p) => $p->where('clinico.pendentes.meus', 1));
-});

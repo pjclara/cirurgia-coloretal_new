@@ -223,7 +223,7 @@ export function FormularioInternamento({
             .then(setEditarUtente)
             .catch(() => setEditarUtente('erro'));
     };
-    const [confirmaSemCirurgia, setConfirmaSemCirurgia] = useState<{ semCirurgia: boolean; naoSocial: boolean } | null>(null);
+    const [confirmaSemCirurgia, setConfirmaSemCirurgia] = useState<{ semCirurgia: boolean; social: number | '' } | null>(null);
     const registado = (m: Momento) => data.morbilidade[m].complicacoes.length > 0;
     /** Com cirurgia, a alta fica pendente até à revisão aos 30 dias. */
     const aguardaRevisao = listaCirurgias.length > 0 && !registado('30_dias');
@@ -296,7 +296,7 @@ export function FormularioInternamento({
         }
         // Ao dar alta (e não ao editar uma alta já registada), pede confirmação num modal: sem cirurgias, que não foi operado; com cirurgias, que estão todas registadas.
         if (internamento && data.data_de_alta && !internamento.data_de_alta) {
-            setConfirmaSemCirurgia({ semCirurgia: false, naoSocial: false });
+            setConfirmaSemCirurgia({ semCirurgia: false, social: data.caso_social_id });
             return;
         }
         gravar();
@@ -305,9 +305,10 @@ export function FormularioInternamento({
     // Os filtros dos seguimentos acompanham a ligação da cirurgia, para voltar à mesma lista.
     const consultaDoRetorno = retorno?.includes('?') ? retorno.slice(retorno.indexOf('?')) : '';
 
-    const gravar = () => {
+    const gravar = (casoSocial?: number | '') => {
         form.transform((atual) => ({
             ...atual,
+            ...(casoSocial !== undefined ? { caso_social_id: casoSocial } : {}),
             ...(aguardaRevisao ? { estado_da_alta_id: ALTA_PENDENTE } : {}),
             ...(origem ? { origem } : {}),
             ...((origem === 'qualidade' || origem === 'referenciacao' || origem === 'seguimentos') && retorno ? { retorno } : {}),
@@ -416,27 +417,26 @@ export function FormularioInternamento({
                                 : 'Confirmo que o doente não foi operado neste internamento.'}
                         </span>
                     </label>
-                    {!temCirurgias && (
-                        <label className="flex items-start gap-2">
-                            <input
-                                type="checkbox"
-                                className="mt-0.5 size-4"
-                                checked={confirmaSemCirurgia.naoSocial}
-                                onChange={(e) => setConfirmaSemCirurgia({ ...confirmaSemCirurgia, naoSocial: e.target.checked })}
-                            />
-                            <span>Confirmo que não se trata de um caso social.</span>
-                        </label>
-                    )}
+                    <Campo rotulo="O doente foi um caso social?" para="alta-caso-social">
+                        <Selecao
+                            id="alta-caso-social"
+                            opcoes={dominios.casos_sociais}
+                            valor={confirmaSemCirurgia.social}
+                            aoMudar={(v) => setConfirmaSemCirurgia({ ...confirmaSemCirurgia, social: v })}
+                            vazio="Escolher…"
+                        />
+                    </Campo>
                 </div>
                 <div className="mt-2 flex justify-end gap-2">
                     <Botao variante="secundario" onClick={() => setConfirmaSemCirurgia(null)}>
                         Voltar
                     </Botao>
                     <Botao
-                        disabled={!confirmaSemCirurgia.semCirurgia || (!temCirurgias && !confirmaSemCirurgia.naoSocial)}
+                        disabled={!confirmaSemCirurgia.semCirurgia || confirmaSemCirurgia.social === ''}
                         onClick={() => {
+                            setData('caso_social_id', confirmaSemCirurgia.social);
                             setConfirmaSemCirurgia(null);
-                            gravar();
+                            gravar(confirmaSemCirurgia.social);
                         }}
                     >
                         Confirmar e dar alta

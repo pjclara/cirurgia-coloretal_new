@@ -373,7 +373,6 @@ class CirurgiaController extends Controller
     /** Gravado a partir do quadro: volta ao quadro. */
     private function destino(Request $request, int $utenteId, string $mensagem): RedirectResponse
     {
-        \App\Support\Pendentes::esquecer($request->user()?->id); // o menu refaz as contagens
         if ($request->input('origem', $request->query('origem')) === 'quadro') {
             return redirect()->route('quadro')->with('sucesso', $mensagem);
         }
