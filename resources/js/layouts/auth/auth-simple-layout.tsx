@@ -1,4 +1,5 @@
 import AppLogoIcon from '@/components/app-logo-icon';
+import { DireitosDeAutor } from '@/components/direitos-de-autor';
 import { VersaoDaApp } from '@/components/versao-da-app';
 import { Link } from '@inertiajs/react';
 
@@ -31,7 +32,10 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     {children}
                 </div>
             </div>
-            <VersaoDaApp />
+            <div className="text-center">
+                <VersaoDaApp />
+                <DireitosDeAutor />
+            </div>
         </div>
     );
 }

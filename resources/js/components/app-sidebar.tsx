@@ -1,3 +1,4 @@
+import { DireitosDeAutor } from '@/components/direitos-de-autor';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -121,7 +122,10 @@ export function AppSidebar() {
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
-                <VersaoDaApp className="px-2 group-data-[collapsible=icon]:hidden" />
+                <div className="px-2 group-data-[collapsible=icon]:hidden">
+                    <VersaoDaApp />
+                    <DireitosDeAutor />
+                </div>
             </SidebarFooter>
         </Sidebar>
     );
