@@ -65,7 +65,7 @@ export function AppSidebar() {
                           ...(verReferenciacao ? [{ title: 'Referenciação', url: '/referenciacao', icon: Network }] : []),
                           ...(verInternamentos
                               ? [
-                                    { title: 'Revisão de internamento', url: '/internamentos', icon: BedDouble },
+                                    { title: 'Histórico dos internamentos', url: '/internamentos', icon: BedDouble },
                                     {
                                         title: 'Seguimentos aos 30 dias',
                                         url: '/internamentos/seguimentos',

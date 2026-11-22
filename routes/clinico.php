@@ -30,6 +30,7 @@ Route::put('conta/password', [ContaController::class, 'atualizarPassword'])->nam
 Route::middleware('can:show internamento')->group(function () {
     Route::get('quadro', QuadroController::class)->name('quadro');
     Route::get('pendentes', PendentesController::class)->name('pendentes');
+    Route::get('pendentes/cirurgias/{bloco}', [PendentesController::class, 'cirurgia'])->whereNumber('bloco')->name('pendentes.cirurgia');
     Route::get('dashboard', AnaliseController::class)->name('dashboard');
     Route::get('quadro/imprimir', [QuadroController::class, 'imprimir'])->name('quadro.imprimir');
     Route::get('quadro/novo', [QuadroController::class, 'novo'])->middleware('can:create internamento')->name('quadro.novo');

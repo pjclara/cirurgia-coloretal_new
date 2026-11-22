@@ -28,7 +28,7 @@ class PerfilController extends Controller
      */
     public const CATALOGO = [
         'internamento' => ['rotulo' => 'Internamentos e cirurgias', 'permissoes' => [
-            'show internamento' => 'Ver o quadro, a revisão de internamentos, as cirurgias, os utentes, os seguimentos aos 30 dias e a análise global',
+            'show internamento' => 'Ver o quadro, o histórico dos internamentos, as cirurgias, os utentes, os seguimentos aos 30 dias e a análise global',
             'create internamento' => 'Registar internamentos, utentes e cirurgias (incluindo os dados do centro de referência da cirurgia)',
             'update internamento' => 'Editar internamentos, utentes e cirurgias e registar os seguimentos aos 30 dias',
             'update internamento de outros' => 'Editar também os internamentos e as cirurgias de que não é o responsável (por omissão só o responsável e os administradores)',

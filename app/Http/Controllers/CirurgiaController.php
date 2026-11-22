@@ -377,7 +377,12 @@ class CirurgiaController extends Controller
             return redirect()->route('quadro')->with('sucesso', $mensagem);
         }
 
-        // Gravado a partir dos seguimentos ou da revisão de internamentos: volta ao internamento, em modal sobre a lista (só endereços desta aplicação).
+        // Gravado a partir de «O que me falta fazer»: volta a essa página.
+        if ($request->input('origem', $request->query('origem')) === 'pendentes') {
+            return redirect('/pendentes')->with('sucesso', $mensagem);
+        }
+
+        // Gravado a partir dos seguimentos ou do histórico de internamentos: volta ao internamento, em modal sobre a lista (só endereços desta aplicação).
         $origem = $request->input('origem', $request->query('origem'));
         if (in_array($origem, ['seguimentos', 'lista'], true)) {
             $retorno = (string) $request->input('retorno', $request->query('retorno'));

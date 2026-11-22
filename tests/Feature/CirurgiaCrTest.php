@@ -203,3 +203,22 @@ test('os valores habituais do CR vêm do mais frequente nas últimas cirurgias',
         ->where('cr.habituais.descricao.anastemose_modo_id', 1)
         ->where('cr.habituais.descricao.libertacao_angulo', '99'));
 });
+
+test('em «o que me falta fazer» a cirurgia abre em modal e, ao gravar, volta a essa página', function () {
+    $utente = novoUtente();
+    referenciarParaCirurgiaCr($utente, $this->utilizador, now()->subDays(30)->format('Y-m-d'));
+    $internamento = novoInternamento($utente, $this->utilizador, ['data_de_entrada' => now()->subDays(10)->format('Y-m-d')]);
+    $this->actingAs($this->utilizador)->post("/internamentos/{$internamento->id}/cirurgias", cirurgiaCrDados())->assertSessionHasNoErrors();
+    $bloco = BlocoOperatorio::first();
+
+    $this->actingAs($this->utilizador)->get("/pendentes/cirurgias/{$bloco->id}")->assertInertia(fn (Assert $p) => $p
+        ->component('pendentes')
+        ->where('modalCirurgia.fechar_url', '/pendentes')
+        ->where('modalCirurgia.origem', 'pendentes')
+        ->where('modalCirurgia.cirurgia.id', $bloco->id)
+        ->has('dominios.complicacoes'));
+
+    $this->actingAs($this->utilizador)->put("/cirurgias/{$bloco->id}", cirurgiaCrDados(['cr' => crDados(), 'descricoes' => [1 => crDescricao()], 'origem' => 'pendentes']))
+        ->assertRedirect('/pendentes');
+    expect(DB::table('bloco_operatorio_c_r_s')->where('bloco_operatorio_id', $bloco->id)->exists())->toBeTrue();
+});

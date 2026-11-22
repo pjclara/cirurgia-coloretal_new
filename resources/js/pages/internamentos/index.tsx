@@ -61,7 +61,7 @@ export default function Internamentos({ internamentos, filtros, responsaveis, an
 
     return (
         <ClinicoLayout
-            titulo="Internamentos"
+            titulo="Histórico dos internamentos"
             largura="larga"
             acoes={
                 <>

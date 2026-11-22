@@ -392,9 +392,7 @@ class InternamentoController extends Controller
 
     private function resolucoesComGrau(): array
     {
-        return DB::table('resolucao_complicacaos')->orderBy('id')->get(['id', 'nome', 'clavien_dindo_id'])
-            ->map(fn ($r) => ['id' => (int) $r->id, 'nome' => trim($r->nome), 'clavien_dindo_id' => $r->clavien_dindo_id ? (int) $r->clavien_dindo_id : null])
-            ->all();
+        return Dominios::resolucoesComGrau();
     }
 
     /** Regista a morbilidade aos 30 dias a partir da lista de seguimentos (sem abrir o formulário completo). */

@@ -63,7 +63,7 @@ export function CorpoFormularioCirurgia({
     origem,
     fechar_url: retorno,
     aoFechar,
-}: PropsCirurgia & { origem?: 'quadro' | 'seguimentos' | 'lista'; fechar_url?: string; aoFechar?: () => void }) {
+}: PropsCirurgia & { origem?: 'quadro' | 'seguimentos' | 'lista' | 'pendentes'; fechar_url?: string; aoFechar?: () => void }) {
     const form = useForm({
         data_de_inicio: cirurgia?.data_de_inicio ?? hoje,
         tipo_de_cirurgia_id: (cirurgia?.tipo_de_cirurgia_id ?? '') as number | '',

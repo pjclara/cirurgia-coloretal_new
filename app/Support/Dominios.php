@@ -102,6 +102,14 @@ class Dominios
     }
 
     /** Complicações com o nome do grupo. */
+    /** Resoluções das complicações, com o grau de Clavien-Dindo que cada uma implica. */
+    public static function resolucoesComGrau(): array
+    {
+        return DB::table('resolucao_complicacaos')->orderBy('id')->get(['id', 'nome', 'clavien_dindo_id'])
+            ->map(fn ($r) => ['id' => (int) $r->id, 'nome' => trim($r->nome), 'clavien_dindo_id' => $r->clavien_dindo_id ? (int) $r->clavien_dindo_id : null])
+            ->all();
+    }
+
     public static function complicacoes(): array
     {
         return self::$cache['__complicacoes'] ??= DB::table('complicacaos')

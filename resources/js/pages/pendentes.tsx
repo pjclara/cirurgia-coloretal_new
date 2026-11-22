@@ -1,6 +1,11 @@
 import { Link } from '@inertiajs/react';
+import { useState } from 'react';
 import { formatarData } from '../clinico/formato';
+import type { Opcao, OpcaoAgrupada } from '../clinico/tipos';
+import { ModalCirurgia, type ModalCirurgiaDados } from '../components/cirurgias/modal-cirurgia';
+import type { ResolucaoComGrau } from '../components/clinico/bloco-morbilidade';
 import { NumeroProcesso } from '../components/clinico/numero-processo';
+import { ModalSeguimento } from '../components/internamentos/modal-seguimento';
 import ClinicoLayout from '../layouts/clinico-layout';
 
 type Utente = { id: number | null; nome: string | null; numero_processo: number | null };
@@ -8,8 +13,14 @@ type Utente = { id: number | null; nome: string | null; numero_processo: number 
 type Props = {
     utilizadorId: number;
     limite: number;
-    seguimentos: { total: number; linhas: { id: number; utente: Utente; data_de_alta: string; dias_de_atraso: number }[] };
+    seguimentos: {
+        total: number;
+        linhas: { id: number; utente: Utente; diagnosticos: string[]; data_de_alta: string; prevista: string; dias_de_atraso: number }[];
+    };
     cr: { total: number | null; linhas: { bloco: number; data: string; intervencoes: string[]; falta: string[]; utente: Utente }[] };
+    modalCirurgia: ModalCirurgiaDados | null;
+    podeRegistar: boolean;
+    dominios: { complicacoes: OpcaoAgrupada[]; resolucoes: ResolucaoComGrau[]; clavien: Opcao[] };
 };
 
 const FALTA: Record<string, string> = { cr: 'dados do CR', descricao: 'descrição das intervenções' };
@@ -52,7 +63,13 @@ function Cartao({
     );
 }
 
-export default function Pendentes({ utilizadorId, limite, seguimentos, cr }: Props) {
+export default function Pendentes({ utilizadorId, limite, seguimentos, cr, modalCirurgia, podeRegistar, dominios }: Props) {
+    // O seguimento regista-se numa janela por cima desta página, que continua aberta depois de gravar.
+    const [abertoId, setAbertoId] = useState<number | null>(null);
+    const indice = seguimentos.linhas.findIndex((l) => l.id === abertoId);
+    const aberto = indice >= 0 ? seguimentos.linhas[indice] : null;
+    const seguinte = indice >= 0 ? (seguimentos.linhas[indice + 1] ?? null) : null;
+
     return (
         <ClinicoLayout titulo="O que me falta fazer" subtitulo="Os internamentos de que é responsável">
             <div className="grid gap-5 lg:grid-cols-2">
@@ -66,12 +83,17 @@ export default function Pendentes({ utilizadorId, limite, seguimentos, cr }: Pro
                     {seguimentos.linhas.map((l) => (
                         <li key={l.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                             <div className="min-w-0">
-                                <Link
-                                    href={`/internamentos/seguimentos/${l.id}?responsavel_id=${utilizadorId}`}
-                                    className="font-medium text-slate-900 hover:underline"
-                                >
-                                    {l.utente.nome}
-                                </Link>
+                                {podeRegistar ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAbertoId(l.id)}
+                                        className="text-left font-medium text-slate-900 hover:underline focus-visible:outline-2 focus-visible:outline-teal-700"
+                                    >
+                                        {l.utente.nome}
+                                    </button>
+                                ) : (
+                                    <span className="font-medium text-slate-900">{l.utente.nome}</span>
+                                )}
                                 <p className="text-xs text-slate-600 tabular-nums">
                                     <NumeroProcesso valor={l.utente.numero_processo} /> · alta a {formatarData(l.data_de_alta)}
                                 </p>
@@ -101,7 +123,8 @@ export default function Pendentes({ utilizadorId, limite, seguimentos, cr }: Pro
                             <li key={l.bloco} className="flex items-center justify-between gap-3 py-2 text-sm">
                                 <div className="min-w-0">
                                     <Link
-                                        href={`/internamentos/cirurgias/${l.bloco}/na-lista`}
+                                        href={`/pendentes/cirurgias/${l.bloco}`}
+                                        preserveScroll
                                         className="font-medium text-slate-900 hover:underline"
                                     >
                                         {l.utente.nome}
@@ -119,6 +142,19 @@ export default function Pendentes({ utilizadorId, limite, seguimentos, cr }: Pro
                     </Cartao>
                 )}
             </div>
+
+            <ModalCirurgia modal={modalCirurgia} />
+
+            {aberto && (
+                <ModalSeguimento
+                    key={aberto.id}
+                    linha={aberto}
+                    dominios={dominios}
+                    temSeguinte={seguinte !== null}
+                    aoFechar={() => setAbertoId(null)}
+                    aoGuardar={(irParaSeguinte) => setAbertoId(irParaSeguinte && seguinte ? seguinte.id : null)}
+                />
+            )}
         </ClinicoLayout>
     );
 }
