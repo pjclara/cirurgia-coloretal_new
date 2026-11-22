@@ -85,13 +85,14 @@ export default function ImprimirQuadro({ internados, equipa, hoje, geradoEm }: P
                         <table className="w-full border-collapse text-left text-xs">
                             <thead>
                                 <tr className="border-b border-slate-400 text-slate-600">
-                                    <th className="w-12 py-1 pr-2 font-medium">Cama</th>
-                                    <th className="w-56 py-1 pr-2 font-medium">Utente</th>
-                                    <th className="w-16 py-1 pr-2 font-medium">Dia</th>
-                                    <th className="w-64 py-1 pr-2 font-medium">Diagnóstico / cirurgia</th>
+                                    <th className="w-10 py-1 pr-2 font-medium">Cama</th>
+                                    <th className="w-60 py-1 pr-2 font-medium">Utente</th>
+                                    <th className="w-14 py-1 pr-2 font-medium">Dia</th>
+                                    <th className="w-40 py-1 pr-2 font-medium">Diagnóstico</th>
+                                    <th className="w-40 py-1 pr-2 font-medium">Cirurgia</th>
                                     <th className="w-12 py-1 pr-2 font-medium">Resp.</th>
-                                    <th className="py-1 pr-2 font-medium">Evolução / plano</th>
-                                    <th className="w-14 py-1 text-center font-medium">Alta hoje</th>
+                                    <th className="w-[30%] py-1 pr-2 font-medium">Evolução / plano</th>
+                                    <th className="w-12 py-1 text-center font-medium">Alta hoje</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -99,7 +100,7 @@ export default function ImprimirQuadro({ internados, equipa, hoje, geradoEm }: P
                                     const anos = idade(i.utente.data_nascimento, hoje);
                                     const pop = posOperatorio(i, hoje);
                                     return (
-                                        <tr key={i.id} className="h-16 border-b border-slate-300 align-top">
+                                        <tr key={i.id} className="h-12 border-b border-slate-300 align-top">
                                             <td className="py-1.5 pr-2 text-base font-semibold tabular-nums">{i.cama}</td>
                                             <td className="py-1.5 pr-2">
                                                 <p className="font-semibold">{i.utente.nome ?? 'Utente sem ficha'}</p>
@@ -115,13 +116,16 @@ export default function ImprimirQuadro({ internados, equipa, hoje, geradoEm }: P
                                             </td>
                                             <td className="py-1.5 pr-2">
                                                 <p>{i.diagnosticos.length > 0 ? i.diagnosticos.join(', ') : i.motivo}</p>
-                                                {pop && (
+                                                {i.caso_social && <p className="font-medium">Caso social: {i.caso_social}</p>}
+                                            </td>
+                                            <td className="py-1.5 pr-2">
+                                                {pop ? (
                                                     <p className="text-slate-700">
                                                         <span className="font-semibold tabular-nums">D+{pop.dias}</span> {pop.texto}
                                                     </p>
+                                                ) : (
+                                                    <span className="text-slate-400">—</span>
                                                 )}
-                                                {i.caso_social && <p className="font-medium">Caso social: {i.caso_social}</p>}
-                                                {i.centro_referencia && <p className="font-medium">Centro de referência</p>}
                                             </td>
                                             <td className="py-1.5 pr-2">{i.responsavel?.abrev ?? '—'}</td>
                                             <td className="border-l border-dashed border-slate-300 py-1.5 pr-2" />

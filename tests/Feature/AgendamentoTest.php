@@ -21,7 +21,7 @@ function pedidoDeAgendar(object $t, array $extra = [])
         'tipo_id' => $t->ocupante->tipo_de_agendamento_id,
         'responsavel_id' => $t->utilizador->id,
         'estado' => ListaDeEspera::ESTADO_AGENDADO,
-        'reserva_sangue' => false,
+        'reserva_sangue' => 1,
     ]);
 }
 

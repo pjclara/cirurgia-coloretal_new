@@ -75,7 +75,7 @@ test('registar o agendamento de quem já foi operado nesse dia deixa-o como oper
         'tipo_id' => DB::table('tipo_de_agendamentos')->value('id'),
         'responsavel_id' => $this->utilizador->id,
         'estado' => ListaDeEspera::ESTADO_AGENDADO,
-        'reserva_sangue' => false,
+        'reserva_sangue' => 1,
     ])->assertSessionHasNoErrors()->assertSessionHas('sucesso', fn ($m) => str_contains($m, 'ficou como operado'));
 
     $agendamento = Agendamento::where('lista_de_espera_id', $espera->id)->firstOrFail();

@@ -82,7 +82,7 @@ test('ao guardar um agendamento como Operado a lista de espera passa a Operado',
         'tipo_id' => DB::table('tipo_de_agendamentos')->value('id'),
         'responsavel_id' => $this->eu->id,
         'estado' => ListaDeEspera::ESTADO_OPERADO,
-        'reserva_sangue' => false,
+        'reserva_sangue' => 1,
     ])->assertSessionHasNoErrors()->assertRedirect();
 
     expect((int) $espera->fresh()->estado_lista_espera)->toBe(5)
@@ -129,7 +129,7 @@ test('o formulário de agendar aceita a hora, recusa uma hora inválida e mover 
         'tipo_id' => DB::table('tipo_de_agendamentos')->value('id'),
         'responsavel_id' => $this->eu->id,
         'estado' => ListaDeEspera::ESTADO_AGENDADO,
-        'reserva_sangue' => false,
+        'reserva_sangue' => 1,
     ];
 
     $this->actingAs($this->eu)->post("/agendamento/lista-de-espera/{$espera->id}/agendar", $corpo + ['hora' => '25:99'])->assertSessionHasErrors('hora');

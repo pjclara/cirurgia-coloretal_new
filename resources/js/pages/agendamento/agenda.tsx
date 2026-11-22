@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { CATEGORIAS, COR_ESTADO, NOMES_DIA, nomeEstado, type Categoria } from '../../clinico/agendamento';
+import { CATEGORIAS, COR_ESTADO, NOMES_DIA, nomeEstado, notaDeSangue, type Categoria } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
@@ -26,7 +26,7 @@ type Item = {
     categoria: Categoria;
     estado: number | null;
     responsavel: string | null;
-    reserva_sangue: boolean;
+    reserva_sangue: string | null;
 };
 
 type Props = {
@@ -377,7 +377,7 @@ export default function Agenda({
                                                             </p>
                                                             <p className="text-xs text-slate-500">
                                                                 {[a.tipo, a.local, a.responsavel].filter(Boolean).join(' · ')}
-                                                                {a.reserva_sangue && ' · Reserva de sangue'}
+                                                                {notaDeSangue(a.reserva_sangue) && ` · ${notaDeSangue(a.reserva_sangue)}`}
                                                             </p>
                                                         </div>
                                                         <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${COR_ESTADO[a.estado ?? 6]}`}>

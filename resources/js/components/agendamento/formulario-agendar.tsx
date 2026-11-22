@@ -1,6 +1,7 @@
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { router, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
+import { OPCOES_SANGUE } from '../../clinico/agendamento';
 import { useResponsavelPorOmissao } from '../../clinico/responsavel';
 import type { Opcao, Responsavel } from '../../clinico/tipos';
 import { Botao, BotaoLigacao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
@@ -20,7 +21,7 @@ export type PropsAgendar = {
         tipo_id: number | null;
         responsavel_id: number | null;
         estado: number;
-        reserva_sangue: boolean;
+        reserva_sangue: string | null;
         comentarios: string;
     } | null;
     espera: {
@@ -51,7 +52,7 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_co
         tipo_id: (agendamento?.tipo_id ?? 1) as number | '',
         responsavel_id: (agendamento?.responsavel_id ?? espera.responsavel_id ?? euResponsavel) as number | '',
         estado: (agendamento?.estado ?? 3) as number | '',
-        reserva_sangue: agendamento?.reserva_sangue ?? false,
+        reserva_sangue: (agendamento?.reserva_sangue ? Number(agendamento.reserva_sangue) : 1) as number | '',
         comentarios: agendamento?.comentarios ?? '',
     });
     const { data, setData, processing } = form;
@@ -162,11 +163,15 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_co
                             <Campo rotulo="Estado" para="estado" erro={erros.estado}>
                                 <Selecao id="estado" opcoes={estadosEscolhiveis} valor={data.estado} aoMudar={(v) => setData('estado', v)} />
                             </Campo>
+                            <Campo rotulo="Sangue" para="sangue" erro={erros.reserva_sangue}>
+                                <Selecao
+                                    id="sangue"
+                                    opcoes={OPCOES_SANGUE}
+                                    valor={data.reserva_sangue}
+                                    aoMudar={(v) => setData('reserva_sangue', v)}
+                                />
+                            </Campo>
                         </div>
-                        <label className="mt-4 flex items-center gap-2 text-sm">
-                            <input type="checkbox" checked={data.reserva_sangue} onChange={(e) => setData('reserva_sangue', e.target.checked)} />
-                            Reserva de sangue
-                        </label>
                         <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional className="mt-4">
                             <textarea
                                 id="comentarios"

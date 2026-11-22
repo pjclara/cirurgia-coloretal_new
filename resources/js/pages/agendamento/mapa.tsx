@@ -1,7 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { NOMES_DIA } from '../../clinico/agendamento';
+import { NOMES_DIA, notaDeSangue } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
-import { EtiquetaCr } from '../../components/clinico/etiqueta-cr';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 
 type Item = {
@@ -17,7 +16,7 @@ type Item = {
     tipo: string | null;
     estado: number | null;
     responsavel: string | null;
-    reserva_sangue: boolean;
+    reserva_sangue: string | null;
     comentarios: string | null;
 };
 
@@ -29,6 +28,28 @@ type Props = {
     seguinte: string;
     geradoEm: string;
 };
+
+const LIGACOES = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+
+/** No máximo três palavras: o primeiro nome e os dois últimos (sem «de», «da», «dos»…). */
+function nomeCurto(nome: string | null) {
+    if (!nome) return 'Utente sem ficha';
+    const palavras = nome.trim().split(/\s+/);
+    if (palavras.length <= 3) return nome.trim();
+    const uteis = palavras.filter((p) => !LIGACOES.has(p.toLowerCase()));
+    return (uteis.length <= 3 ? uteis : [uteis[0], ...uteis.slice(-2)]).join(' ');
+}
+
+const ABREVIATURAS: Record<string, string> = {
+    programada: 'Prog.',
+    urgência: 'Urg.',
+    urgencia: 'Urg.',
+    adicional: 'Adic.',
+    'bloco central': 'Bloco',
+    ambulatorio: 'Amb.',
+    ambulatório: 'Amb.',
+};
+const abreviar = (texto: string | null) => (texto ? (ABREVIATURAS[texto.trim().toLowerCase()] ?? texto) : null);
 
 /** Mapa operatório sem menus nem cores de fundo, pensado para imprimir (ou guardar em PDF pelo diálogo de impressão). */
 export default function Mapa({ dias, vista, inicio, anterior, seguinte, geradoEm }: Props) {
@@ -95,7 +116,7 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, geradoEm
                             <table className="w-full border-collapse text-left text-xs">
                                 <thead>
                                     <tr className="border-b border-slate-300 text-slate-600">
-                                        <th className="py-1 pr-2 font-medium">Hora / sala</th>
+                                        <th className="py-1 pr-2 font-medium">Sala / hora</th>
                                         <th className="py-1 pr-2 font-medium">Utente</th>
                                         <th className="py-1 pr-2 font-medium">Processo</th>
                                         <th className="py-1 pr-2 font-medium">Intervenção</th>
@@ -108,21 +129,24 @@ export default function Mapa({ dias, vista, inicio, anterior, seguinte, geradoEm
                                     {dia.agendamentos.map((a) => (
                                         <tr key={a.id} className="border-b border-slate-200 align-top">
                                             <td className="py-1.5 pr-2 whitespace-nowrap">
-                                                {[a.hora, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
+                                                {[a.sala ? `Sala ${a.sala}` : null, a.hora].filter(Boolean).join(' · ') || '—'}
                                             </td>
                                             <td className="py-1.5 pr-2 font-medium">
-                                                {a.utente.nome ?? 'Utente sem ficha'}
-                                                {a.utente.cr && <EtiquetaCr />}
+                                                {nomeCurto(a.utente.nome)}
                                                 {a.idade !== null && <span className="font-normal text-slate-600"> ({a.idade} anos)</span>}
                                             </td>
                                             <td className="py-1.5 pr-2 tabular-nums">
                                                 <NumeroProcesso semRotulo valor={a.utente.numero_processo} />
                                             </td>
                                             <td className="py-1.5 pr-2">{a.intervencoes.join(', ') || '—'}</td>
-                                            <td className="py-1.5 pr-2">{[a.tipo, a.local].filter(Boolean).join(' · ') || '—'}</td>
+                                            <td className="py-1.5 pr-2">
+                                                {[abreviar(a.tipo), abreviar(a.local)].filter(Boolean).join(' · ') || '—'}
+                                            </td>
                                             <td className="py-1.5 pr-2">{a.responsavel ?? '—'}</td>
                                             <td className="py-1.5">
-                                                {a.reserva_sangue && <span className="font-semibold">Reserva de sangue. </span>}
+                                                {notaDeSangue(a.reserva_sangue) && (
+                                                    <span className="font-semibold">{notaDeSangue(a.reserva_sangue)}. </span>
+                                                )}
                                                 {a.comentarios}
                                             </td>
                                         </tr>

@@ -488,7 +488,7 @@ class AgendamentoController extends Controller
             'categoria' => $a->categoria(),
             'estado' => $a->estado(),
             'responsavel' => $a->responsavel?->abrev ?: $a->responsavel?->name,
-            'reserva_sangue' => (string) $a->reserva_sangue === '1',
+            'reserva_sangue' => in_array((string) $a->reserva_sangue, ['1', '2', '3'], true) ? (string) $a->reserva_sangue : null,
             'comentarios' => $a->comentarios,
         ];
     }
@@ -555,7 +555,7 @@ class AgendamentoController extends Controller
                 'tipo_id' => $agendamento->tipo_de_agendamento_id,
                 'responsavel_id' => $agendamento->responsavel_id,
                 'estado' => $agendamento->estado() ?? ListaDeEspera::ESTADO_PENDENTE,
-                'reserva_sangue' => (string) $agendamento->reserva_sangue === '1',
+                'reserva_sangue' => in_array((string) $agendamento->reserva_sangue, ['1', '2', '3'], true) ? (string) $agendamento->reserva_sangue : null,
                 'comentarios' => $agendamento->comentarios ?? '',
             ] : null,
             'somente_consulta' => $this->somenteConsulta($espera, $agendamento),
@@ -621,7 +621,7 @@ class AgendamentoController extends Controller
             'tipo_id' => ['required', 'integer', Rule::exists('tipo_de_agendamentos', 'id')],
             'responsavel_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'estado' => ['required', 'integer', Rule::in(array_filter([...self::ESTADOS_DO_FORMULARIO, $estadoAtual]))],
-            'reserva_sangue' => ['required', 'boolean'],
+            'reserva_sangue' => ['required', 'integer', Rule::in([1, 2, 3])], // 1 não é necessário, 2 apenas classificação, 3 reserva de sangue
             'comentarios' => ['nullable', 'string', 'max:2000'],
             'forcar' => ['sometimes', 'boolean'],
         ], ['required' => 'Preencha este campo.']);
@@ -677,7 +677,7 @@ class AgendamentoController extends Controller
             'estado_de_agendamento_id' => $d['estado'],
             // O campo antigo só admite 1 a 4: Operado e Outro guardam-se como Agendado; vale o estado_de_agendamento_id.
             'estado_de_agendamento' => (string) ($d['estado'] <= 4 ? $d['estado'] : ListaDeEspera::ESTADO_AGENDADO),
-            'reserva_sangue' => $d['reserva_sangue'] ? '1' : '0',
+            'reserva_sangue' => (string) $d['reserva_sangue'],
             'comentarios' => $d['comentarios'] ?? null,
         ];
     }

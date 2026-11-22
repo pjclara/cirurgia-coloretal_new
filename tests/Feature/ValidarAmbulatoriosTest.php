@@ -116,7 +116,7 @@ test('quem já tem um agendamento pendente sai da lista ao lado da agenda e não
         ->assertRedirect(route('agendamento.edit', $agendamento));
 
     // E gravar um novo agendamento é recusado.
-    $dados = ['data' => now()->addDays(9)->format('Y-m-d'), 'periodo_id' => 1, 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => false, 'estado' => 3, 'responsavel_id' => $this->utilizador->id];
+    $dados = ['data' => now()->addDays(9)->format('Y-m-d'), 'periodo_id' => 1, 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => 1, 'estado' => 3, 'responsavel_id' => $this->utilizador->id];
     $this->actingAs($this->utilizador)->post("/agendamento/lista-de-espera/{$comPendente->id}/agendar", $dados)->assertSessionHasErrors('conflito');
     expect($comPendente->agendamentos()->count())->toBe(1);
 
@@ -143,7 +143,7 @@ test('o mapa para imprimir só traz os dias com cirurgias', function () {
 test('o período já não se escolhe: o agendamento novo fica de manhã e o que já existe mantém o seu', function () {
     $espera = novaEspera(novoUtente(), $this->utilizador);
     $dados = [
-        'data' => now()->addDays(9)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => false,
+        'data' => now()->addDays(9)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => 1,
         'estado' => 3, 'responsavel_id' => $this->utilizador->id,
     ];
 
@@ -158,7 +158,7 @@ test('o período já não se escolhe: o agendamento novo fica de manhã e o que 
 });
 
 test('só se agenda de novo o que foi cancelado e o formulário só oferece agendado, operado e cancelado', function () {
-    $dados = ['data' => now()->addDays(9)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => false, 'responsavel_id' => $this->utilizador->id];
+    $dados = ['data' => now()->addDays(9)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => 1, 'responsavel_id' => $this->utilizador->id];
 
     // Com um agendamento (agendado, pendente ou operado) não se agenda de novo.
     foreach ([ListaDeEspera::ESTADO_AGENDADO, ListaDeEspera::ESTADO_PENDENTE] as $estado) {
@@ -193,7 +193,7 @@ test('doente operado: o agendamento e a inscrição só se consultam, exceto par
         'estado_de_agendamento_id' => ListaDeEspera::ESTADO_OPERADO, 'estado_de_agendamento' => (string) ListaDeEspera::ESTADO_AGENDADO,
     ]);
     $espera->update(['estado_lista_espera' => ListaDeEspera::ESTADO_OPERADO]);
-    $dados = ['data' => now()->subDays(3)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => false, 'estado' => 5, 'responsavel_id' => $this->utilizador->id, 'comentarios' => 'x'];
+    $dados = ['data' => now()->subDays(3)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'reserva_sangue' => 1, 'estado' => 5, 'responsavel_id' => $this->utilizador->id, 'comentarios' => 'x'];
     $inscricao = ['prioridade_id' => 1, 'data_de_lista' => now()->format('Y-m-d'), 'responsavel_id' => $this->utilizador->id, 'intervencoes' => [DB::table('intervencaos')->value('id')]];
 
     // Os formulários chegam só para consulta.
@@ -214,4 +214,21 @@ test('doente operado: o agendamento e a inscrição só se consultam, exceto par
     $this->actingAs($admin)->get("/agendamento/{$agendamento->id}")->assertInertia(fn (Assert $p) => $p->where('modal.somente_consulta', false));
     $this->actingAs($admin)->put("/agendamento/{$agendamento->id}", $dados)->assertSessionHasNoErrors();
     expect($agendamento->fresh()->comentarios)->toBe('x');
+});
+
+test('o sangue tem três opções: não é necessário, apenas classificação e reserva de sangue', function () {
+    $dados = ['data' => now()->addDays(9)->format('Y-m-d'), 'local_id' => 1, 'tipo_id' => 1, 'sala_id' => 1, 'estado' => 3, 'responsavel_id' => $this->utilizador->id];
+
+    foreach ([1, 2, 3] as $codigo) {
+        $espera = novaEspera(novoUtente(), $this->utilizador);
+        $this->actingAs($this->utilizador)->post("/agendamento/lista-de-espera/{$espera->id}/agendar", ['data' => now()->addDays(9 + $codigo)->format('Y-m-d')] + $dados + ['reserva_sangue' => $codigo])->assertSessionHasNoErrors(); // dias diferentes: a mesma sala e dia avisa de conflito
+        $agendamento = $espera->agendamentos()->first();
+        expect((string) $agendamento->fresh()->reserva_sangue)->toBe((string) $codigo);
+        $this->actingAs($this->utilizador)->get("/agendamento/{$agendamento->id}")->assertInertia(fn (Assert $p) => $p->where('modal.agendamento.reserva_sangue', (string) $codigo));
+    }
+
+    // Fora das três opções (ou em falta) é recusado.
+    $outra = novaEspera(novoUtente(), $this->utilizador);
+    $this->actingAs($this->utilizador)->post("/agendamento/lista-de-espera/{$outra->id}/agendar", $dados + ['reserva_sangue' => 4])->assertSessionHasErrors('reserva_sangue');
+    $this->actingAs($this->utilizador)->post("/agendamento/lista-de-espera/{$outra->id}/agendar", $dados)->assertSessionHasErrors('reserva_sangue');
 });
