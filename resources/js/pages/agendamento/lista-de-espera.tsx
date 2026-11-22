@@ -21,6 +21,8 @@ type Linha = {
     diagnosticos: string[];
     responsavel: string | null;
     agendamento: { id: number; data: string | null } | null;
+    /** Já tem um agendamento pendente: não se volta a agendar. */
+    agendamento_pendente: boolean;
 };
 
 type Props = {
@@ -149,7 +151,7 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                                     )}
                                 </td>
                                 <td className="space-x-3 px-4 py-2 text-right whitespace-nowrap">
-                                    {permissoes.includes('create agendamento') && ![4, 5].includes(l.estado) && (
+                                    {permissoes.includes('create agendamento') && ![4, 5].includes(l.estado) && !l.agendamento_pendente && (
                                         <Link
                                             href={`/agendamento/lista-de-espera/${l.id}/agendar${dataAlvo ? `?agendar_em=${dataAlvo}` : ''}`}
                                             className="font-medium text-[#7d1830] hover:underline"

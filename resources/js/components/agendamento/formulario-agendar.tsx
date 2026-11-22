@@ -8,6 +8,8 @@ import { NumeroProcesso } from '../clinico/numero-processo';
 import { PerguntaCentroReferencia, type DadosSinalizacao } from '../referenciacao/pergunta-centro';
 
 export type PropsAgendar = {
+    /** Endereço da agenda por trás desta janela: é a ele que a inscrição aberta daqui volta. */
+    fechar_url?: string;
     agendamento: {
         id: number;
         data: string | null;
@@ -35,7 +37,7 @@ export type PropsAgendar = {
 
 type Props = PropsAgendar & { fechar: () => void };
 
-export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, hoje, dataSugerida, fechar }: Props) {
+export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, hoje, dataSugerida, fechar, fechar_url }: Props) {
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         data: agendamento?.data ?? dataSugerida ?? '',
@@ -176,7 +178,10 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, 
                     <Botao variante="secundario" onClick={fechar}>
                         Cancelar
                     </Botao>
-                    <BotaoLigacao href={`/agendamento/lista-de-espera/${espera.id}`} variante="secundario">
+                    <BotaoLigacao
+                        href={`/agendamento/lista-de-espera/${espera.id}?origem=agenda&retorno=${encodeURIComponent(fechar_url ?? '/agendamento')}`}
+                        variante="secundario"
+                    >
                         Ver inscrição
                     </BotaoLigacao>
                     {agendamento && (

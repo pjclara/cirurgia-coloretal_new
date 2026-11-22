@@ -63,4 +63,19 @@ class ListaDeEspera extends Model
     {
         return $this->hasMany(Agendamento::class, 'lista_de_espera_id');
     }
+
+    /** O estado do agendamento está em duas colunas (registos antigos e novos). */
+    private const ESTADO_DO_AGENDAMENTO = 'coalesce(estado_de_agendamento_id, cast(estado_de_agendamento as unsigned))';
+
+    /** Inscrições que já têm um agendamento pendente: não se voltam a agendar, altera-se o que já existe. */
+    public function scopeSemAgendamentoPendente($consulta)
+    {
+        return $consulta->whereDoesntHave('agendamentos', fn ($q) => $q->whereRaw(self::ESTADO_DO_AGENDAMENTO.' = ?', [self::ESTADO_PENDENTE]));
+    }
+
+    /** O agendamento pendente desta inscrição, se tiver. */
+    public function agendamentoPendente(): ?Agendamento
+    {
+        return $this->agendamentos()->whereRaw(self::ESTADO_DO_AGENDAMENTO.' = ?', [self::ESTADO_PENDENTE])->orderByDesc('start')->first();
+    }
 }

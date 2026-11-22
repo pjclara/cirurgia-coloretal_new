@@ -56,6 +56,24 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        ...(pode('show agendamento')
+            ? [
+                  {
+                      title: 'Bloco operatório',
+                      items: [
+                          {
+                              title: 'Agendamento',
+                              url: '/agendamento',
+                              icon: CalendarDays,
+                              filhos: [
+                                  { title: 'Lista de espera', url: '/agendamento/lista-de-espera', icon: ClipboardList },
+                                  { title: 'Mapa operatório', url: '/agendamento/mapa', icon: Map, novoSeparador: true },
+                              ],
+                          },
+                      ],
+                  },
+              ]
+            : []),
         // O percurso do doente: referenciação, internamento e seguimento.
         ...(verInternamentos || verReferenciacao
             ? [
@@ -73,24 +91,6 @@ export function AppSidebar() {
                                     },
                                 ]
                               : []),
-                      ],
-                  },
-              ]
-            : []),
-        ...(pode('show agendamento')
-            ? [
-                  {
-                      title: 'Bloco operatório',
-                      items: [
-                          {
-                              title: 'Agendamento',
-                              url: '/agendamento',
-                              icon: CalendarDays,
-                              filhos: [
-                                  { title: 'Lista de espera', url: '/agendamento/lista-de-espera', icon: ClipboardList },
-                                  { title: 'Mapa operatório', url: '/agendamento/mapa', icon: Map, novoSeparador: true },
-                              ],
-                          },
                       ],
                   },
               ]

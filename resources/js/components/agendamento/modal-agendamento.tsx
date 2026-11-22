@@ -3,7 +3,9 @@ import { router } from '@inertiajs/react';
 import { FormularioAgendar, type PropsAgendar } from './formulario-agendar';
 import { FormularioInscricao, type PropsInscricao } from './formulario-inscricao';
 
-export type Modal = ({ tipo: 'agendar' } & PropsAgendar & { fechar_url: string }) | ({ tipo: 'inscricao' } & PropsInscricao & { fechar_url: string });
+/** `origem` e `retorno`: a janela abriu-se por cima da agenda (a partir de outra janela) e é para lá que se volta ao gravar. */
+type Contexto = { fechar_url: string; origem?: 'agenda' | null; retorno?: string | null };
+export type Modal = ({ tipo: 'agendar' } & PropsAgendar & Contexto) | ({ tipo: 'inscricao' } & PropsInscricao & Contexto);
 
 /** Formulários de agendamento e inscrição em janela modal sobre a agenda / lista de espera. */
 export function ModalAgendamento({ modal }: { modal: Modal | null }) {

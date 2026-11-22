@@ -106,6 +106,7 @@ class AgendamentoController extends Controller
 
         $consulta = ListaDeEspera::query()
             ->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), [ListaDeEspera::ESTADO_PROPOSTO, ListaDeEspera::ESTADO_PENDENTE])
+            ->semAgendamentoPendente() // quem já tem um agendamento pendente não se agenda de novo
             ->when($filtro === 'meus', fn ($query) => $query->where('responsavel_id', $request->user()->id))
             ->when($q !== '', fn ($query) => $query->whereHas('utente', fn ($u) => $u->pesquisar($q)));
 
@@ -214,6 +215,7 @@ class AgendamentoController extends Controller
                     'diagnosticos' => $e->diagnosticos->map(fn ($d) => trim($d->nome))->values(),
                     'responsavel' => $e->responsavel?->abrev ?: $e->responsavel?->name,
                     'agendamento' => $proximo ? ['id' => $proximo->id, 'data' => $proximo->start?->format('Y-m-d')] : null,
+                    'agendamento_pendente' => $e->agendamentos->contains(fn ($a) => $a->estado() === ListaDeEspera::ESTADO_PENDENTE),
                 ];
             });
 
@@ -231,12 +233,40 @@ class AgendamentoController extends Controller
 
     public function criarInscricao(Request $request, Utente $utente): Response
     {
-        return $this->montarLista($request, ['tipo' => 'inscricao'] + $this->formularioInscricao($utente, null));
+        return $this->inscricaoNaPagina($request, ['tipo' => 'inscricao'] + $this->formularioInscricao($utente, null));
     }
 
     public function editarInscricao(Request $request, ListaDeEspera $espera): Response
     {
-        return $this->montarLista($request, ['tipo' => 'inscricao'] + $this->formularioInscricao($espera->utente, $espera));
+        return $this->inscricaoNaPagina($request, ['tipo' => 'inscricao'] + $this->formularioInscricao($espera->utente, $espera));
+    }
+
+    /**
+     * A inscrição abre por cima da página de onde se veio: a agenda (com os mesmos filtros) ou, por omissão, a lista de espera.
+     * Ao gravar ou cancelar volta a essa página.
+     */
+    private function inscricaoNaPagina(Request $request, array $modal): Response
+    {
+        $retorno = $this->retornoDaAgenda($request);
+        if ($retorno === null) {
+            return $this->montarLista($request, $modal);
+        }
+
+        parse_str((string) parse_url($retorno, PHP_URL_QUERY), $filtros);
+        $request->query->add(array_diff_key($filtros, $request->query->all()));
+
+        return $this->montarAgenda($request, $modal + ['fechar_url' => $retorno, 'origem' => 'agenda', 'retorno' => $retorno]);
+    }
+
+    /** Endereço da agenda de onde se abriu uma inscrição (só desta secção), ou null se não veio da agenda. */
+    private function retornoDaAgenda(Request $request): ?string
+    {
+        if ($request->input('origem', $request->query('origem')) !== 'agenda') {
+            return null;
+        }
+        $retorno = (string) $request->input('retorno', $request->query('retorno'));
+
+        return preg_match('#^/agendamento(\?[^\s]*)?$#', $retorno) ? $retorno : '/agendamento';
     }
 
     public function guardarInscricao(Request $request, Utente $utente): RedirectResponse
@@ -254,7 +284,9 @@ class AgendamentoController extends Controller
         // Os diagnósticos CR da inscrição passam sozinhos para a referenciação e para os internamentos do utente.
         DiagnosticosCr::sincronizar($utente->id, 'lista');
 
-        return redirect()->route('agendamento.espera')->with('sucesso', 'Utente inscrito em lista de espera.');
+        return ($retorno = $this->retornoDaAgenda($request)) !== null
+            ? redirect($retorno)->with('sucesso', 'Utente inscrito em lista de espera.')
+            : redirect()->route('agendamento.espera')->with('sucesso', 'Utente inscrito em lista de espera.');
     }
 
     public function atualizarInscricao(Request $request, ListaDeEspera $espera): RedirectResponse
@@ -268,20 +300,29 @@ class AgendamentoController extends Controller
         });
         DiagnosticosCr::sincronizar($espera->utente_id, 'lista');
 
-        return redirect()->route('agendamento.espera')->with('sucesso', 'Inscrição atualizada.');
+        return ($retorno = $this->retornoDaAgenda($request)) !== null
+            ? redirect($retorno)->with('sucesso', 'Inscrição atualizada.')
+            : redirect()->route('agendamento.espera')->with('sucesso', 'Inscrição atualizada.');
     }
 
-    public function cancelarInscricao(ListaDeEspera $espera): RedirectResponse
+    public function cancelarInscricao(Request $request, ListaDeEspera $espera): RedirectResponse
     {
         $espera->update(['estado_lista_espera' => ListaDeEspera::ESTADO_CANCELADO]);
 
-        return redirect()->route('agendamento.espera')->with('sucesso', 'Inscrição cancelada.');
+        return ($retorno = $this->retornoDaAgenda($request)) !== null
+            ? redirect($retorno)->with('sucesso', 'Inscrição cancelada.')
+            : redirect()->route('agendamento.espera')->with('sucesso', 'Inscrição cancelada.');
     }
 
     // ---- Agendamento: registo ----
 
-    public function criarAgendamento(Request $request, ListaDeEspera $espera): Response
+    public function criarAgendamento(Request $request, ListaDeEspera $espera): Response|RedirectResponse
     {
+        // Já tem um agendamento pendente: abre-se esse, em vez de agendar de novo.
+        if ($pendente = $espera->agendamentoPendente()) {
+            return redirect()->route('agendamento.edit', $pendente)->with('erro', 'Esta inscrição já tem um agendamento pendente: altere-o em vez de agendar de novo.');
+        }
+
         $data = $this->dataAlvo($request);
 
         return $this->montarAgenda($request, ['tipo' => 'agendar'] + $this->formularioAgendamento($espera, null, $data), $data);
@@ -294,6 +335,10 @@ class AgendamentoController extends Controller
 
     public function guardarAgendamento(Request $request, ListaDeEspera $espera): RedirectResponse
     {
+        if ($espera->agendamentoPendente()) {
+            return back()->withInput()->withErrors(['conflito' => 'Esta inscrição já tem um agendamento pendente: altere-o em vez de agendar de novo.']);
+        }
+
         $dados = $this->validarAgendamento($request);
 
         if ($aviso = $this->avisoDeConflito($request, $dados['data'], $dados['periodo_id'], $dados['local_id'], $dados['sala_id'] ?? null, (int) $dados['estado'], null)) {

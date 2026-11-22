@@ -104,7 +104,7 @@ class UtenteController extends Controller
 
         // Criado a partir do Agendamento: segue para a inscrição deste utente em lista de espera.
         if ($request->input('origem') === 'agendamento') {
-            return redirect()->route('agendamento.espera.create', $utente)->with('sucesso', 'Utente criado. Preencha agora a inscrição em lista de espera.');
+            return redirect()->route('agendamento.espera.create', ['utente' => $utente, 'origem' => 'agenda', 'retorno' => '/agendamento'])->with('sucesso', 'Utente criado. Preencha agora a inscrição em lista de espera.');
         }
 
         // Criado a partir da modal do quadro: segue para o registo do internamento deste utente.

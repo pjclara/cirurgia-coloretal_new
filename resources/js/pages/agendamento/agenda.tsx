@@ -161,7 +161,7 @@ export default function Agenda({
         >
             {validarAmbulatorios && <ModalValidarAmbulatorios lista={ambulatoriosPorValidar} aoFechar={() => setValidarAmbulatorios(false)} />}
 
-            <NovaInscricao />
+            <NovaInscricao aPartirDaAgenda />
 
             <div className="mb-4 flex flex-wrap items-center gap-2">
                 <div className="mr-2 inline-flex overflow-hidden rounded-md border border-slate-300">

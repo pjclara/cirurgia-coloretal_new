@@ -29,11 +29,25 @@ export type PropsInscricao = {
     dominios: { prioridades: Opcao[]; responsaveis: Responsavel[]; diagnosticos: OpcaoAgrupada[]; intervencoes: OpcaoAgrupada[] };
     hoje: string;
     estados: Opcao[];
+    /** Aberta por cima da agenda: ao gravar ou cancelar volta a ela (ao endereço `retorno`). */
+    origem?: 'agenda' | null;
+    retorno?: string | null;
 };
 
 type Props = PropsInscricao & { fechar: () => void };
 
-export function FormularioInscricao({ espera, utente, sinalizacao, diagnosticos_cr_do_utente, dominios, hoje, estados, fechar }: Props) {
+export function FormularioInscricao({
+    espera,
+    utente,
+    sinalizacao,
+    diagnosticos_cr_do_utente,
+    dominios,
+    hoje,
+    estados,
+    origem,
+    retorno,
+    fechar,
+}: Props) {
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         prioridade_id: (espera?.prioridade_id ?? 1) as number | '',
@@ -48,13 +62,17 @@ export function FormularioInscricao({ espera, utente, sinalizacao, diagnosticos_
 
     const guardar = (e: FormEvent) => {
         e.preventDefault();
+        if (origem === 'agenda') form.transform((atual) => ({ ...atual, origem, retorno: retorno ?? '/agendamento' }));
         if (espera) form.put(`/agendamento/lista-de-espera/${espera.id}`, { preserveScroll: true });
         else form.post(`/agendamento/utentes/${utente.id}/inscrever`, { preserveScroll: true });
     };
 
     const cancelar = () => {
         if (espera && window.confirm('Cancelar esta inscrição em lista de espera?'))
-            router.post(`/agendamento/lista-de-espera/${espera.id}/cancelar`);
+            router.post(
+                `/agendamento/lista-de-espera/${espera.id}/cancelar`,
+                origem === 'agenda' ? { origem, retorno: retorno ?? '/agendamento' } : {},
+            );
     };
 
     return (
@@ -161,7 +179,7 @@ export function FormularioInscricao({ espera, utente, sinalizacao, diagnosticos_
                     <Botao type="submit" disabled={processing}>
                         {espera ? 'Guardar alterações' : 'Inscrever'}
                     </Botao>
-                    {espera && espera.estado !== 4 && (
+                    {espera && espera.estado !== 4 && !espera.agendamentos.some((a) => a.estado === 2) && (
                         <BotaoLigacao href={`/agendamento/lista-de-espera/${espera.id}/agendar`} variante="secundario">
                             Agendar cirurgia
                         </BotaoLigacao>
