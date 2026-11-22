@@ -116,7 +116,8 @@ export function FormularioReferenciacao({
     const [confirmarApagar, setConfirmarApagar] = useState(false);
     /** Decisão a editar (null = nova; undefined = nenhuma aberta). */
     const [decisaoAberta, setDecisaoAberta] = useState<DecisaoTerapeutica | null | undefined>(undefined);
-    const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
+    const { permissoes, administrador } = usePage<PropsPartilhadas>().props.clinico;
+    const podeApagar = administrador || permissoes.includes('delete referenciacao');
 
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
@@ -547,7 +548,7 @@ export function FormularioReferenciacao({
                     <Botao variante="secundario" onClick={fechar}>
                         Cancelar
                     </Botao>
-                    {referenciacao && (
+                    {referenciacao && podeApagar && (
                         <div className="ml-auto flex items-center gap-2">
                             {confirmarApagar ? (
                                 <>

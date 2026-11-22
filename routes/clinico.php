@@ -167,6 +167,6 @@ Route::prefix('referenciacao')->name('referenciacao.')->group(function () {
     Route::middleware('can:update referenciacao')->group(function () {
         Route::put('decisoes/{decisao}', [ReferenciacaoController::class, 'atualizarDecisao'])->whereNumber('decisao')->name('decisoes.update');
         Route::put('{referenciacao}', [ReferenciacaoController::class, 'atualizar'])->whereNumber('referenciacao')->name('update');
-        Route::delete('{referenciacao}', [ReferenciacaoController::class, 'apagar'])->whereNumber('referenciacao')->name('destroy');
     });
+    Route::delete('{referenciacao}', [ReferenciacaoController::class, 'apagar'])->whereNumber('referenciacao')->middleware('can:delete referenciacao')->name('destroy');
 });

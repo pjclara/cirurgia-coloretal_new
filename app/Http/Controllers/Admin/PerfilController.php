@@ -37,7 +37,8 @@ class PerfilController extends Controller
         'referenciacao' => ['rotulo' => 'Centro de referência', 'permissoes' => [
             'show referenciacao' => 'Ver as referenciações e as decisões terapêuticas, a análise colorretal, o centro de referência (indicadores do cancro retal), a qualidade dos dados e quem é doente do CR',
             'create referenciacao' => 'Referenciar e sinalizar doentes para o centro de referência e registar decisões terapêuticas',
-            'update referenciacao' => 'Editar e apagar referenciações e editar decisões terapêuticas; os diagnósticos CR dos internamentos passam para a referenciação',
+            'update referenciacao' => 'Editar referenciações e decisões terapêuticas; os diagnósticos CR dos internamentos passam para a referenciação',
+            'delete referenciacao' => 'Apagar referenciações',
         ]],
         'agendamento' => ['rotulo' => 'Agendamento cirúrgico', 'permissoes' => [
             'show agendamento' => 'Ver a agenda, o mapa operatório (página própria) e a lista de espera',

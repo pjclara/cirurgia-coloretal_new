@@ -4,7 +4,7 @@ use App\Models\Referenciacao;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
-    $this->gestor = utilizadorClinico(['show referenciacao', 'create referenciacao', 'update referenciacao']);
+    $this->gestor = utilizadorClinico(['show referenciacao', 'create referenciacao', 'update referenciacao', 'delete referenciacao']);
     $this->utente = novoUtente();
     $this->hoje = now()->format('Y-m-d');
 });
@@ -113,6 +113,32 @@ test('apagar faz soft delete e a modal de edição abre sobre a lista', function
 
     $this->actingAs($this->gestor)->delete("/referenciacao/{$r->id}")->assertRedirect('/referenciacao');
     expect(Referenciacao::count())->toBe(0)->and(Referenciacao::withTrashed()->count())->toBe(1);
+});
+
+test('apagar uma referenciação exige a permissão de apagar, não basta poder editar', function () {
+    referenciar($this);
+    $r = Referenciacao::first();
+    $editor = utilizadorClinico(['show referenciacao', 'create referenciacao', 'update referenciacao']);
+
+    $this->actingAs($editor)->delete("/referenciacao/{$r->id}")->assertForbidden();
+    expect(Referenciacao::count())->toBe(1);
+
+    $this->actingAs($this->gestor)->delete("/referenciacao/{$r->id}")->assertRedirect('/referenciacao');
+    expect(Referenciacao::count())->toBe(0);
+});
+
+test('a migration dá a permissão de apagar a quem já podia editar referenciações', function () {
+    $migration = require database_path('migrations/2026_11_22_000001_permissao_apagar_referenciacoes.php');
+    $perfil = \Spatie\Permission\Models\Role::create(['name' => 'perfil de teste referenciacao', 'guard_name' => 'web']);
+    $perfil->givePermissionTo('update referenciacao');
+    $outro = \Spatie\Permission\Models\Role::create(['name' => 'perfil de teste so ver', 'guard_name' => 'web']);
+    $outro->givePermissionTo('show referenciacao');
+
+    $migration->up();
+    $migration->up(); // repetir não duplica
+
+    expect($perfil->fresh()->hasPermissionTo('delete referenciacao'))->toBeTrue()
+        ->and($outro->fresh()->hasPermissionTo('delete referenciacao'))->toBeFalse();
 });
 
 test('sinalizar um utente só pede a origem e a data e fica em nome de quem sinalizou', function () {
