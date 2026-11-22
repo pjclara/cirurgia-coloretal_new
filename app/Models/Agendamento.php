@@ -37,8 +37,21 @@ class Agendamento extends Model
         'estado_de_agendamento',
         'estado_de_agendamento_id',
         'reserva_sangue',
+        'motivo_cancelar_agendamento',
         'comentarios',
     ];
+
+    /** Motivos de cancelamento (motivo_cancelar_agendamento). O 6 existe só em registos antigos, sem descrição conhecida. */
+    public const MOTIVOS_CANCELAMENTO = [
+        1 => 'Falta de tempo operatório',
+        2 => 'Doente sem resposta ou operado noutra instituição',
+        3 => 'Pedido do doente (prefere outra data ou tratar antes outro problema)',
+        4 => 'Condição clínica do doente',
+        5 => 'Falta de recursos (equipa, material, greve)',
+        99 => 'Outro motivo',
+    ];
+
+    public const MOTIVO_ANTIGO = 6;
 
     protected function casts(): array
     {

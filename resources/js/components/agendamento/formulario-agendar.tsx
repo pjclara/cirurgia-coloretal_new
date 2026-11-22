@@ -22,6 +22,7 @@ export type PropsAgendar = {
         responsavel_id: number | null;
         estado: number;
         reserva_sangue: string | null;
+        motivo_cancelamento: number | null;
         comentarios: string;
     } | null;
     espera: {
@@ -33,7 +34,7 @@ export type PropsAgendar = {
     sinalizacao?: DadosSinalizacao | null;
     /** Doente operado: só se consulta (um administrador pode alterar). */
     somente_consulta?: boolean;
-    dominios: { locais: Opcao[]; salas: Opcao[]; tipos: Opcao[]; estados: Opcao[]; responsaveis: Responsavel[] };
+    dominios: { locais: Opcao[]; salas: Opcao[]; tipos: Opcao[]; estados: Opcao[]; motivos_cancelamento: Opcao[]; responsaveis: Responsavel[] };
     hoje: string;
     dataSugerida: string | null;
 };
@@ -53,6 +54,7 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_co
         responsavel_id: (agendamento?.responsavel_id ?? espera.responsavel_id ?? euResponsavel) as number | '',
         estado: (agendamento?.estado ?? 3) as number | '',
         reserva_sangue: (agendamento?.reserva_sangue ? Number(agendamento.reserva_sangue) : 1) as number | '',
+        motivo_cancelamento: (agendamento?.motivo_cancelamento ?? '') as number | '',
         comentarios: agendamento?.comentarios ?? '',
     });
     const { data, setData, processing } = form;
@@ -171,6 +173,17 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_co
                                     aoMudar={(v) => setData('reserva_sangue', v)}
                                 />
                             </Campo>
+                            {data.estado === 4 && (
+                                <Campo rotulo="Motivo do cancelamento" para="motivo-cancelamento" erro={erros.motivo_cancelamento}>
+                                    <Selecao
+                                        id="motivo-cancelamento"
+                                        opcoes={dominios.motivos_cancelamento}
+                                        valor={data.motivo_cancelamento}
+                                        aoMudar={(v) => setData('motivo_cancelamento', v)}
+                                        invalido={!!erros.motivo_cancelamento}
+                                    />
+                                </Campo>
+                            )}
                         </div>
                         <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional className="mt-4">
                             <textarea

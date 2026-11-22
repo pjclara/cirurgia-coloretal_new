@@ -409,7 +409,7 @@ class AgendamentoController extends Controller
         $this->impedirSeOperado($agendamento->espera, $agendamento);
 
         // Quem já tinha período (manhã ou tarde) mantém-no.
-        $dados = $this->validarAgendamento($request, $agendamento->periodo_de_agendamento_id ?? self::PERIODO_POR_OMISSAO, $agendamento->estado());
+        $dados = $this->validarAgendamento($request, $agendamento->periodo_de_agendamento_id ?? self::PERIODO_POR_OMISSAO, $agendamento->estado(), (int) $agendamento->motivo_cancelar_agendamento ?: null);
 
         if ($aviso = $this->avisoDeConflito($request, $dados['data'], $dados['periodo_id'], $dados['local_id'], $dados['sala_id'] ?? null, (int) $dados['estado'], $agendamento->id)) {
             return back()->withInput()->withErrors(['conflito' => $aviso]);
@@ -585,6 +585,7 @@ class AgendamentoController extends Controller
                 'responsavel_id' => $agendamento->responsavel_id,
                 'estado' => $agendamento->estado() ?? ListaDeEspera::ESTADO_PENDENTE,
                 'reserva_sangue' => in_array((string) $agendamento->reserva_sangue, ['1', '2', '3'], true) ? (string) $agendamento->reserva_sangue : null,
+                'motivo_cancelamento' => $agendamento->motivo_cancelar_agendamento ? (int) $agendamento->motivo_cancelar_agendamento : null,
                 'comentarios' => $agendamento->comentarios ?? '',
             ] : null,
             'somente_consulta' => $this->somenteConsulta($espera, $agendamento),
@@ -599,12 +600,24 @@ class AgendamentoController extends Controller
                 'salas' => Dominios::tabelaLista('sala_de_agendamentos'),
                 'tipos' => Dominios::tabelaLista('tipo_de_agendamentos'),
                 'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
+                'motivos_cancelamento' => $this->motivosDeCancelamento($agendamento),
                 'responsaveis' => Dominios::responsaveis($agendamento?->responsavel_id ?? $espera->responsavel_id),
             ],
             'sinalizacao' => Dominios::sinalizacao(request()->user()),
             'hoje' => now()->format('Y-m-d'),
             'dataSugerida' => $dataSugerida,
         ];
+    }
+
+    /** Motivos para escolher; um agendamento antigo com o motivo 6 mantém-no. */
+    private function motivosDeCancelamento(?Agendamento $agendamento): array
+    {
+        $motivos = Agendamento::MOTIVOS_CANCELAMENTO;
+        if ((int) $agendamento?->motivo_cancelar_agendamento === Agendamento::MOTIVO_ANTIGO) {
+            $motivos[Agendamento::MOTIVO_ANTIGO] = 'Motivo antigo (sem descrição)';
+        }
+
+        return collect($motivos)->map(fn ($nome, $id) => ['id' => $id, 'nome' => $nome])->values()->all();
     }
 
     private function intervencoes(): array
@@ -639,7 +652,7 @@ class AgendamentoController extends Controller
     /** Estados que se escolhem ao agendar; um agendamento que já tem outro estado (pendente…) mantém o seu. */
     private const ESTADOS_DO_FORMULARIO = [ListaDeEspera::ESTADO_AGENDADO, ListaDeEspera::ESTADO_CANCELADO, ListaDeEspera::ESTADO_OPERADO];
 
-    private function validarAgendamento(Request $request, int $periodoPorOmissao = self::PERIODO_POR_OMISSAO, ?int $estadoAtual = null): array
+    private function validarAgendamento(Request $request, int $periodoPorOmissao = self::PERIODO_POR_OMISSAO, ?int $estadoAtual = null, ?int $motivoAtual = null): array
     {
         $dados = $request->validate([
             'data' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:'.now()->addYears(3)->format('Y-m-d')],
@@ -651,6 +664,12 @@ class AgendamentoController extends Controller
             'responsavel_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'estado' => ['required', 'integer', Rule::in(array_filter([...self::ESTADOS_DO_FORMULARIO, $estadoAtual]))],
             'reserva_sangue' => ['required', 'integer', Rule::in([1, 2, 3])], // 1 não é necessário, 2 apenas classificação, 3 reserva de sangue
+            // Ao cancelar diz-se porquê; o motivo antigo (6) só se mantém num agendamento que já o tem.
+            'motivo_cancelamento' => [
+                Rule::requiredIf((int) $request->input('estado') === ListaDeEspera::ESTADO_CANCELADO),
+                'nullable', 'integer',
+                Rule::in([...array_keys(Agendamento::MOTIVOS_CANCELAMENTO), ...($motivoAtual ? [$motivoAtual] : [])]),
+            ],
             'comentarios' => ['nullable', 'string', 'max:2000'],
             'forcar' => ['sometimes', 'boolean'],
         ], ['required' => 'Preencha este campo.']);
@@ -707,6 +726,8 @@ class AgendamentoController extends Controller
             // O campo antigo só admite 1 a 4: Operado e Outro guardam-se como Agendado; vale o estado_de_agendamento_id.
             'estado_de_agendamento' => (string) ($d['estado'] <= 4 ? $d['estado'] : ListaDeEspera::ESTADO_AGENDADO),
             'reserva_sangue' => (string) $d['reserva_sangue'],
+            // Só um agendamento cancelado tem motivo; se voltar a agendado, limpa-se.
+            'motivo_cancelar_agendamento' => (int) $d['estado'] === ListaDeEspera::ESTADO_CANCELADO && ! empty($d['motivo_cancelamento']) ? (string) $d['motivo_cancelamento'] : null,
             'comentarios' => $d['comentarios'] ?? null,
         ];
     }
