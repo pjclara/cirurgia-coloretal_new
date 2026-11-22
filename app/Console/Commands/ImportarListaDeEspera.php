@@ -178,7 +178,7 @@ class ImportarListaDeEspera extends Command
                     $utente = Utente::create([
                         'nome' => trim((string) $p['linha']['Nome']),
                         'numero_processo' => $p['processo'],
-                        'data_nascimento' => LeitorDeFolha::data($p['linha']['Data de nascimento'] ?? null),
+                        'data_nascimento' => LeitorDeFolha::data($p['linha']['Data de nascimento'] ?? null, 1),
                     ]);
                     $utenteId = $utente->id;
                     $criado = true;

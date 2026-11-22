@@ -41,7 +41,7 @@ class LeitorDeFolha
     }
 
     /** Converte uma data da folha (texto ISO, dd/mm/aaaa ou número de série do Excel) em Y-m-d; null se não for data. */
-    public static function data(?string $valor): ?string
+    public static function data(?string $valor, float $serieMinima = 20000): ?string
     {
         $valor = trim((string) $valor);
         if ($valor === '') {
@@ -53,7 +53,7 @@ class LeitorDeFolha
         if (preg_match('#^(\d{1,2})/(\d{1,2})/(\d{4})#', $valor, $m)) {
             return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
         }
-        if (is_numeric($valor) && (float) $valor > 20000 && (float) $valor < 80000) {
+        if (is_numeric($valor) && (float) $valor >= $serieMinima && (float) $valor < 80000) {
             return Carbon::create(1899, 12, 30)->addDays((int) floor((float) $valor))->format('Y-m-d');
         }
 

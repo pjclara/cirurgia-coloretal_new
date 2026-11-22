@@ -53,6 +53,11 @@ class Utente extends Model
         return $this->hasMany(Referenciacao::class)->whereNull('data_de_saida');
     }
 
+    public function listaDeEspera(): HasMany
+    {
+        return $this->hasMany(ListaDeEspera::class);
+    }
+
     public function internamentos(): HasMany
     {
         return $this->hasMany(Internamento::class)->orderByDesc('data_de_entrada');

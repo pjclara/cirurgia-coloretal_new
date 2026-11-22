@@ -1,6 +1,6 @@
-import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { router, useForm } from '@inertiajs/react';
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { COR_ESTADO, nomeEstado } from '../../clinico/agendamento';
 import { formatarData } from '../../clinico/formato';
 import { useResponsavelPorOmissao } from '../../clinico/responsavel';
@@ -27,6 +27,15 @@ export type PropsInscricao = {
     } | null;
     utente: { id: number; nome: string; numero_processo: number; sinalizado?: boolean };
     sinalizacao?: DadosSinalizacao | null;
+    /** Inscrições do utente ainda por operar: avisa-se para não se duplicar. */
+    inscricoes_ativas?: {
+        id: number;
+        data: string | null;
+        estado: number;
+        intervencoes: string[];
+        agendamento: string | null;
+        pode_agendar: boolean;
+    }[];
     /** Diagnósticos CR que o utente já tem registados: a inscrição nova já os traz. */
     diagnosticos_cr_do_utente?: number[];
     dominios: { prioridades: Opcao[]; responsaveis: Responsavel[]; diagnosticos: OpcaoAgrupada[]; intervencoes: OpcaoAgrupada[] };
@@ -43,6 +52,7 @@ export function FormularioInscricao({
     espera,
     utente,
     sinalizacao,
+    inscricoes_ativas,
     diagnosticos_cr_do_utente,
     dominios,
     hoje,
@@ -51,6 +61,7 @@ export function FormularioInscricao({
     retorno,
     fechar,
 }: Props) {
+    const [avisoAberto, setAvisoAberto] = useState(true);
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         prioridade_id: (espera?.prioridade_id ?? 1) as number | '',
@@ -86,6 +97,50 @@ export function FormularioInscricao({
                     {utente.nome} · <NumeroProcesso valor={utente.numero_processo} />
                 </DialogDescription>
             </DialogHeader>
+            {!espera && inscricoes_ativas && inscricoes_ativas.length > 0 && (
+                <Dialog open={avisoAberto} onOpenChange={(aberto) => !aberto && fechar()}>
+                    <DialogContent className="max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
+                        <DialogHeader>
+                            <DialogTitle>Já existe inscrição por operar</DialogTitle>
+                            <DialogDescription>
+                                {utente.nome} já tem {inscricoes_ativas.length === 1 ? 'uma inscrição' : `${inscricoes_ativas.length} inscrições`} em
+                                lista de espera. Confirme que não é uma duplicação.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <ul className="space-y-2 text-sm">
+                            {inscricoes_ativas.map((i) => (
+                                <li
+                                    key={i.id}
+                                    className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950"
+                                >
+                                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${COR_ESTADO[i.estado] ?? COR_ESTADO[6]}`}>
+                                        {nomeEstado(estados, i.estado)}
+                                    </span>
+                                    <span className="tabular-nums">
+                                        Inscrito em {i.data ? formatarData(i.data) : '—'}
+                                        {i.agendamento ? ` · cirurgia a ${formatarData(i.agendamento)}` : ''}
+                                    </span>
+                                    {i.intervencoes.length > 0 && <span>· {i.intervencoes.join(', ')}</span>}
+                                    <a
+                                        href={`/agendamento/lista-de-espera/${i.id}${i.pode_agendar ? '/agendar' : ''}`}
+                                        className="ml-auto font-medium underline"
+                                    >
+                                        {i.pode_agendar ? 'Agendar' : 'Abrir'}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                        <DialogFooter className="gap-2">
+                            <Botao variante="secundario" onClick={fechar}>
+                                Cancelar
+                            </Botao>
+                            <Botao variante="primario" onClick={() => setAvisoAberto(false)}>
+                                Inscrever mesmo assim
+                            </Botao>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
             {!espera && <PerguntaCentroReferencia utente={utente} sinalizacao={sinalizacao} />}
             <form onSubmit={guardar} noValidate className="space-y-5">
                 {espera?.somente_consulta && (

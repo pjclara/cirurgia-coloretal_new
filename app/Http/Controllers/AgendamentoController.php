@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Agendamento;
 use App\Models\ListaDeEspera;
+use App\Models\User;
 use App\Models\Utente;
 use App\Services\SincronizarOperados;
 use App\Support\DiagnosticosCr;
@@ -193,11 +194,21 @@ class AgendamentoController extends Controller
         $estado = array_key_exists($request->query('estado'), $estados) ? $request->query('estado') : 'abertas';
         $prioridade = in_array((int) $request->query('prioridade'), array_keys(ListaDeEspera::PRIORIDADES), true) ? (int) $request->query('prioridade') : null;
         $q = trim((string) $request->query('q', ''));
+        // Ano da inscrição: só aceita anos que existem na lista.
+        $anos = ListaDeEspera::query()->selectRaw('YEAR(data_de_lista) as ano')->distinct()->orderByDesc('ano')->pluck('ano')->map(fn ($a) => (int) $a)->all();
+        $ano = in_array((int) $request->query('ano'), $anos, true) ? (int) $request->query('ano') : null;
+
+        // Responsável: só os que têm inscrições.
+        $responsaveis = User::query()->whereIn('id', ListaDeEspera::query()->select('responsavel_id'))->orderBy('name')
+            ->get(['id', 'name', 'abrev'])->map(fn (User $u) => ['id' => $u->id, 'nome' => $u->name])->values()->all();
+        $responsavel = in_array((int) $request->query('responsavel'), array_column($responsaveis, 'id'), true) ? (int) $request->query('responsavel') : null;
 
         $lista = ListaDeEspera::query()
             ->with(['utente:id,nome,numero_processo', 'utente.referenciacoesAtivas', 'intervencoes:id,nome,abrev', 'diagnosticos:id,nome', 'responsavel:id,name,abrev', 'agendamentos'])
             ->when($estados[$estado], fn ($query, $ids) => $query->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), $ids))
             ->when($prioridade, fn ($query, $p) => $query->where('prioridade_id', $p))
+            ->when($responsavel, fn ($query, $r) => $query->where('responsavel_id', $r))
+            ->when($ano, fn ($query, $a) => $query->whereYear('data_de_lista', $a))
             ->when($q !== '', fn ($query) => $query->whereHas('utente', fn ($u) => $u->pesquisar($q)))
             ->orderByRaw('CASE prioridade_id WHEN 2 THEN 0 WHEN 3 THEN 1 WHEN 1 THEN 2 ELSE 3 END')
             ->orderBy('data_de_lista')
@@ -222,7 +233,9 @@ class AgendamentoController extends Controller
 
         return Inertia::render('agendamento/lista-de-espera', [
             'lista' => $lista,
-            'filtros' => ['estado' => $estado, 'prioridade' => $prioridade, 'q' => $q],
+            'filtros' => ['estado' => $estado, 'prioridade' => $prioridade, 'q' => $q, 'ano' => $ano, 'responsavel' => $responsavel],
+            'anos' => $anos,
+            'responsaveis' => $responsaveis,
             'dataAlvo' => $this->dataAlvo($request),
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento/lista-de-espera'] : null,
             'prioridades' => $this->opcoesPrioridade(),
@@ -527,6 +540,22 @@ class AgendamentoController extends Controller
             ] : null,
             'utente' => ['id' => $utente->id, 'nome' => $utente->nome, 'numero_processo' => $utente->numero_processo, 'sinalizado' => $utente->referenciacoesAtivas()->exists()],
             // Diagnósticos CR que o utente já tem registados (internamentos, referenciação, outra inscrição): a inscrição nova já os traz.
+            // Inscrições do utente ainda por operar (propostas, pendentes ou agendadas): para não se inscrever duas vezes.
+            'inscricoes_ativas' => $espera ? [] : $utente->listaDeEspera()
+                ->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), [ListaDeEspera::ESTADO_PROPOSTO, ListaDeEspera::ESTADO_PENDENTE, ListaDeEspera::ESTADO_AGENDADO])
+                ->with(['intervencoes:id,nome,abrev', 'agendamentos'])->orderBy('data_de_lista')->get()
+                ->map(function (ListaDeEspera $e) {
+                    $proximo = $e->agendamentos->filter(fn ($a) => $a->estado() !== ListaDeEspera::ESTADO_CANCELADO)->sortByDesc('start')->first();
+
+                    return [
+                        'id' => $e->id,
+                        'data' => $e->data_de_lista?->format('Y-m-d'),
+                        'estado' => (int) $e->estado_lista_espera,
+                        'intervencoes' => $e->intervencoes->map(fn ($i) => trim($i->abrev ?: $i->nome))->values(),
+                        'agendamento' => $proximo?->start?->format('Y-m-d'),
+                        'pode_agendar' => $e->podeAgendar(),
+                    ];
+                })->values(),
             'diagnosticos_cr_do_utente' => $espera ? [] : DiagnosticosCr::doUtente($utente->id)->pluck('id')->values(),
             'sinalizacao' => Dominios::sinalizacao(request()->user()),
             'dominios' => [

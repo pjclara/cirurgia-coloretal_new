@@ -63,3 +63,48 @@ test('importa a lista de espera: cria utentes, mapeia o catálogo e salta ativos
     $this->artisan('lista-espera:importar', ['ficheiro' => $ficheiro, '--aplicar' => true])->assertSuccessful();
     expect(ListaDeEspera::count())->toBe(3);
 });
+
+test('a lista de espera filtra pelo ano da inscrição', function () {
+    $u = utilizadorClinico();
+    foreach (['2025-06-01', '2026-02-01', '2026-03-01'] as $data) {
+        ListaDeEspera::create([
+            'prioridade_id' => 1, 'utente_id' => novoUtente()->id, 'data_de_lista' => $data,
+            'estado_lista_espera' => ListaDeEspera::ESTADO_PROPOSTO, 'responsavel_id' => $u->id,
+        ]);
+    }
+
+    $this->actingAs($u)->get('/agendamento/lista-de-espera?ano=2026')->assertInertia(fn ($p) => $p
+        ->where('lista.total', 2)->where('filtros.ano', 2026)->where('anos', [2026, 2025]));
+    $this->actingAs($u)->get('/agendamento/lista-de-espera?ano=1999')->assertInertia(fn ($p) => $p
+        ->where('lista.total', 3)->where('filtros.ano', null));
+});
+
+test('ao inscrever, mostra as inscrições do utente que ainda estão por operar', function () {
+    $u = utilizadorClinico();
+    $utente = novoUtente();
+    $ativa = ListaDeEspera::create(['prioridade_id' => 1, 'utente_id' => $utente->id, 'data_de_lista' => '2026-02-01', 'estado_lista_espera' => ListaDeEspera::ESTADO_PENDENTE, 'responsavel_id' => $u->id]);
+    ListaDeEspera::create(['prioridade_id' => 1, 'utente_id' => $utente->id, 'data_de_lista' => '2025-02-01', 'estado_lista_espera' => ListaDeEspera::ESTADO_OPERADO, 'responsavel_id' => $u->id]);
+
+    $this->actingAs($u)->get("/agendamento/utentes/{$utente->id}/inscrever")->assertInertia(fn ($p) => $p
+        ->has('modal.inscricoes_ativas', 1)->where('modal.inscricoes_ativas.0.id', $ativa->id)->where('modal.inscricoes_ativas.0.pode_agendar', true));
+    $this->actingAs($u)->get('/agendamento/utentes/'.novoUtente()->id.'/inscrever')->assertInertia(fn ($p) => $p
+        ->has('modal.inscricoes_ativas', 0));
+});
+
+test('a lista de espera filtra pelo responsável', function () {
+    $u = utilizadorClinico();
+    $outro = App\Models\User::factory()->create();
+    foreach ([$u, $u, $outro] as $m) {
+        ListaDeEspera::create(['prioridade_id' => 1, 'utente_id' => novoUtente()->id, 'data_de_lista' => '2026-02-01', 'estado_lista_espera' => 1, 'responsavel_id' => $m->id]);
+    }
+
+    $this->actingAs($u)->get('/agendamento/lista-de-espera?responsavel='.$outro->id)->assertInertia(fn ($p) => $p
+        ->where('lista.total', 1)->where('filtros.responsavel', $outro->id)->has('responsaveis', 2));
+    $this->actingAs($u)->get('/agendamento/lista-de-espera?responsavel=999999')->assertInertia(fn ($p) => $p
+        ->where('lista.total', 3)->where('filtros.responsavel', null));
+});
+
+test('datas de nascimento antigas em número de série do Excel também se leem', function () {
+    expect(App\Support\LeitorDeFolha::data('14102.5', 1))->toBe('1938-08-10')
+        ->and(App\Support\LeitorDeFolha::data('14102.5'))->toBeNull();
+});

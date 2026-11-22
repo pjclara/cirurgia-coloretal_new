@@ -27,7 +27,9 @@ type Linha = {
 
 type Props = {
     lista: { data: Linha[]; links: { url: string | null; label: string; active: boolean }[]; total: number };
-    filtros: { estado: string; prioridade: number | null; q: string };
+    filtros: { estado: string; prioridade: number | null; q: string; ano: number | null; responsavel: number | null };
+    anos: number[];
+    responsaveis: Opcao[];
     prioridades: Opcao[];
     estados: Opcao[];
     dataAlvo: string | null;
@@ -42,7 +44,7 @@ const ESTADOS = [
     ['todas', 'Todas'],
 ];
 
-export default function ListaDeEspera({ lista, filtros, prioridades, estados, dataAlvo, modal }: Props) {
+export default function ListaDeEspera({ lista, filtros, anos, responsaveis, prioridades, estados, dataAlvo, modal }: Props) {
     const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
     const [q, setQ] = useState(filtros.q);
     const filtrar = (novos: Record<string, unknown>) =>
@@ -73,26 +75,54 @@ export default function ListaDeEspera({ lista, filtros, prioridades, estados, da
                     aoPesquisar={() => filtrar({ q })}
                     rotulo="Procurar utente"
                     placeholder="Nome ou processo"
-                    className="w-72"
+                    className="w-56"
                 />
                 {ESTADOS.map(([valor, rotulo]) => (
                     <Botao key={valor} variante={filtros.estado === valor ? 'primario' : 'secundario'} onClick={() => filtrar({ estado: valor })}>
                         {rotulo}
                     </Botao>
                 ))}
-                <select
-                    value={filtros.prioridade ?? ''}
-                    onChange={(e) => filtrar({ prioridade: e.target.value || null })}
-                    className={`${estiloEntrada} w-auto`}
-                    aria-label="Prioridade"
-                >
-                    <option value="">Todas as prioridades</option>
-                    {prioridades.map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.nome}
-                        </option>
-                    ))}
-                </select>
+                <div className="flex items-center gap-2">
+                    <select
+                        value={filtros.prioridade ?? ''}
+                        onChange={(e) => filtrar({ prioridade: e.target.value || null })}
+                        className={`${estiloEntrada} w-auto min-w-0`}
+                        aria-label="Prioridade"
+                    >
+                        <option value="">Todas as prioridades</option>
+                        {prioridades.map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.nome}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={filtros.ano ?? ''}
+                        onChange={(e) => filtrar({ ano: e.target.value || null })}
+                        className={`${estiloEntrada} w-auto min-w-0`}
+                        aria-label="Ano da inscrição"
+                    >
+                        <option value="">Todos os anos</option>
+                        {anos.map((a) => (
+                            <option key={a} value={a}>
+                                {a}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={filtros.responsavel ?? ''}
+                        onChange={(e) => filtrar({ responsavel: e.target.value || null })}
+                        className={`${estiloEntrada} w-auto min-w-0`}
+                        aria-label="Responsável"
+                    >
+                        <option value="">Todos os responsáveis</option>
+                        {responsaveis.map((r) => (
+                            <option key={r.id} value={r.id}>
+                                {r.nome}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
