@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 /** Inscrição de um utente em lista de espera cirúrgica. */
 class ListaDeEspera extends Model
@@ -67,15 +68,34 @@ class ListaDeEspera extends Model
     /** O estado do agendamento está em duas colunas (registos antigos e novos). */
     private const ESTADO_DO_AGENDAMENTO = 'coalesce(estado_de_agendamento_id, cast(estado_de_agendamento as unsigned))';
 
-    /** Inscrições que já têm um agendamento pendente: não se voltam a agendar, altera-se o que já existe. */
-    public function scopeSemAgendamentoPendente($consulta)
+    /**
+     * Inscrições que se podem agendar: sem nenhum agendamento que não esteja cancelado (só se volta a agendar o que foi cancelado)
+     * e ainda por operar. Uma inscrição cancelada só se reagenda se foi por cancelar o agendamento, não a própria inscrição.
+     */
+    public function scopePorAgendar($consulta)
     {
-        return $consulta->whereDoesntHave('agendamentos', fn ($q) => $q->whereRaw(self::ESTADO_DO_AGENDAMENTO.' = ?', [self::ESTADO_PENDENTE]));
+        return $consulta
+            ->whereDoesntHave('agendamentos', fn ($q) => $q->whereRaw(self::ESTADO_DO_AGENDAMENTO.' <> ?', [self::ESTADO_CANCELADO]))
+            ->where(fn ($q) => $q
+                ->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), [self::ESTADO_PROPOSTO, self::ESTADO_PENDENTE])
+                ->orWhere(fn ($c) => $c->where(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), self::ESTADO_CANCELADO)->whereHas('agendamentos')));
     }
 
-    /** O agendamento pendente desta inscrição, se tiver. */
-    public function agendamentoPendente(): ?Agendamento
+    /** O agendamento que impede de agendar de novo (qualquer um que não esteja cancelado), se houver. */
+    public function agendamentoAtivo(): ?Agendamento
     {
-        return $this->agendamentos()->whereRaw(self::ESTADO_DO_AGENDAMENTO.' = ?', [self::ESTADO_PENDENTE])->orderByDesc('start')->first();
+        return $this->agendamentos()->whereRaw(self::ESTADO_DO_AGENDAMENTO.' <> ?', [self::ESTADO_CANCELADO])->orderByDesc('start')->first();
+    }
+
+    public function podeAgendar(): bool
+    {
+        $estado = (int) $this->estado_lista_espera;
+
+        if ($this->agendamentoAtivo() || $estado === self::ESTADO_OPERADO) {
+            return false;
+        }
+
+        // Cancelada: só se reagenda se foi por se cancelar o agendamento (já teve algum), não por se cancelar a inscrição.
+        return $estado !== self::ESTADO_CANCELADO || $this->agendamentos()->exists();
     }
 }

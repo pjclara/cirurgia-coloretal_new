@@ -68,7 +68,7 @@ export default function Agenda({
     espera,
     ambulatoriosPorValidar,
 }: Props) {
-    const { permissoes } = usePage<PropsPartilhadas>().props.clinico;
+    const { permissoes, administrador } = usePage<PropsPartilhadas>().props.clinico;
     const ir = (parametros: Record<string, string | boolean>) => router.get('/agendamento', parametros, { preserveScroll: true });
     // O que se está a arrastar: um agendamento (mover) ou um doente da lista de espera (agendar).
     const [arrastado, setArrastado] = useState<{ tipo: 'agendamento' | 'espera'; id: number } | null>(null);
@@ -276,7 +276,7 @@ export default function Agenda({
                                                 {dia.agendamentos.slice(0, MAX_NO_DIA).map((a) => (
                                                     <li key={a.id}>
                                                         <Link
-                                                            draggable={podeMover}
+                                                            draggable={podeMover && (administrador || a.estado !== 5)}
                                                             onDragStart={(e) => {
                                                                 e.dataTransfer.setData('text/plain', `agendamento:${a.id}`);
                                                                 e.dataTransfer.effectAllowed = 'move';

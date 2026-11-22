@@ -20,6 +20,9 @@ export type PropsInscricao = {
         intervencoes: number[];
         diagnosticos: number[];
         estado: number;
+        pode_agendar: boolean;
+        /** Doente operado: só se consulta (um administrador pode alterar). */
+        somente_consulta?: boolean;
         agendamentos: { id: number; data: string | null; estado: number | null }[];
     } | null;
     utente: { id: number; nome: string; numero_processo: number; sinalizado?: boolean };
@@ -85,101 +88,110 @@ export function FormularioInscricao({
             </DialogHeader>
             {!espera && <PerguntaCentroReferencia utente={utente} sinalizacao={sinalizacao} />}
             <form onSubmit={guardar} noValidate className="space-y-5">
-                <Seccao titulo="Inscrição">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Campo rotulo="Data de inscrição" para="data" erro={erros.data_de_lista}>
-                            <input
-                                id="data"
-                                type="date"
-                                max={hoje}
-                                value={data.data_de_lista}
-                                onChange={(e) => setData('data_de_lista', e.target.value)}
+                {espera?.somente_consulta && (
+                    <p role="note" className="rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+                        Doente operado: a inscrição só se consulta. Apenas um administrador a pode alterar.
+                    </p>
+                )}
+                <fieldset disabled={espera?.somente_consulta} className="space-y-5">
+                    <Seccao titulo="Inscrição">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Campo rotulo="Data de inscrição" para="data" erro={erros.data_de_lista}>
+                                <input
+                                    id="data"
+                                    type="date"
+                                    max={hoje}
+                                    value={data.data_de_lista}
+                                    onChange={(e) => setData('data_de_lista', e.target.value)}
+                                    className={estiloEntrada}
+                                />
+                            </Campo>
+                            <Campo rotulo="Prioridade" para="prioridade" erro={erros.prioridade_id}>
+                                <Selecao
+                                    id="prioridade"
+                                    opcoes={dominios.prioridades}
+                                    valor={data.prioridade_id}
+                                    aoMudar={(v) => setData('prioridade_id', v)}
+                                    invalido={!!erros.prioridade_id}
+                                />
+                            </Campo>
+                            <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
+                                <SelecaoResponsavel
+                                    id="responsavel"
+                                    responsaveis={dominios.responsaveis}
+                                    valor={data.responsavel_id}
+                                    aoMudar={(v) => setData('responsavel_id', v)}
+                                    invalido={!!erros.responsavel_id}
+                                />
+                            </Campo>
+                        </div>
+                    </Seccao>
+
+                    <div className="grid items-start gap-5 md:grid-cols-2">
+                        <Seccao titulo="Diagnósticos">
+                            <EscolhaMultipla
+                                opcoes={dominios.diagnosticos}
+                                valor={data.diagnosticos}
+                                aoMudar={(v) => setData('diagnosticos', v)}
+                                procurar="Procurar diagnóstico"
+                                vazio="Nenhum diagnóstico escolhido."
+                            />
+                        </Seccao>
+
+                        <Seccao titulo="Intervenções propostas" descricao="Escolha pelo menos uma.">
+                            <EscolhaMultipla
+                                opcoes={dominios.intervencoes}
+                                valor={data.intervencoes}
+                                aoMudar={(v) => setData('intervencoes', v)}
+                                procurar="Procurar intervenção"
+                                vazio="Nenhuma intervenção escolhida."
+                            />
+                            {erros.intervencoes && (
+                                <p className="mt-2 text-sm text-rose-700" role="alert">
+                                    {erros.intervencoes}
+                                </p>
+                            )}
+                        </Seccao>
+                    </div>
+
+                    <Seccao titulo="Comentários">
+                        <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional>
+                            <textarea
+                                id="comentarios"
+                                rows={3}
+                                maxLength={2000}
+                                value={data.comentarios}
+                                onChange={(e) => setData('comentarios', e.target.value)}
                                 className={estiloEntrada}
                             />
                         </Campo>
-                        <Campo rotulo="Prioridade" para="prioridade" erro={erros.prioridade_id}>
-                            <Selecao
-                                id="prioridade"
-                                opcoes={dominios.prioridades}
-                                valor={data.prioridade_id}
-                                aoMudar={(v) => setData('prioridade_id', v)}
-                                invalido={!!erros.prioridade_id}
-                            />
-                        </Campo>
-                        <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
-                            <SelecaoResponsavel
-                                id="responsavel"
-                                responsaveis={dominios.responsaveis}
-                                valor={data.responsavel_id}
-                                aoMudar={(v) => setData('responsavel_id', v)}
-                                invalido={!!erros.responsavel_id}
-                            />
-                        </Campo>
-                    </div>
-                </Seccao>
-
-                <div className="grid items-start gap-5 md:grid-cols-2">
-                    <Seccao titulo="Diagnósticos">
-                        <EscolhaMultipla
-                            opcoes={dominios.diagnosticos}
-                            valor={data.diagnosticos}
-                            aoMudar={(v) => setData('diagnosticos', v)}
-                            procurar="Procurar diagnóstico"
-                            vazio="Nenhum diagnóstico escolhido."
-                        />
                     </Seccao>
 
-                    <Seccao titulo="Intervenções propostas" descricao="Escolha pelo menos uma.">
-                        <EscolhaMultipla
-                            opcoes={dominios.intervencoes}
-                            valor={data.intervencoes}
-                            aoMudar={(v) => setData('intervencoes', v)}
-                            procurar="Procurar intervenção"
-                            vazio="Nenhuma intervenção escolhida."
-                        />
-                        {erros.intervencoes && (
-                            <p className="mt-2 text-sm text-rose-700" role="alert">
-                                {erros.intervencoes}
-                            </p>
-                        )}
-                    </Seccao>
-                </div>
-
-                <Seccao titulo="Comentários">
-                    <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional>
-                        <textarea
-                            id="comentarios"
-                            rows={3}
-                            maxLength={2000}
-                            value={data.comentarios}
-                            onChange={(e) => setData('comentarios', e.target.value)}
-                            className={estiloEntrada}
-                        />
-                    </Campo>
-                </Seccao>
-
-                {espera && espera.agendamentos.length > 0 && (
-                    <Seccao titulo="Agendamentos desta inscrição">
-                        <ul className="space-y-1 text-sm">
-                            {espera.agendamentos.map((a) => (
-                                <li key={a.id} className="flex items-center gap-3">
-                                    <a href={`/agendamento/${a.id}`} className="text-[#7d1830] tabular-nums hover:underline">
-                                        {formatarData(a.data)}
-                                    </a>
-                                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${COR_ESTADO[a.estado ?? 6]}`}>
-                                        {nomeEstado(estados, a.estado)}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </Seccao>
-                )}
+                    {espera && espera.agendamentos.length > 0 && (
+                        <Seccao titulo="Agendamentos desta inscrição">
+                            <ul className="space-y-1 text-sm">
+                                {espera.agendamentos.map((a) => (
+                                    <li key={a.id} className="flex items-center gap-3">
+                                        <a href={`/agendamento/${a.id}`} className="text-[#7d1830] tabular-nums hover:underline">
+                                            {formatarData(a.data)}
+                                        </a>
+                                        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${COR_ESTADO[a.estado ?? 6]}`}>
+                                            {nomeEstado(estados, a.estado)}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Seccao>
+                    )}
+                </fieldset>
 
                 <div className="flex flex-wrap gap-3">
-                    <Botao type="submit" disabled={processing}>
-                        {espera ? 'Guardar alterações' : 'Inscrever'}
-                    </Botao>
-                    {espera && espera.estado !== 4 && !espera.agendamentos.some((a) => a.estado === 2) && (
+                    {!espera?.somente_consulta && (
+                        <Botao type="submit" disabled={processing}>
+                            {espera ? 'Guardar alterações' : 'Inscrever'}
+                        </Botao>
+                    )}
+                    {espera && espera.pode_agendar && (
                         <BotaoLigacao href={`/agendamento/lista-de-espera/${espera.id}/agendar`} variante="secundario">
                             Agendar cirurgia
                         </BotaoLigacao>
@@ -187,7 +199,7 @@ export function FormularioInscricao({
                     <Botao variante="secundario" onClick={fechar}>
                         Cancelar
                     </Botao>
-                    {espera && espera.estado !== 4 && (
+                    {espera && espera.estado !== 4 && !espera.somente_consulta && (
                         <Botao variante="perigo" className="ml-auto" onClick={cancelar}>
                             Cancelar inscrição
                         </Botao>

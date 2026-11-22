@@ -30,18 +30,21 @@ export type PropsAgendar = {
         responsavel_id: number | null;
     };
     sinalizacao?: DadosSinalizacao | null;
-    dominios: { periodos: Opcao[]; locais: Opcao[]; salas: Opcao[]; tipos: Opcao[]; estados: Opcao[]; responsaveis: Responsavel[] };
+    /** Doente operado: só se consulta (um administrador pode alterar). */
+    somente_consulta?: boolean;
+    dominios: { locais: Opcao[]; salas: Opcao[]; tipos: Opcao[]; estados: Opcao[]; responsaveis: Responsavel[] };
     hoje: string;
     dataSugerida: string | null;
 };
 
 type Props = PropsAgendar & { fechar: () => void };
 
-export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, hoje, dataSugerida, fechar, fechar_url }: Props) {
+export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_consulta, dominios, hoje, dataSugerida, fechar, fechar_url }: Props) {
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
         data: agendamento?.data ?? dataSugerida ?? '',
         hora: agendamento?.hora ?? '',
+        // O período já não se escolhe: os agendamentos novos ficam de manhã e os que já existem mantêm o seu.
         periodo_id: (agendamento?.periodo_id ?? 1) as number | '',
         local_id: (agendamento?.local_id ?? 1) as number | '',
         sala_id: (agendamento?.sala_id ?? '') as number | '',
@@ -52,6 +55,8 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, 
         comentarios: agendamento?.comentarios ?? '',
     });
     const { data, setData, processing } = form;
+    // Só se escolhe entre Agendado, Operado e Cancelado; um agendamento que já tem outro estado (pendente…) mantém-no.
+    const estadosEscolhiveis = dominios.estados.filter((e) => [3, 4, 5].includes(e.id) || e.id === agendamento?.estado);
     const erros = form.errors as Record<string, string | undefined>;
 
     const enviar = (forcar: boolean) => {
@@ -96,87 +101,93 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, 
                         </Botao>
                     </div>
                 )}
-                <Seccao titulo="Data e local">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Campo rotulo="Data" para="data" erro={erros.data}>
-                            <input
-                                id="data"
-                                type="date"
-                                min={agendamento ? undefined : hoje}
-                                value={data.data}
-                                onChange={(e) => setData('data', e.target.value)}
-                                className={estiloEntrada}
-                                aria-invalid={!!erros.data}
-                            />
-                        </Campo>
-                        <Campo rotulo="Hora" para="hora" erro={erros.hora} opcional>
-                            <input
-                                id="hora"
-                                type="time"
-                                value={data.hora}
-                                onChange={(e) => setData('hora', e.target.value)}
-                                className={estiloEntrada}
-                                aria-invalid={!!erros.hora}
-                            />
-                        </Campo>
-                        <Campo rotulo="Período" para="periodo" erro={erros.periodo_id}>
-                            <Selecao id="periodo" opcoes={dominios.periodos} valor={data.periodo_id} aoMudar={(v) => setData('periodo_id', v)} />
-                        </Campo>
-                        <Campo rotulo="Tipo" para="tipo" erro={erros.tipo_id}>
-                            <Selecao id="tipo" opcoes={dominios.tipos} valor={data.tipo_id} aoMudar={(v) => setData('tipo_id', v)} />
-                        </Campo>
-                        <Campo rotulo="Local" para="local" erro={erros.local_id}>
-                            <Selecao id="local" opcoes={dominios.locais} valor={data.local_id} aoMudar={(v) => setData('local_id', v)} />
-                        </Campo>
-                        <Campo rotulo="Sala" para="sala" erro={erros.sala_id}>
-                            <Selecao
-                                id="sala"
-                                opcoes={dominios.salas}
-                                valor={data.sala_id}
-                                aoMudar={(v) => setData('sala_id', v)}
-                                invalido={!!erros.sala_id}
-                            />
-                        </Campo>
-                        <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
-                            <SelecaoResponsavel
-                                id="responsavel"
-                                responsaveis={dominios.responsaveis}
-                                valor={data.responsavel_id}
-                                aoMudar={(v) => setData('responsavel_id', v)}
-                                invalido={!!erros.responsavel_id}
-                            />
-                        </Campo>
-                    </div>
-                </Seccao>
+                {somente_consulta && (
+                    <p role="note" className="rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+                        Doente operado: o agendamento só se consulta. Apenas um administrador o pode alterar.
+                    </p>
+                )}
+                <fieldset disabled={somente_consulta} className="space-y-5">
+                    <Seccao titulo="Data e local">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Campo rotulo="Data" para="data" erro={erros.data}>
+                                <input
+                                    id="data"
+                                    type="date"
+                                    min={agendamento ? undefined : hoje}
+                                    value={data.data}
+                                    onChange={(e) => setData('data', e.target.value)}
+                                    className={estiloEntrada}
+                                    aria-invalid={!!erros.data}
+                                />
+                            </Campo>
+                            <Campo rotulo="Hora" para="hora" erro={erros.hora} opcional>
+                                <input
+                                    id="hora"
+                                    type="time"
+                                    value={data.hora}
+                                    onChange={(e) => setData('hora', e.target.value)}
+                                    className={estiloEntrada}
+                                    aria-invalid={!!erros.hora}
+                                />
+                            </Campo>
+                            <Campo rotulo="Tipo" para="tipo" erro={erros.tipo_id}>
+                                <Selecao id="tipo" opcoes={dominios.tipos} valor={data.tipo_id} aoMudar={(v) => setData('tipo_id', v)} />
+                            </Campo>
+                            <Campo rotulo="Local" para="local" erro={erros.local_id}>
+                                <Selecao id="local" opcoes={dominios.locais} valor={data.local_id} aoMudar={(v) => setData('local_id', v)} />
+                            </Campo>
+                            <Campo rotulo="Sala" para="sala" erro={erros.sala_id}>
+                                <Selecao
+                                    id="sala"
+                                    opcoes={dominios.salas}
+                                    valor={data.sala_id}
+                                    aoMudar={(v) => setData('sala_id', v)}
+                                    invalido={!!erros.sala_id}
+                                />
+                            </Campo>
+                            <Campo rotulo="Responsável" para="responsavel" erro={erros.responsavel_id}>
+                                <SelecaoResponsavel
+                                    id="responsavel"
+                                    responsaveis={dominios.responsaveis}
+                                    valor={data.responsavel_id}
+                                    aoMudar={(v) => setData('responsavel_id', v)}
+                                    invalido={!!erros.responsavel_id}
+                                />
+                            </Campo>
+                        </div>
+                    </Seccao>
 
-                <Seccao titulo="Estado">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Campo rotulo="Estado" para="estado" erro={erros.estado}>
-                            <Selecao id="estado" opcoes={dominios.estados} valor={data.estado} aoMudar={(v) => setData('estado', v)} />
+                    <Seccao titulo="Estado">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Campo rotulo="Estado" para="estado" erro={erros.estado}>
+                                <Selecao id="estado" opcoes={estadosEscolhiveis} valor={data.estado} aoMudar={(v) => setData('estado', v)} />
+                            </Campo>
+                        </div>
+                        <label className="mt-4 flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={data.reserva_sangue} onChange={(e) => setData('reserva_sangue', e.target.checked)} />
+                            Reserva de sangue
+                        </label>
+                        <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional className="mt-4">
+                            <textarea
+                                id="comentarios"
+                                rows={3}
+                                maxLength={2000}
+                                value={data.comentarios}
+                                onChange={(e) => setData('comentarios', e.target.value)}
+                                className={estiloEntrada}
+                            />
                         </Campo>
-                    </div>
-                    <label className="mt-4 flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked={data.reserva_sangue} onChange={(e) => setData('reserva_sangue', e.target.checked)} />
-                        Reserva de sangue
-                    </label>
-                    <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional className="mt-4">
-                        <textarea
-                            id="comentarios"
-                            rows={3}
-                            maxLength={2000}
-                            value={data.comentarios}
-                            onChange={(e) => setData('comentarios', e.target.value)}
-                            className={estiloEntrada}
-                        />
-                    </Campo>
-                </Seccao>
+                    </Seccao>
+                </fieldset>
 
                 <div className="flex flex-wrap gap-3">
-                    <Botao type="submit" disabled={processing}>
-                        {agendamento ? 'Guardar alterações' : 'Agendar'}
-                    </Botao>
+                    {!somente_consulta && (
+                        <Botao type="submit" disabled={processing}>
+                            {agendamento ? 'Guardar alterações' : 'Agendar'}
+                        </Botao>
+                    )}
                     <Botao variante="secundario" onClick={fechar}>
-                        Cancelar
+                        {somente_consulta ? 'Fechar' : 'Cancelar'}
                     </Botao>
                     <BotaoLigacao
                         href={`/agendamento/lista-de-espera/${espera.id}?origem=agenda&retorno=${encodeURIComponent(fechar_url ?? '/agendamento')}`}
@@ -184,7 +195,7 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, dominios, 
                     >
                         Ver inscrição
                     </BotaoLigacao>
-                    {agendamento && (
+                    {agendamento && !somente_consulta && (
                         <Botao variante="perigo" className="ml-auto" onClick={apagar}>
                             Apagar agendamento
                         </Botao>

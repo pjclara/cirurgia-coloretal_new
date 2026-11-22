@@ -22,6 +22,9 @@ class AgendamentoController extends Controller
 {
     private const LOCAL_AMBULATORIO = 2;
 
+    /** O período já não se escolhe: os agendamentos novos ficam de manhã. */
+    private const PERIODO_POR_OMISSAO = 1;
+
     public function agenda(Request $request): Response
     {
         return $this->montarAgenda($request, null);
@@ -105,8 +108,7 @@ class AgendamentoController extends Controller
         $q = trim((string) $request->query('espera_q', ''));
 
         $consulta = ListaDeEspera::query()
-            ->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), [ListaDeEspera::ESTADO_PROPOSTO, ListaDeEspera::ESTADO_PENDENTE])
-            ->semAgendamentoPendente() // quem já tem um agendamento pendente não se agenda de novo
+            ->porAgendar() // só se agenda quem não tem agendamento por cancelar
             ->when($filtro === 'meus', fn ($query) => $query->where('responsavel_id', $request->user()->id))
             ->when($q !== '', fn ($query) => $query->whereHas('utente', fn ($u) => $u->pesquisar($q)));
 
@@ -163,11 +165,11 @@ class AgendamentoController extends Controller
             ])
             ->groupBy('data');
 
-        // Numa semana mostram-se os dias úteis e ainda os dias de fim de semana com cirurgias.
+        // Só se mostram os dias com cirurgias.
         $dias = collect(range(0, $nDias - 1))
             ->map(fn ($n) => $inicio->copy()->addDays($n))
             ->map(fn ($d) => ['data' => $d->format('Y-m-d'), 'util' => $d->isWeekday(), 'agendamentos' => $agendamentos->get($d->format('Y-m-d'), collect())->values()])
-            ->filter(fn ($d) => $vista === 'dia' || $d['util'] || $d['agendamentos']->isNotEmpty())
+            ->filter(fn ($d) => $d['agendamentos']->isNotEmpty())
             ->values();
 
         return Inertia::render('agendamento/mapa', [
@@ -176,7 +178,6 @@ class AgendamentoController extends Controller
             'inicio' => $inicio->format('Y-m-d'),
             'anterior' => $inicio->copy()->subDays($nDias)->format('Y-m-d'),
             'seguinte' => $inicio->copy()->addDays($nDias)->format('Y-m-d'),
-            'estados' => Dominios::tabelaLista('estado_de_agendamentos'),
             'geradoEm' => now()->format('d/m/Y H:i'),
         ]);
     }
@@ -215,7 +216,7 @@ class AgendamentoController extends Controller
                     'diagnosticos' => $e->diagnosticos->map(fn ($d) => trim($d->nome))->values(),
                     'responsavel' => $e->responsavel?->abrev ?: $e->responsavel?->name,
                     'agendamento' => $proximo ? ['id' => $proximo->id, 'data' => $proximo->start?->format('Y-m-d')] : null,
-                    'agendamento_pendente' => $e->agendamentos->contains(fn ($a) => $a->estado() === ListaDeEspera::ESTADO_PENDENTE),
+                    'pode_agendar' => $e->podeAgendar(),
                 ];
             });
 
@@ -291,6 +292,8 @@ class AgendamentoController extends Controller
 
     public function atualizarInscricao(Request $request, ListaDeEspera $espera): RedirectResponse
     {
+        $this->impedirSeOperado($espera);
+
         $dados = $this->validarInscricao($request);
 
         DB::transaction(function () use ($dados, $espera) {
@@ -307,6 +310,8 @@ class AgendamentoController extends Controller
 
     public function cancelarInscricao(Request $request, ListaDeEspera $espera): RedirectResponse
     {
+        $this->impedirSeOperado($espera);
+
         $espera->update(['estado_lista_espera' => ListaDeEspera::ESTADO_CANCELADO]);
 
         return ($retorno = $this->retornoDaAgenda($request)) !== null
@@ -318,14 +323,44 @@ class AgendamentoController extends Controller
 
     public function criarAgendamento(Request $request, ListaDeEspera $espera): Response|RedirectResponse
     {
-        // Já tem um agendamento pendente: abre-se esse, em vez de agendar de novo.
-        if ($pendente = $espera->agendamentoPendente()) {
-            return redirect()->route('agendamento.edit', $pendente)->with('erro', 'Esta inscrição já tem um agendamento pendente: altere-o em vez de agendar de novo.');
+        // Só se agenda de novo o que foi cancelado: se já há um agendamento, abre-se esse.
+        if (! $espera->podeAgendar()) {
+            return $this->recusarAgendar($espera);
         }
 
         $data = $this->dataAlvo($request);
 
         return $this->montarAgenda($request, ['tipo' => 'agendar'] + $this->formularioAgendamento($espera, null, $data), $data);
+    }
+
+    /** Doentes operados: o agendamento e a inscrição só se consultam; só um administrador os altera. */
+    private function somenteConsulta(ListaDeEspera $espera, ?Agendamento $agendamento = null): bool
+    {
+        if (request()->user()->eAdministrador()) {
+            return false;
+        }
+
+        return (int) $espera->estado_lista_espera === ListaDeEspera::ESTADO_OPERADO || $agendamento?->estado() === ListaDeEspera::ESTADO_OPERADO;
+    }
+
+    private function impedirSeOperado(ListaDeEspera $espera, ?Agendamento $agendamento = null): void
+    {
+        abort_if($this->somenteConsulta($espera, $agendamento), 403, 'Doente operado: o agendamento e a inscrição só se consultam; só um administrador os pode alterar.');
+    }
+
+    private function motivoDeNaoAgendar(ListaDeEspera $espera): string
+    {
+        return $espera->agendamentoAtivo()
+            ? 'Esta inscrição já tem um agendamento: só se agenda de novo se for cancelado. Altere o que já existe.'
+            : 'Esta inscrição não pode ser agendada (já foi operada ou foi cancelada).';
+    }
+
+    private function recusarAgendar(ListaDeEspera $espera): RedirectResponse
+    {
+        $existente = $espera->agendamentoAtivo();
+
+        return ($existente ? redirect()->route('agendamento.edit', $existente) : redirect()->route('agendamento.espera'))
+            ->with('erro', $this->motivoDeNaoAgendar($espera));
     }
 
     public function editarAgendamento(Request $request, Agendamento $agendamento): Response
@@ -335,8 +370,8 @@ class AgendamentoController extends Controller
 
     public function guardarAgendamento(Request $request, ListaDeEspera $espera): RedirectResponse
     {
-        if ($espera->agendamentoPendente()) {
-            return back()->withInput()->withErrors(['conflito' => 'Esta inscrição já tem um agendamento pendente: altere-o em vez de agendar de novo.']);
+        if (! $espera->podeAgendar()) {
+            return back()->withInput()->withErrors(['conflito' => $this->motivoDeNaoAgendar($espera)]);
         }
 
         $dados = $this->validarAgendamento($request);
@@ -358,7 +393,10 @@ class AgendamentoController extends Controller
 
     public function atualizarAgendamento(Request $request, Agendamento $agendamento): RedirectResponse
     {
-        $dados = $this->validarAgendamento($request);
+        $this->impedirSeOperado($agendamento->espera, $agendamento);
+
+        // Quem já tinha período (manhã ou tarde) mantém-no.
+        $dados = $this->validarAgendamento($request, $agendamento->periodo_de_agendamento_id ?? self::PERIODO_POR_OMISSAO, $agendamento->estado());
 
         if ($aviso = $this->avisoDeConflito($request, $dados['data'], $dados['periodo_id'], $dados['local_id'], $dados['sala_id'] ?? null, (int) $dados['estado'], $agendamento->id)) {
             return back()->withInput()->withErrors(['conflito' => $aviso]);
@@ -375,6 +413,8 @@ class AgendamentoController extends Controller
 
     public function apagarAgendamento(Request $request, Agendamento $agendamento): RedirectResponse
     {
+        $this->impedirSeOperado($agendamento->espera, $agendamento);
+
         $agendamento->forceFill(['deleted_by_id' => $request->user()->id])->saveQuietly();
         $agendamento->delete();
 
@@ -409,6 +449,8 @@ class AgendamentoController extends Controller
     /** Move um agendamento para outra data (arrastar no calendário). */
     public function moverAgendamento(Request $request, Agendamento $agendamento): RedirectResponse
     {
+        $this->impedirSeOperado($agendamento->espera, $agendamento);
+
         $dados = $request->validate([
             'data' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:'.now()->addYears(3)->format('Y-m-d')],
             'forcar' => ['sometimes', 'boolean'],
@@ -475,6 +517,8 @@ class AgendamentoController extends Controller
                 'intervencoes' => $espera->intervencoes()->pluck('intervencaos.id')->map(fn ($i) => (int) $i)->values(),
                 'diagnosticos' => $espera->diagnosticos()->pluck('diagnosticos.id')->map(fn ($i) => (int) $i)->values(),
                 'estado' => (int) $espera->estado_lista_espera,
+                'pode_agendar' => $espera->podeAgendar(),
+                'somente_consulta' => $this->somenteConsulta($espera),
                 'agendamentos' => $espera->agendamentos()->orderByDesc('start')->get()->map(fn ($a) => [
                     'id' => $a->id,
                     'data' => $a->start?->format('Y-m-d'),
@@ -514,6 +558,7 @@ class AgendamentoController extends Controller
                 'reserva_sangue' => (string) $agendamento->reserva_sangue === '1',
                 'comentarios' => $agendamento->comentarios ?? '',
             ] : null,
+            'somente_consulta' => $this->somenteConsulta($espera, $agendamento),
             'espera' => [
                 'id' => $espera->id,
                 'utente' => ['id' => $espera->utente?->id, 'nome' => $espera->utente?->nome, 'numero_processo' => $espera->utente?->numero_processo, 'sinalizado' => (bool) $espera->utente?->referenciacoesAtivas()->exists()],
@@ -521,7 +566,6 @@ class AgendamentoController extends Controller
                 'responsavel_id' => $espera->responsavel_id,
             ],
             'dominios' => [
-                'periodos' => Dominios::tabelaLista('periodo_de_agendamentos'),
                 'locais' => Dominios::tabelaLista('local_de_agendamentos'),
                 'salas' => Dominios::tabelaLista('sala_de_agendamentos'),
                 'tipos' => Dominios::tabelaLista('tipo_de_agendamentos'),
@@ -563,21 +607,27 @@ class AgendamentoController extends Controller
         ]);
     }
 
-    private function validarAgendamento(Request $request): array
+    /** Estados que se escolhem ao agendar; um agendamento que já tem outro estado (pendente…) mantém o seu. */
+    private const ESTADOS_DO_FORMULARIO = [ListaDeEspera::ESTADO_AGENDADO, ListaDeEspera::ESTADO_CANCELADO, ListaDeEspera::ESTADO_OPERADO];
+
+    private function validarAgendamento(Request $request, int $periodoPorOmissao = self::PERIODO_POR_OMISSAO, ?int $estadoAtual = null): array
     {
-        return $request->validate([
+        $dados = $request->validate([
             'data' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:'.now()->addYears(3)->format('Y-m-d')],
-            'periodo_id' => ['required', 'integer', Rule::exists('periodo_de_agendamentos', 'id')],
+            'periodo_id' => ['nullable', 'integer', Rule::exists('periodo_de_agendamentos', 'id')], // já não se escolhe: por omissão, de manhã
             'hora' => ['nullable', 'date_format:H:i'],
             'local_id' => ['required', 'integer', Rule::exists('local_de_agendamentos', 'id')],
             'sala_id' => ['required', 'integer', Rule::exists('sala_de_agendamentos', 'id')], // a coluna é obrigatória na base
             'tipo_id' => ['required', 'integer', Rule::exists('tipo_de_agendamentos', 'id')],
             'responsavel_id' => ['required', 'integer', Rule::exists('users', 'id')],
-            'estado' => ['required', 'integer', Rule::exists('estado_de_agendamentos', 'id')],
+            'estado' => ['required', 'integer', Rule::in(array_filter([...self::ESTADOS_DO_FORMULARIO, $estadoAtual]))],
             'reserva_sangue' => ['required', 'boolean'],
             'comentarios' => ['nullable', 'string', 'max:2000'],
             'forcar' => ['sometimes', 'boolean'],
         ], ['required' => 'Preencha este campo.']);
+        $dados['periodo_id'] ??= $periodoPorOmissao;
+
+        return $dados;
     }
 
     /**
