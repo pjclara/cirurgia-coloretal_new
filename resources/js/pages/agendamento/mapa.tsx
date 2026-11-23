@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { NOMES_DIA, notaDeSangue } from '../../clinico/agendamento';
-import { formatarData } from '../../clinico/formato';
+import { formatarData, nomeCurto } from '../../clinico/formato';
 import { NumeroProcesso } from '../../components/clinico/numero-processo';
 
 type Item = {
@@ -28,17 +28,6 @@ type Props = {
     seguinte: string;
     geradoEm: string;
 };
-
-const LIGACOES = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
-
-/** No máximo três palavras: o primeiro nome e os dois últimos (sem «de», «da», «dos»…). */
-function nomeCurto(nome: string | null) {
-    if (!nome) return 'Utente sem ficha';
-    const palavras = nome.trim().split(/\s+/);
-    if (palavras.length <= 3) return nome.trim();
-    const uteis = palavras.filter((p) => !LIGACOES.has(p.toLowerCase()));
-    return (uteis.length <= 3 ? uteis : [uteis[0], ...uteis.slice(-2)]).join(' ');
-}
 
 const ABREVIATURAS: Record<string, string> = {
     programada: 'Prog.',

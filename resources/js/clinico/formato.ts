@@ -36,3 +36,14 @@ export function idade(nascimento: string | null | undefined, referencia: string 
 export function plural(n: number, singular: string, pluralizado: string): string {
     return `${n} ${n === 1 ? singular : pluralizado}`;
 }
+
+const LIGACOES = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+
+/** No máximo três palavras: o primeiro nome e os dois últimos (sem «de», «da», «dos»…). */
+export function nomeCurto(nome: string | null) {
+    if (!nome) return 'Utente sem ficha';
+    const palavras = nome.trim().split(/\s+/);
+    if (palavras.length <= 3) return nome.trim();
+    const uteis = palavras.filter((p) => !LIGACOES.has(p.toLowerCase()));
+    return (uteis.length <= 3 ? uteis : [uteis[0], ...uteis.slice(-2)]).join(' ');
+}

@@ -1,7 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { CATEGORIAS, COR_ESTADO, NOMES_DIA, nomeEstado, notaDeSangue, type Categoria } from '../../clinico/agendamento';
-import { formatarData } from '../../clinico/formato';
+import { formatarData, nomeCurto } from '../../clinico/formato';
 import type { Opcao, PropsPartilhadas } from '../../clinico/tipos';
 import { ModalAgendamento, type Modal } from '../../components/agendamento/modal-agendamento';
 import { ModalValidarAmbulatorios, type AmbulatorioPorValidar } from '../../components/agendamento/modal-validar-ambulatorios';
@@ -254,7 +254,7 @@ export default function Agenda({
                                         <div
                                             key={dia.data}
                                             {...zona(dia.data)}
-                                            className={`group min-h-28 border-r border-b border-slate-100 p-1.5 ${doMes ? 'bg-white' : 'bg-slate-50/70'} ${realce(dia.data)}`}
+                                            className={`group min-h-32 border-r border-b border-slate-100 p-1.5 ${doMes ? 'bg-white' : 'bg-slate-50/70'} ${realce(dia.data)}`}
                                         >
                                             <span
                                                 className={`mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs tabular-nums ${
@@ -287,16 +287,15 @@ export default function Agenda({
                                                                 setSobre(null);
                                                             }}
                                                             href={permissoes.includes('show agendamento') ? `/agendamento/${a.id}` : '#'}
-                                                            title={`${CATEGORIAS[a.categoria].rotulo}${a.estado === 4 ? ' (cancelado)' : a.estado === 5 ? ' (operado)' : ''} · Processo ${a.utente.numero_processo ?? '—'} — ${a.intervencoes.join(', ')}`}
+                                                            title={`${CATEGORIAS[a.categoria].rotulo}${a.estado === 4 ? ' (cancelado)' : a.estado === 5 ? ' (operado)' : ''} · ${a.utente.nome ?? 'Utente sem ficha'} · Processo ${a.utente.numero_processo ?? '—'} — ${a.intervencoes.join(', ')}`}
                                                             className={`block rounded px-1.5 py-0.5 text-xs leading-tight ${CATEGORIAS[a.categoria].chip} ${estiloDoEstado(a.estado)}`}
                                                         >
                                                             <span className="block truncate font-medium">
                                                                 {a.estado === 5 ? '✓ ' : a.estado === 4 ? '✕ ' : ''}
-                                                                {[
-                                                                    a.hora ?? a.periodo?.charAt(0),
-                                                                    a.sala ? `S${a.sala}` : null,
-                                                                    a.utente.numero_processo ?? 'Sem processo',
-                                                                ]
+                                                                {nomeCurto(a.utente.nome)}
+                                                            </span>
+                                                            <span className="block truncate opacity-80">
+                                                                {[a.hora, a.sala ? `S${a.sala}` : null, a.utente.numero_processo ?? 'Sem processo']
                                                                     .filter(Boolean)
                                                                     .join(' · ')}
                                                             </span>
@@ -353,7 +352,7 @@ export default function Agenda({
                                                         className={`flex flex-wrap items-baseline gap-x-5 gap-y-1 border-l-4 px-4 py-2.5 ${CATEGORIAS[a.categoria].faixa} ${a.estado === 4 ? 'opacity-60' : ''}`}
                                                     >
                                                         <p className="w-36 shrink-0 text-xs text-slate-600">
-                                                            {[a.hora, a.periodo, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
+                                                            {[a.hora, a.sala ? `Sala ${a.sala}` : null].filter(Boolean).join(' · ') || '—'}
                                                         </p>
                                                         <div
                                                             className={`min-w-0 flex-1 ${a.estado === 5 ? 'line-through decoration-2 opacity-70' : ''}`}
