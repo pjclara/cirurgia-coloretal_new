@@ -74,3 +74,53 @@ test('as intervenções têm a marca de cirurgia de ressecção e filtram-se por
     $this->actingAs($admin)->get("/admin/catalogos/intervencoes?q=Interven%C3%A7%C3%A3o+de+Teste&cr=1&grupo=$grupo")->assertInertia(fn (Assert $p) => $p
         ->where('itens.total', 1)->where('itens.data.0.cirurgia_de_ressecao', true));
 });
+
+test('complicações e resoluções: só administradores, com nome único e sem apagar o que está em uso', function () {
+    $this->actingAs(utilizadorClinico())->get('/admin/catalogos/complicacoes')->assertForbidden();
+    $this->actingAs(utilizadorClinico())->get('/admin/catalogos/resolucoes')->assertForbidden();
+
+    $admin = administrador();
+    $this->actingAs($admin)->get('/admin/catalogos/complicacoes')->assertOk()->assertInertia(fn (Assert $p) => $p
+        ->component('admin/catalogo')->where('catalogo.chave', 'complicacoes')->where('catalogo.temCr', false)->where('catalogo.temAbrev', true)->has('grupos'));
+    $this->actingAs($admin)->get('/admin/catalogos/resolucoes')->assertOk()->assertInertia(fn (Assert $p) => $p
+        ->where('catalogo.chave', 'resolucoes')->where('catalogo.temAbrev', false)->where('catalogo.grupoOpcional', true)->has('catalogo.aviso'));
+
+    // Complicação: cria, recusa nome repetido, edita e apaga.
+    $grupo = DB::table('grupo_complicacaos')->value('id');
+    $corpo = ['nome' => 'Complicação de Teste', 'abrev' => 'CT', 'grupo_id' => $grupo];
+    $this->actingAs($admin)->post('/admin/catalogos/complicacoes', $corpo)->assertSessionHasNoErrors();
+    $this->actingAs($admin)->post('/admin/catalogos/complicacoes', $corpo)->assertSessionHasErrors('nome');
+    $this->actingAs($admin)->post('/admin/catalogos/complicacoes', ['nome' => 'Sem grupo'])->assertSessionHasErrors('grupo_id');
+    $complicacao = DB::table('complicacaos')->where('nome', 'Complicação de Teste')->first();
+    $this->actingAs($admin)->put("/admin/catalogos/complicacoes/{$complicacao->id}", ['nome' => 'Complicação Editada', 'grupo_id' => $grupo])->assertSessionHasNoErrors();
+    expect(DB::table('complicacaos')->where('id', $complicacao->id)->value('nome'))->toBe('Complicação Editada');
+
+    // Em uso numa morbilidade: não se apaga; «Sem complicações» é protegida.
+    $internamento = novoInternamento(novoUtente(), $admin);
+    $morbilidade = App\Models\Morbilidade::create(['internamento_id' => $internamento->id, 'momento' => 'alta']);
+    DB::table('complicacao_morbilidade')->insert(['morbilidade_id' => $morbilidade->id, 'complicacao_id' => $complicacao->id]);
+    $this->actingAs($admin)->delete("/admin/catalogos/complicacoes/{$complicacao->id}")->assertSessionHas('erro');
+    expect(DB::table('complicacaos')->where('id', $complicacao->id)->exists())->toBeTrue();
+    $this->actingAs($admin)->delete('/admin/catalogos/complicacoes/'.App\Models\Complicacao::SEM_COMPLICACOES)->assertSessionHas('erro');
+    DB::table('complicacao_morbilidade')->where('morbilidade_id', $morbilidade->id)->delete();
+    $this->actingAs($admin)->delete("/admin/catalogos/complicacoes/{$complicacao->id}")->assertSessionHas('sucesso');
+
+    // Resolução: o grau de Clavien-Dindo é opcional; em uso (lista JSON de ids) não se apaga.
+    $grau = DB::table('clavien_dindos')->value('id');
+    $this->actingAs($admin)->post('/admin/catalogos/resolucoes', ['nome' => 'Resolução de Teste', 'grupo_id' => $grau])->assertSessionHasNoErrors();
+    $this->actingAs($admin)->post('/admin/catalogos/resolucoes', ['nome' => 'Resolução sem grau'])->assertSessionHasNoErrors();
+    $resolucao = DB::table('resolucao_complicacaos')->where('nome', 'Resolução de Teste')->first();
+    expect((int) $resolucao->clavien_dindo_id)->toBe((int) $grau)
+        ->and(DB::table('resolucao_complicacaos')->where('nome', 'Resolução sem grau')->value('clavien_dindo_id'))->toBeNull();
+    $this->actingAs($admin)->post('/admin/catalogos/resolucoes', ['nome' => 'Resolução de Teste'])->assertSessionHasErrors('nome');
+    $this->actingAs($admin)->get('/admin/catalogos/resolucoes?q=Teste')->assertInertia(fn (Assert $p) => $p->where('itens.data.0.nome', 'Resolução de Teste')->where('itens.data.0.usos', 0));
+
+    DB::table('complicacao_morbilidade')->insert(['morbilidade_id' => $morbilidade->id, 'complicacao_id' => 2, 'resolucao' => json_encode([(int) $resolucao->id])]);
+    $this->actingAs($admin)->get('/admin/catalogos/resolucoes?q=Teste')->assertInertia(fn (Assert $p) => $p->where('itens.data.0.usos', 1));
+    $this->actingAs($admin)->delete("/admin/catalogos/resolucoes/{$resolucao->id}")->assertSessionHas('erro');
+    // Os registos antigos guardam os ids como texto: também contam.
+    DB::table('complicacao_morbilidade')->where('morbilidade_id', $morbilidade->id)->update(['resolucao' => json_encode([(string) $resolucao->id])]);
+    $this->actingAs($admin)->get('/admin/catalogos/resolucoes?q=Teste')->assertInertia(fn (Assert $p) => $p->where('itens.data.0.usos', 1));
+    DB::table('complicacao_morbilidade')->where('morbilidade_id', $morbilidade->id)->delete();
+    $this->actingAs($admin)->delete("/admin/catalogos/resolucoes/{$resolucao->id}")->assertSessionHas('sucesso');
+});

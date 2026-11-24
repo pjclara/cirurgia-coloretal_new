@@ -11,7 +11,7 @@ type Item = {
     id: number;
     nome: string;
     abrev: string;
-    grupo_id: number;
+    grupo_id: number | null;
     grupo: string | null;
     tipo_id: number | null;
     centro_de_referencia: boolean;
@@ -21,7 +21,18 @@ type Item = {
 };
 
 type Props = {
-    catalogo: { chave: string; titulo: string; singular: string; temTipo: boolean; temRessecao: boolean };
+    catalogo: {
+        chave: string;
+        titulo: string;
+        singular: string;
+        temTipo: boolean;
+        temRessecao: boolean;
+        temAbrev: boolean;
+        temCr: boolean;
+        rotuloGrupo: string;
+        grupoOpcional: boolean;
+        aviso: string | null;
+    };
     itens: Paginado<Item>;
     filtros: { q: string; grupo: number | null; cr: boolean };
     grupos: Opcao[];
@@ -73,11 +84,20 @@ function FormularioItem({
                 />
             </Campo>
             <div className="grid gap-4 sm:grid-cols-2">
-                <Campo rotulo="Abreviatura" para="abrev" erro={errors.abrev} opcional>
-                    <input id="abrev" className={estiloEntrada} value={data.abrev} onChange={(e) => setData('abrev', e.target.value)} />
-                </Campo>
-                <Campo rotulo="Grupo" para="grupo" erro={errors.grupo_id}>
-                    <Selecao id="grupo" opcoes={grupos} valor={data.grupo_id} aoMudar={(v) => setData('grupo_id', v)} invalido={!!errors.grupo_id} />
+                {catalogo.temAbrev && (
+                    <Campo rotulo="Abreviatura" para="abrev" erro={errors.abrev} opcional>
+                        <input id="abrev" className={estiloEntrada} value={data.abrev} onChange={(e) => setData('abrev', e.target.value)} />
+                    </Campo>
+                )}
+                <Campo rotulo={catalogo.rotuloGrupo} para="grupo" erro={errors.grupo_id} opcional={catalogo.grupoOpcional}>
+                    <Selecao
+                        id="grupo"
+                        opcoes={grupos}
+                        valor={data.grupo_id}
+                        aoMudar={(v) => setData('grupo_id', v)}
+                        invalido={!!errors.grupo_id}
+                        vazio={catalogo.grupoOpcional ? 'Sem grau' : 'Escolher…'}
+                    />
                 </Campo>
             </div>
             {catalogo.temTipo && (
@@ -86,10 +106,16 @@ function FormularioItem({
                 </Campo>
             )}
             <div className="space-y-2 text-sm">
-                <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={data.centro_de_referencia} onChange={(e) => setData('centro_de_referencia', e.target.checked)} />
-                    Do centro de referência
-                </label>
+                {catalogo.temCr && (
+                    <label className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            checked={data.centro_de_referencia}
+                            onChange={(e) => setData('centro_de_referencia', e.target.checked)}
+                        />
+                        Do centro de referência
+                    </label>
+                )}
                 {catalogo.temRessecao && (
                     <label className="flex items-center gap-2">
                         <input
@@ -141,23 +167,25 @@ export default function Catalogo({ catalogo, itens, filtros, grupos, tipos }: Pr
                     termo={termo}
                     aoEscrever={setTermo}
                     aoPesquisar={() => filtrar({})}
-                    rotulo={`Procurar ${catalogo.singular} por nome ou abreviatura`}
-                    placeholder="Nome ou abreviatura"
+                    rotulo={`Procurar ${catalogo.singular} por nome${catalogo.temAbrev ? ' ou abreviatura' : ''}`}
+                    placeholder={catalogo.temAbrev ? 'Nome ou abreviatura' : 'Nome'}
                     className="min-w-64 sm:max-w-sm"
                 />
                 <div className="w-56">
                     <Selecao
-                        aria-label="Grupo"
+                        aria-label={catalogo.rotuloGrupo}
                         opcoes={grupos}
                         valor={filtros.grupo ?? ''}
                         aoMudar={(v) => filtrar({ grupo: v === '' ? null : v })}
-                        vazio="Todos os grupos"
+                        vazio={catalogo.temAbrev ? 'Todos os grupos' : 'Todos os graus'}
                     />
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={filtros.cr} onChange={(e) => filtrar({ cr: e.target.checked })} />
-                    Só do centro de referência
-                </label>
+                {catalogo.temCr && (
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={filtros.cr} onChange={(e) => filtrar({ cr: e.target.checked })} />
+                        Só do centro de referência
+                    </label>
+                )}
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -165,9 +193,9 @@ export default function Catalogo({ catalogo, itens, filtros, grupos, tipos }: Pr
                     <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600 uppercase">
                         <tr>
                             <th className="px-4 py-2.5 font-medium">Nome</th>
-                            <th className="px-4 py-2.5 font-medium">Abreviatura</th>
-                            <th className="px-4 py-2.5 font-medium">Grupo</th>
-                            <th className="px-4 py-2.5 font-medium">CR</th>
+                            {catalogo.temAbrev && <th className="px-4 py-2.5 font-medium">Abreviatura</th>}
+                            <th className="px-4 py-2.5 font-medium">{catalogo.rotuloGrupo}</th>
+                            {catalogo.temCr && <th className="px-4 py-2.5 font-medium">CR</th>}
                             {catalogo.temRessecao && <th className="px-4 py-2.5 font-medium">Ressecção</th>}
                             <th className="px-4 py-2.5 font-medium">Em uso</th>
                             <th className="px-4 py-2.5" />
@@ -184,15 +212,17 @@ export default function Catalogo({ catalogo, itens, filtros, grupos, tipos }: Pr
                         {itens.data.map((i) => (
                             <tr key={i.id}>
                                 <td className="px-4 py-2 font-medium">{i.nome}</td>
-                                <td className="px-4 py-2 text-slate-600">{i.abrev || '—'}</td>
+                                {catalogo.temAbrev && <td className="px-4 py-2 text-slate-600">{i.abrev || '—'}</td>}
                                 <td className="px-4 py-2 text-slate-600">{i.grupo ?? '—'}</td>
-                                <td className="px-4 py-2">
-                                    {i.centro_de_referencia ? (
-                                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-900">CR</span>
-                                    ) : (
-                                        '—'
-                                    )}
-                                </td>
+                                {catalogo.temCr && (
+                                    <td className="px-4 py-2">
+                                        {i.centro_de_referencia ? (
+                                            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-900">CR</span>
+                                        ) : (
+                                            '—'
+                                        )}
+                                    </td>
+                                )}
                                 {catalogo.temRessecao && <td className="px-4 py-2">{i.cirurgia_de_ressecao ? 'Sim' : '—'}</td>}
                                 <td className="px-4 py-2 tabular-nums">{i.usos > 0 ? i.usos : '—'}</td>
                                 <td className="px-4 py-2 text-right whitespace-nowrap">
@@ -241,7 +271,10 @@ export default function Catalogo({ catalogo, itens, filtros, grupos, tipos }: Pr
                 <DialogContent className="max-w-xl bg-white text-slate-900" aria-describedby={undefined}>
                     <DialogHeader>
                         <DialogTitle>{aEditar === 'novo' ? `Novo ${catalogo.singular}` : `Editar ${catalogo.singular}`}</DialogTitle>
-                        <DialogDescription>Os registos em uso não se apagam; editam-se aqui.</DialogDescription>
+                        <DialogDescription>
+                            Os registos em uso não se apagam; editam-se aqui.
+                            {catalogo.aviso && <span className="mt-1 block font-medium text-amber-900">{catalogo.aviso}</span>}
+                        </DialogDescription>
                     </DialogHeader>
                     {aEditar !== null && (
                         <FormularioItem

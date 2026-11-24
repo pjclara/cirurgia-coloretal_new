@@ -16,6 +16,7 @@ import {
     ClipboardList,
     DatabaseZap,
     FileUp,
+    HeartPulse,
     KeyRound,
     LayoutGrid,
     ListTodo,
@@ -24,6 +25,7 @@ import {
     Scissors,
     ShieldCheck,
     Stethoscope,
+    Syringe,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -127,6 +129,8 @@ export function AppSidebar() {
                           { title: 'Utilizadores', url: '/admin/utilizadores', icon: ShieldCheck },
                           { title: 'Diagnósticos', url: '/admin/catalogos/diagnosticos', icon: Stethoscope },
                           { title: 'Intervenções', url: '/admin/catalogos/intervencoes', icon: Scissors },
+                          { title: 'Complicações', url: '/admin/catalogos/complicacoes', icon: HeartPulse },
+                          { title: 'Resoluções', url: '/admin/catalogos/resolucoes', icon: Syringe },
                           { title: 'Importar lista de espera', url: '/admin/importar/lista-de-espera', icon: FileUp },
                           ...(superAdmin ? [{ title: 'Perfis e permissões', url: '/admin/perfis', icon: KeyRound }] : []),
                       ],
