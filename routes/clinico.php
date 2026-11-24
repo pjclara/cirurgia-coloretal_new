@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CatalogoController;
+use App\Http\Controllers\Admin\ImportacaoController;
 use App\Http\Controllers\Admin\PerfilController;
 use App\Http\Controllers\Admin\UtilizadorController;
 use App\Http\Controllers\AgendamentoController;
@@ -115,6 +116,12 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
         Route::put('{id}', [CatalogoController::class, 'update'])->whereNumber('id')->name('update');
         Route::delete('{id}', [CatalogoController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
+
+    // Importação da lista de espera por Excel (simulação e confirmação).
+    Route::get('importar/lista-de-espera', [ImportacaoController::class, 'listaDeEspera'])->name('importar.lista-de-espera');
+    Route::post('importar/lista-de-espera', [ImportacaoController::class, 'previsualizar'])->name('importar.previsualizar');
+    Route::post('importar/lista-de-espera/confirmar', [ImportacaoController::class, 'aplicar'])->name('importar.aplicar');
+    Route::post('importar/lista-de-espera/cancelar', [ImportacaoController::class, 'cancelar'])->name('importar.cancelar');
 
     // Perfis e permissões: só o superAdmin.
     Route::middleware('clinico.superadmin')->group(function () {

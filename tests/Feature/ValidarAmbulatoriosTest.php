@@ -52,23 +52,31 @@ test('cada ambulatório é operado ou cancelado com o seu motivo, de uma só vez
     $futuro = ambulatorio($this, -3);
 
     // Cancelar sem motivo, ou com um motivo que não existe, é recusado e nada muda.
-    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', ['cancelados' => [['id' => $porTempo->id]]])->assertSessionHasErrors('cancelados.0.motivo');
-    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', ['cancelados' => [['id' => $porTempo->id, 'motivo' => 7]]])->assertSessionHasErrors('cancelados.0.motivo');
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', ['cancelados' => [['id' => $porTempo->id]], 'cancelar_inscricoes' => false])->assertSessionHasErrors('cancelados.0.motivo');
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', ['cancelados' => [['id' => $porTempo->id, 'motivo' => 7]], 'cancelar_inscricoes' => false])->assertSessionHasErrors('cancelados.0.motivo');
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', ['cancelados' => [['id' => $porTempo->id, 'motivo' => 1]]])->assertSessionHasErrors('cancelar_inscricoes');
     expect($porTempo->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO);
 
     $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', [
         'operados' => [$operado->id, $futuro->id],
         'cancelados' => [['id' => $porTempo->id, 'motivo' => 1], ['id' => $clinico->id, 'motivo' => 4]],
+        'cancelar_inscricoes' => false,
     ])->assertSessionHasNoErrors();
 
     expect($operado->fresh()->estado())->toBe(ListaDeEspera::ESTADO_OPERADO)
         ->and($porTempo->fresh()->estado())->toBe(ListaDeEspera::ESTADO_CANCELADO)
         ->and((string) $porTempo->fresh()->motivo_cancelar_agendamento)->toBe('1')
         ->and((string) $clinico->fresh()->motivo_cancelar_agendamento)->toBe('4')
-        ->and((int) $clinico->fresh()->espera->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_CANCELADO)
+        // Cancelar o agendamento não cancela a inscrição: o doente volta à lista de espera.
+        ->and((int) $clinico->fresh()->espera->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_PROPOSTO)
         ->and($clinico->fresh()->espera->podeAgendar())->toBeTrue()
         ->and($porDecidir->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO)
         ->and($futuro->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO);
+
+    // Com «cancelar também as inscrições», a inscrição dos cancelados fica cancelada.
+    $outro = ambulatorio($this, 7);
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/decisoes', ['cancelados' => [['id' => $outro->id, 'motivo' => 3]], 'cancelar_inscricoes' => true])->assertSessionHasNoErrors();
+    expect((int) $outro->fresh()->espera->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_CANCELADO)->and($outro->fresh()->espera->podeAgendar())->toBeFalse();
 
     // Só fica por validar quem não foi decidido (e o futuro nunca entra).
     $this->actingAs($this->utilizador)->get('/agendamento')->assertInertia(fn (Assert $p) => $p->has('ambulatoriosPorValidar', 1)->where('ambulatoriosPorValidar.0.id', $porDecidir->id));
@@ -198,14 +206,32 @@ test('só se agenda de novo o que foi cancelado e o formulário só oferece agen
         $this->actingAs($this->utilizador)->post("/agendamento/lista-de-espera/{$espera->id}/agendar", $dados + ['estado' => 3])->assertSessionHasErrors('conflito');
     }
 
-    // Cancelado o agendamento (pelo formulário, que passa também a inscrição a cancelada), agenda-se de novo.
+    // Cancelado o agendamento, a inscrição volta à lista de espera e agenda-se de novo.
     $espera = novaEspera(novoUtente(), $this->utilizador);
     $agendamento = novoAgendamento($espera, $this->utilizador, now()->addDays(5)->format('Y-m-d'));
-    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $dados + ['estado' => ListaDeEspera::ESTADO_CANCELADO, 'motivo_cancelamento' => 1])->assertSessionHasNoErrors();
-    expect((int) $espera->fresh()->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_CANCELADO)->and($espera->fresh()->podeAgendar())->toBeTrue();
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $dados + ['estado' => ListaDeEspera::ESTADO_CANCELADO, 'motivo_cancelamento' => 1, 'cancelar_inscricao' => false])->assertSessionHasNoErrors();
+    expect((int) $espera->fresh()->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_PROPOSTO)->and($espera->fresh()->podeAgendar())->toBeTrue();
     $this->actingAs($this->utilizador)->get('/agendamento')->assertInertia(fn (Assert $p) => $p->where('espera.itens', fn ($l) => collect($l)->pluck('id')->contains($espera->id)));
     $this->actingAs($this->utilizador)->post("/agendamento/lista-de-espera/{$espera->id}/agendar", $dados + ['estado' => 3])->assertSessionHasNoErrors();
     expect($espera->agendamentos()->count())->toBe(2);
+
+    // Se se cancela também a inscrição, já não volta à lista de espera nem se agenda.
+    $inteira = novaEspera(novoUtente(), $this->utilizador);
+    $agInteira = novoAgendamento($inteira, $this->utilizador, now()->addDays(5)->format('Y-m-d'));
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agInteira->id}", $dados + ['estado' => ListaDeEspera::ESTADO_CANCELADO, 'motivo_cancelamento' => 4, 'cancelar_inscricao' => true])->assertSessionHasNoErrors();
+    expect((int) $inteira->fresh()->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_CANCELADO)->and($inteira->fresh()->podeAgendar())->toBeFalse();
+    $this->actingAs($this->utilizador)->get('/agendamento')->assertInertia(fn (Assert $p) => $p->where('espera.itens', fn ($l) => ! collect($l)->pluck('id')->contains($inteira->id)));
+    // Voltar a agendado repõe a inscrição.
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agInteira->id}", $dados + ['estado' => 3, 'forcar' => true])->assertSessionHasNoErrors();
+    expect((int) $inteira->fresh()->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_AGENDADO)->and($inteira->fresh()->cancelar_lista_espera)->toBeNull();
+
+    // Registos antigos: inscrição cancelada só por se ter cancelado o agendamento (sem motivo próprio) ainda se agenda.
+    $antiga = novaEspera(novoUtente(), $this->utilizador);
+    novoAgendamento($antiga, $this->utilizador, now()->subDays(40)->format('Y-m-d'), ['estado_de_agendamento_id' => 4, 'estado_de_agendamento' => '4']);
+    $antiga->update(['estado_lista_espera' => ListaDeEspera::ESTADO_CANCELADO]);
+    expect($antiga->fresh()->podeAgendar())->toBeTrue();
+    $antiga->update(['cancelar_lista_espera' => ListaDeEspera::CANCELADA_DE_PROPOSITO]);
+    expect($antiga->fresh()->podeAgendar())->toBeFalse();
 
     // Uma inscrição cancelada sem nunca ter tido agendamento não se agenda.
     $cancelada = novaEspera(novoUtente(), $this->utilizador);
@@ -270,10 +296,12 @@ test('cancelar um agendamento pede o motivo e este limpa-se ao voltar a agendar'
     $agendamento = $espera->agendamentos()->first();
 
     // Cancelar sem motivo, ou com um motivo que não existe, é recusado.
-    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4])->assertSessionHasErrors('motivo_cancelamento');
-    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4, 'motivo_cancelamento' => 7])->assertSessionHasErrors('motivo_cancelamento');
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4, 'cancelar_inscricao' => false])->assertSessionHasErrors('motivo_cancelamento');
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4, 'motivo_cancelamento' => 7, 'cancelar_inscricao' => false])->assertSessionHasErrors('motivo_cancelamento');
+    // Cancelar sem dizer o que fazer à inscrição também é recusado.
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4, 'motivo_cancelamento' => 1])->assertSessionHasErrors('cancelar_inscricao');
 
-    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4, 'motivo_cancelamento' => 1])->assertSessionHasNoErrors();
+    $this->actingAs($this->utilizador)->put("/agendamento/{$agendamento->id}", $base + ['estado' => 4, 'motivo_cancelamento' => 1, 'cancelar_inscricao' => false])->assertSessionHasNoErrors();
     expect((string) $agendamento->fresh()->motivo_cancelar_agendamento)->toBe('1');
     $this->actingAs($this->utilizador)->get("/agendamento/{$agendamento->id}")->assertInertia(fn (Assert $p) => $p
         ->where('modal.agendamento.motivo_cancelamento', 1)->has('modal.dominios.motivos_cancelamento', 6));

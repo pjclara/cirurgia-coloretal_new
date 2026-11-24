@@ -326,7 +326,7 @@ class AgendamentoController extends Controller
     {
         $this->impedirSeOperado($espera);
 
-        $espera->update(['estado_lista_espera' => ListaDeEspera::ESTADO_CANCELADO]);
+        $espera->update(['estado_lista_espera' => ListaDeEspera::ESTADO_CANCELADO, 'cancelar_lista_espera' => ListaDeEspera::CANCELADA_DE_PROPOSITO]);
 
         return ($retorno = $this->retornoDaAgenda($request)) !== null
             ? redirect($retorno)->with('sucesso', 'Inscrição cancelada.')
@@ -394,11 +394,11 @@ class AgendamentoController extends Controller
             return back()->withInput()->withErrors(['conflito' => $aviso]);
         }
 
-        DB::transaction(function () use ($dados, $espera) {
+        DB::transaction(function () use ($dados, $espera, $request) {
             $agendamento = new Agendamento($this->paraGravar($dados));
             $agendamento->lista_de_espera_id = $espera->id;
             $agendamento->save();
-            $this->espelharEstado($espera, $dados['estado']);
+            $this->espelharEstado($espera, $dados['estado'], $request->boolean('cancelar_inscricao'));
         });
 
         return redirect()->route('agendamento.agenda', ['semana' => $dados['data']])
@@ -416,9 +416,9 @@ class AgendamentoController extends Controller
             return back()->withInput()->withErrors(['conflito' => $aviso]);
         }
 
-        DB::transaction(function () use ($dados, $agendamento) {
+        DB::transaction(function () use ($dados, $agendamento, $request) {
             $agendamento->update($this->paraGravar($dados));
-            $this->espelharEstado($agendamento->espera, $dados['estado']);
+            $this->espelharEstado($agendamento->espera, $dados['estado'], $request->boolean('cancelar_inscricao'));
         });
 
         return redirect()->route('agendamento.agenda', ['semana' => $dados['data']])
@@ -470,9 +470,10 @@ class AgendamentoController extends Controller
             'operados' => ['sometimes', 'array', 'max:300'],
             'operados.*' => ['integer'],
             'cancelados' => ['sometimes', 'array', 'max:300'],
+            'cancelar_inscricoes' => [Rule::requiredIf(count((array) $request->input('cancelados', [])) > 0), 'nullable', 'boolean'],
             'cancelados.*.id' => ['required', 'integer'],
             'cancelados.*.motivo' => ['required', 'integer', Rule::in(array_keys(Agendamento::MOTIVOS_CANCELAMENTO))],
-        ], ['required' => 'Escolha o motivo do cancelamento.', 'in' => 'Motivo inválido.']);
+        ], ['required' => 'Escolha o motivo do cancelamento.', 'in' => 'Motivo inválido.', 'cancelar_inscricoes.required' => 'Diga se as inscrições dos cancelados também se cancelam.']);
 
         $idsOperados = array_map('intval', $dados['operados'] ?? []);
         $motivos = collect($dados['cancelados'] ?? [])->mapWithKeys(fn ($c) => [(int) $c['id'] => (int) $c['motivo']]);
@@ -485,7 +486,7 @@ class AgendamentoController extends Controller
         $paraOperar = $porValidar->only(array_diff($idsOperados, $motivos->keys()->all()))->values();
         $paraCancelar = $porValidar->only($motivos->keys()->all());
 
-        DB::transaction(function () use ($operados, $paraOperar, $paraCancelar, $motivos) {
+        DB::transaction(function () use ($operados, $paraOperar, $paraCancelar, $motivos, $request) {
             $operados->marcarOperados($paraOperar);
             foreach ($paraCancelar as $agendamento) {
                 $agendamento->update([
@@ -493,7 +494,7 @@ class AgendamentoController extends Controller
                     'estado_de_agendamento' => (string) ListaDeEspera::ESTADO_CANCELADO,
                     'motivo_cancelar_agendamento' => (string) $motivos[$agendamento->id],
                 ]);
-                $this->espelharEstado($agendamento->espera, ListaDeEspera::ESTADO_CANCELADO);
+                $this->espelharEstado($agendamento->espera, ListaDeEspera::ESTADO_CANCELADO, $request->boolean('cancelar_inscricoes'));
             }
         });
 
@@ -717,8 +718,10 @@ class AgendamentoController extends Controller
                 Rule::in([...array_keys(Agendamento::MOTIVOS_CANCELAMENTO), ...($motivoAtual ? [$motivoAtual] : [])]),
             ],
             'comentarios' => ['nullable', 'string', 'max:2000'],
+            // Ao cancelar pergunta-se sempre se a inscrição também se cancela (senão o doente volta à lista de espera).
+            'cancelar_inscricao' => [Rule::requiredIf((int) $request->input('estado') === ListaDeEspera::ESTADO_CANCELADO), 'nullable', 'boolean'],
             'forcar' => ['sometimes', 'boolean'],
-        ], ['required' => 'Preencha este campo.']);
+        ], ['required' => 'Preencha este campo.', 'cancelar_inscricao.required' => 'Diga se a inscrição em lista de espera também se cancela.']);
         $dados['periodo_id'] ??= $periodoPorOmissao;
 
         return $dados;
@@ -785,11 +788,20 @@ class AgendamentoController extends Controller
     }
 
     /** Mantém o estado da inscrição coerente com o do agendamento (Agendado, Pendente ou Cancelado). */
-    private function espelharEstado(ListaDeEspera $espera, int $estado): void
+    private function espelharEstado(ListaDeEspera $espera, int $estado, bool $cancelarInscricao = false): void
     {
-        // A lista tem os mesmos estados do agendamento (1 a 6).
+        // Cancelar o agendamento nem sempre cancela a inscrição: por omissão o doente volta à lista de espera para ser agendado de novo.
+        if ($estado === ListaDeEspera::ESTADO_CANCELADO) {
+            $espera->update($cancelarInscricao
+                ? ['estado_lista_espera' => (string) ListaDeEspera::ESTADO_CANCELADO, 'cancelar_lista_espera' => ListaDeEspera::CANCELADA_DE_PROPOSITO]
+                : ['estado_lista_espera' => (string) ListaDeEspera::ESTADO_PROPOSTO, 'cancelar_lista_espera' => null]);
+
+            return;
+        }
+
+        // A lista tem os mesmos estados do agendamento (1 a 6); voltar a agendar tira o motivo de cancelamento da inscrição.
         if (in_array($estado, [1, 2, 3, 4, 5, 6], true)) {
-            $espera->update(['estado_lista_espera' => (string) $estado]);
+            $espera->update(['estado_lista_espera' => (string) $estado, 'cancelar_lista_espera' => null]);
         }
     }
 }

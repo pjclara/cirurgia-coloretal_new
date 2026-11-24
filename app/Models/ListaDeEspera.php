@@ -31,9 +31,12 @@ class ListaDeEspera extends Model
 
     public const ESTADO_OUTRO = 6;
 
+    /** Motivo gravado quando a inscrição se cancela de propósito (o enum antigo, sem descrição, usa 99 para «outro»). */
+    public const CANCELADA_DE_PROPOSITO = '99';
+
     public const PRIORIDADES = [1 => 'Normal', 2 => 'Prioritária', 3 => 'Prioridade 3', 99 => 'Não definida'];
 
-    protected $fillable = ['prioridade_id', 'utente_id', 'data_de_lista', 'estado_lista_espera', 'comentarios', 'responsavel_id'];
+    protected $fillable = ['prioridade_id', 'utente_id', 'data_de_lista', 'estado_lista_espera', 'cancelar_lista_espera', 'comentarios', 'responsavel_id'];
 
     protected function casts(): array
     {
@@ -78,7 +81,8 @@ class ListaDeEspera extends Model
             ->whereDoesntHave('agendamentos', fn ($q) => $q->whereRaw(self::ESTADO_DO_AGENDAMENTO.' <> ?', [self::ESTADO_CANCELADO]))
             ->where(fn ($q) => $q
                 ->whereIn(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), [self::ESTADO_PROPOSTO, self::ESTADO_PENDENTE])
-                ->orWhere(fn ($c) => $c->where(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), self::ESTADO_CANCELADO)->whereHas('agendamentos')));
+                // Registos antigos: inscrição cancelada só por se ter cancelado o agendamento (sem motivo de cancelamento da inscrição).
+                ->orWhere(fn ($c) => $c->where(DB::raw('CAST(estado_lista_espera AS UNSIGNED)'), self::ESTADO_CANCELADO)->whereNull('cancelar_lista_espera')->whereHas('agendamentos')));
     }
 
     /** O agendamento que impede de agendar de novo (qualquer um que não esteja cancelado), se houver. */
@@ -95,7 +99,8 @@ class ListaDeEspera extends Model
             return false;
         }
 
-        // Cancelada: só se reagenda se foi por se cancelar o agendamento (já teve algum), não por se cancelar a inscrição.
-        return $estado !== self::ESTADO_CANCELADO || $this->agendamentos()->exists();
+        // Cancelada: só se reagenda a dos registos antigos, cancelada por se cancelar o agendamento (sem motivo de cancelamento da inscrição).
+        // Hoje cancelar o agendamento deixa a inscrição à espera; a inscrição só fica cancelada se se cancelar de propósito.
+        return $estado !== self::ESTADO_CANCELADO || ($this->cancelar_lista_espera === null && $this->agendamentos()->exists());
     }
 }

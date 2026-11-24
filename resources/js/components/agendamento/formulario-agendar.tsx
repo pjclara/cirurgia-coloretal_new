@@ -55,6 +55,8 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_co
         estado: (agendamento?.estado ?? 3) as number | '',
         reserva_sangue: (agendamento?.reserva_sangue ? Number(agendamento.reserva_sangue) : 1) as number | '',
         motivo_cancelamento: (agendamento?.motivo_cancelamento ?? '') as number | '',
+        // Cancelar o agendamento nem sempre cancela a inscrição: por omissão o doente volta à lista de espera.
+        cancelar_inscricao: null as boolean | null,
         comentarios: agendamento?.comentarios ?? '',
     });
     const { data, setData, processing } = form;
@@ -185,6 +187,34 @@ export function FormularioAgendar({ agendamento, espera, sinalizacao, somente_co
                                 </Campo>
                             )}
                         </div>
+                        {data.estado === 4 && (
+                            <fieldset className="mt-4">
+                                <legend className="text-sm font-medium text-slate-900">Cancelar também a inscrição em lista de espera?</legend>
+                                <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-800">
+                                    <label className="flex items-center gap-2">
+                                        <input
+                                            type="radio"
+                                            name="cancelar_inscricao"
+                                            className="size-4"
+                                            checked={data.cancelar_inscricao === false}
+                                            onChange={() => setData('cancelar_inscricao', false)}
+                                        />
+                                        Não, volta à lista de espera para ser agendado de novo
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                        <input
+                                            type="radio"
+                                            name="cancelar_inscricao"
+                                            className="size-4"
+                                            checked={data.cancelar_inscricao === true}
+                                            onChange={() => setData('cancelar_inscricao', true)}
+                                        />
+                                        Sim, cancelar a inscrição
+                                    </label>
+                                </div>
+                                {erros.cancelar_inscricao && <p className="mt-1 text-sm text-red-700">{erros.cancelar_inscricao}</p>}
+                            </fieldset>
+                        )}
                         <Campo rotulo="Comentários" para="comentarios" erro={erros.comentarios} opcional className="mt-4">
                             <textarea
                                 id="comentarios"

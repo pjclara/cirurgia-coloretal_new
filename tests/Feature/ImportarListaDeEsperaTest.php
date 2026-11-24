@@ -108,3 +108,41 @@ test('datas de nascimento antigas em número de série do Excel também se leem'
     expect(App\Support\LeitorDeFolha::data('14102.5', 1))->toBe('1938-08-10')
         ->and(App\Support\LeitorDeFolha::data('14102.5'))->toBeNull();
 });
+
+test('o administrador importa a lista de espera por Excel: carrega, vê a simulação e confirma', function () {
+    Illuminate\Support\Facades\Storage::fake('local');
+    $admin = User::factory()->create(['activo' => true]);
+    $admin->assignRole('admin');
+    $medico = User::factory()->create(['name' => 'Vera Pedro']);
+    $linhas = [
+        ['2026-03-01', '99100001', 'Ana Nova', '1950-01-01', 'VERA PEDRO', 'K642', 'Hemorroidas', '06BY0ZC', 'Excisao'],
+        ['2026-03-02', '99100002', 'Rui Novo', '1960-01-01', 'MEDICO DESCONHECIDO', 'K642', 'x', '06BY0ZC', 'x'],
+    ];
+    $csv = Illuminate\Http\UploadedFile::fake()->createWithContent('lista.csv', file_get_contents(csvDeListaDeEspera($linhas)));
+
+    // Só o administrador vê a página.
+    $this->actingAs(utilizadorClinico())->get('/admin/importar/lista-de-espera')->assertForbidden();
+
+    // Carregar mostra a simulação e não grava nada.
+    $this->actingAs($admin)->post('/admin/importar/lista-de-espera', ['ficheiro' => $csv])->assertRedirect('/admin/importar/lista-de-espera');
+    $previa = session('previa');
+    expect($previa['a_criar'])->toBe(1)->and($previa['novos_utentes'])->toBe(1)->and($previa['saltados']['sem_medico'])->toBe(1)
+        ->and($previa['amostra'][0]['nome'])->toBe('Ana Nova')
+        ->and(Utente::where('numero_processo', 99100001)->exists())->toBeFalse();
+    $this->actingAs($admin)->withSession(['previa' => $previa])->get('/admin/importar/lista-de-espera')->assertInertia(fn ($p) => $p
+        ->component('admin/importar-lista-de-espera')->where('previa.a_criar', 1));
+
+    // Confirmar grava; repetir o mesmo token já não encontra a folha.
+    $this->actingAs($admin)->post('/admin/importar/lista-de-espera/confirmar', ['token' => $previa['token']])->assertSessionHas('sucesso');
+    $utente = Utente::where('numero_processo', 99100001)->first();
+    expect($utente)->not->toBeNull()
+        ->and(ListaDeEspera::where('utente_id', $utente->id)->where('responsavel_id', $medico->id)->exists())->toBeTrue();
+    $this->actingAs($admin)->post('/admin/importar/lista-de-espera/confirmar', ['token' => $previa['token']])->assertSessionHasErrors('ficheiro');
+    expect(ListaDeEspera::where('utente_id', $utente->id)->count())->toBe(1);
+
+    // Token inventado ou com caminho: recusado.
+    $this->actingAs($admin)->post('/admin/importar/lista-de-espera/confirmar', ['token' => '../../x'])->assertSessionHasErrors('ficheiro');
+
+    // Ficheiro de outro tipo é recusado.
+    $this->actingAs($admin)->post('/admin/importar/lista-de-espera', ['ficheiro' => Illuminate\Http\UploadedFile::fake()->create('x.pdf', 10)])->assertSessionHasErrors('ficheiro');
+});

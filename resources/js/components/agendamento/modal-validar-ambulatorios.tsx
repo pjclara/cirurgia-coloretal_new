@@ -23,6 +23,7 @@ type Decisao = 'operado' | number;
 export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: AmbulatorioPorValidar[]; motivos: Opcao[]; aoFechar: () => void }) {
     const [decisoes, setDecisoes] = useState<Map<number, Decisao>>(() => new Map());
     const [a_gravar, setAGravar] = useState(false);
+    const [cancelarInscricoes, setCancelarInscricoes] = useState<boolean | null>(null);
 
     const decidir = (id: number, valor: string) =>
         setDecisoes((atual) => {
@@ -151,12 +152,38 @@ export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: 
                     )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3">
+                    {cancelados.length > 0 && (
+                        <fieldset className="mr-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-800">
+                            <legend className="sr-only">Cancelar também as inscrições em lista de espera?</legend>
+                            <span className="font-medium">Cancelar também as inscrições?</span>
+                            <label className="flex items-center gap-1.5">
+                                <input
+                                    type="radio"
+                                    name="cancelar-inscricoes"
+                                    className="size-4"
+                                    checked={cancelarInscricoes === false}
+                                    onChange={() => setCancelarInscricoes(false)}
+                                />
+                                Não, voltam à lista de espera
+                            </label>
+                            <label className="flex items-center gap-1.5">
+                                <input
+                                    type="radio"
+                                    name="cancelar-inscricoes"
+                                    className="size-4"
+                                    checked={cancelarInscricoes === true}
+                                    onChange={() => setCancelarInscricoes(true)}
+                                />
+                                Sim
+                            </label>
+                        </fieldset>
+                    )}
                     <Botao variante="secundario" onClick={aoFechar}>
                         Fechar
                     </Botao>
                     {lista.length > 0 && (
-                        <Botao onClick={gravar} disabled={decisoes.size === 0 || a_gravar}>
+                        <Botao onClick={gravar} disabled={decisoes.size === 0 || a_gravar || (cancelados.length > 0 && cancelarInscricoes === null)}>
                             {decisoes.size === 0 ? 'Gravar' : `Gravar: ${resumo}`}
                         </Botao>
                     )}
