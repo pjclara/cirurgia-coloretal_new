@@ -91,6 +91,7 @@ class AgendamentoController extends Controller
             'ambulatoriosPorValidar' => $request->user()->can('update agendamento')
                 ? $this->ambulatoriosPorValidar()->limit(300)->get()->map(fn (Agendamento $a) => $this->resumo($a))->values()
                 : [],
+            'motivosCancelamento' => $this->motivosDeCancelamento(null),
             'modalUtente' => $modalUtente,
             'modal' => $modal ? $modal + ['fechar_url' => '/agendamento?semana='.$mesBase->format('Y-m-d')] : null,
         ]);
@@ -457,6 +458,30 @@ class AgendamentoController extends Controller
         $operados->marcarOperados($agendamentos);
 
         return back()->with('sucesso', $agendamentos->count() === 1 ? '1 ambulatório marcado como operado.' : $agendamentos->count().' ambulatórios marcados como operados.');
+    }
+
+    /** Cancela de uma vez os ambulatórios escolhidos (os que não se realizaram), com o motivo, e a inscrição fica cancelada para se poder agendar de novo. */
+    public function cancelarAmbulatorios(Request $request): RedirectResponse
+    {
+        $dados = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:300'],
+            'ids.*' => ['integer'],
+            'motivo_cancelamento' => ['required', 'integer', Rule::in(array_keys(Agendamento::MOTIVOS_CANCELAMENTO))],
+        ], ['required' => 'Escolha o motivo do cancelamento.']);
+
+        $agendamentos = $this->ambulatoriosPorValidar()->whereIn('id', $dados['ids'])->get();
+        DB::transaction(function () use ($agendamentos, $dados) {
+            foreach ($agendamentos as $agendamento) {
+                $agendamento->update([
+                    'estado_de_agendamento_id' => ListaDeEspera::ESTADO_CANCELADO,
+                    'estado_de_agendamento' => (string) ListaDeEspera::ESTADO_CANCELADO,
+                    'motivo_cancelar_agendamento' => (string) $dados['motivo_cancelamento'],
+                ]);
+                $this->espelharEstado($agendamento->espera, ListaDeEspera::ESTADO_CANCELADO);
+            }
+        });
+
+        return back()->with('sucesso', $agendamentos->count() === 1 ? '1 ambulatório cancelado.' : $agendamentos->count().' ambulatórios cancelados.');
     }
 
     /** Move um agendamento para outra data (arrastar no calendário). */

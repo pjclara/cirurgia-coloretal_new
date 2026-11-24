@@ -2,7 +2,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
-import { Botao } from '../clinico/campos';
+import type { Opcao } from '../../clinico/tipos';
+import { Botao, Selecao } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type AmbulatorioPorValidar = {
@@ -16,9 +17,12 @@ export type AmbulatorioPorValidar = {
 };
 
 /** Ambulatórios já passados que não estão como operados, para validar de uma vez (não têm internamento nem cirurgia registada). */
-export function ModalValidarAmbulatorios({ lista, aoFechar }: { lista: AmbulatorioPorValidar[]; aoFechar: () => void }) {
+export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: AmbulatorioPorValidar[]; motivos: Opcao[]; aoFechar: () => void }) {
     const [escolhidos, setEscolhidos] = useState<Set<number>>(() => new Set());
     const [a_gravar, setAGravar] = useState(false);
+    const [motivo, setMotivo] = useState<number | ''>('');
+    const [aCancelar, setACancelar] = useState(false);
+    const [erro, setErro] = useState<string | null>(null);
 
     const alternar = (id: number) =>
         setEscolhidos((atual) => {
@@ -47,6 +51,19 @@ export function ModalValidarAmbulatorios({ lista, aoFechar }: { lista: Ambulator
         );
     };
 
+    /** Cancela os escolhidos (não se realizaram): pede o motivo. */
+    const cancelar = () => {
+        if (motivo === '') return setErro('Escolha o motivo do cancelamento.');
+        if (!window.confirm(`Cancelar ${escolhidos.size} ambulatório(s)? Ficam cancelados e podem voltar a ser agendados.`)) return;
+        setErro(null);
+        setAGravar(true);
+        router.post(
+            '/agendamento/ambulatorio/cancelados',
+            { ids: [...escolhidos], motivo_cancelamento: motivo },
+            { preserveScroll: true, onSuccess: aoFechar, onFinish: () => setAGravar(false) },
+        );
+    };
+
     return (
         <Dialog open onOpenChange={(aberto) => !aberto && aoFechar()}>
             <DialogContent
@@ -56,7 +73,8 @@ export function ModalValidarAmbulatorios({ lista, aoFechar }: { lista: Ambulator
                 <DialogHeader>
                     <DialogTitle>Validar ambulatórios</DialogTitle>
                     <DialogDescription>
-                        Ambulatórios já passados que não estão como operados. Marque os que foram realizados e confirme.
+                        Ambulatórios já passados que não estão como operados. Marque os que foram realizados e confirme, ou cancele os que não se
+                        fizeram.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -116,7 +134,27 @@ export function ModalValidarAmbulatorios({ lista, aoFechar }: { lista: Ambulator
                     )}
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3">
+                    {lista.length > 0 && (
+                        <div className="mr-auto flex flex-wrap items-center gap-2">
+                            <Selecao
+                                id="motivo-cancelar-lote"
+                                opcoes={motivos}
+                                valor={motivo}
+                                aoMudar={(v) => {
+                                    setMotivo(v);
+                                    setErro(null);
+                                }}
+                                invalido={!!erro}
+                                vazio="Motivo do cancelamento…"
+                                className="w-72"
+                            />
+                            <Botao variante="secundario" onClick={cancelar} disabled={escolhidos.size === 0 || a_gravar}>
+                                Cancelar {escolhidos.size}
+                            </Botao>
+                            {erro && <span className="text-sm text-red-700">{erro}</span>}
+                        </div>
+                    )}
                     <Botao variante="secundario" onClick={aoFechar}>
                         Fechar
                     </Botao>

@@ -43,6 +43,7 @@ type Props = {
     modalUtente: ModalUtenteDados | null;
     espera: Espera;
     ambulatoriosPorValidar: AmbulatorioPorValidar[];
+    motivosCancelamento: Opcao[];
 };
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -67,6 +68,7 @@ export default function Agenda({
     modalUtente,
     espera,
     ambulatoriosPorValidar,
+    motivosCancelamento,
 }: Props) {
     const { permissoes, administrador } = usePage<PropsPartilhadas>().props.clinico;
     const ir = (parametros: Record<string, string | boolean>) => router.get('/agendamento', parametros, { preserveScroll: true });
@@ -159,7 +161,13 @@ export default function Agenda({
                 </>
             }
         >
-            {validarAmbulatorios && <ModalValidarAmbulatorios lista={ambulatoriosPorValidar} aoFechar={() => setValidarAmbulatorios(false)} />}
+            {validarAmbulatorios && (
+                <ModalValidarAmbulatorios
+                    lista={ambulatoriosPorValidar}
+                    motivos={motivosCancelamento}
+                    aoFechar={() => setValidarAmbulatorios(false)}
+                />
+            )}
 
             <NovaInscricao aPartirDaAgenda />
 

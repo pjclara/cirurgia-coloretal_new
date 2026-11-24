@@ -44,6 +44,29 @@ test('validar marca os escolhidos como operados e ignora os que não estão por 
         ->and($bloco->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO);
 });
 
+test('os ambulatórios que não se fizeram cancelam-se em lote, com motivo, e a inscrição pode ser agendada de novo', function () {
+    $a = ambulatorio($this, 5);
+    $b = ambulatorio($this, 6);
+    $futuro = ambulatorio($this, -3);
+
+    // Sem motivo, ou com um motivo que não existe, é recusado e nada muda.
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/cancelados', ['ids' => [$a->id]])->assertSessionHasErrors('motivo_cancelamento');
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/cancelados', ['ids' => [$a->id], 'motivo_cancelamento' => 7])->assertSessionHasErrors('motivo_cancelamento');
+    expect($a->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO);
+
+    $this->actingAs($this->utilizador)->post('/agendamento/ambulatorio/cancelados', ['ids' => [$a->id, $futuro->id], 'motivo_cancelamento' => 4])->assertSessionHasNoErrors();
+
+    expect($a->fresh()->estado())->toBe(ListaDeEspera::ESTADO_CANCELADO)
+        ->and((string) $a->fresh()->motivo_cancelar_agendamento)->toBe('4')
+        ->and((int) $a->fresh()->espera->estado_lista_espera)->toBe(ListaDeEspera::ESTADO_CANCELADO)
+        ->and($a->fresh()->espera->podeAgendar())->toBeTrue()
+        ->and($b->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO)
+        ->and($futuro->fresh()->estado())->toBe(ListaDeEspera::ESTADO_AGENDADO);
+
+    // Já não aparece por validar.
+    $this->actingAs($this->utilizador)->get('/agendamento')->assertInertia(fn (Assert $p) => $p->has('ambulatoriosPorValidar', 1)->where('ambulatoriosPorValidar.0.id', $b->id));
+});
+
 test('quem não pode alterar agendamentos não valida ambulatórios', function () {
     $a = ambulatorio($this, 5);
     $leitor = utilizadorClinico(['show agendamento']);
