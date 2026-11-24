@@ -3,7 +3,7 @@ import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatarData } from '../../clinico/formato';
 import type { Opcao } from '../../clinico/tipos';
-import { Botao, Selecao } from '../clinico/campos';
+import { Botao, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
 
 export type AmbulatorioPorValidar = {
@@ -16,53 +16,51 @@ export type AmbulatorioPorValidar = {
     estado: number | null;
 };
 
-/** Ambulatórios já passados que não estão como operados, para validar de uma vez (não têm internamento nem cirurgia registada). */
-export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: AmbulatorioPorValidar[]; motivos: Opcao[]; aoFechar: () => void }) {
-    const [escolhidos, setEscolhidos] = useState<Set<number>>(() => new Set());
-    const [a_gravar, setAGravar] = useState(false);
-    const [motivo, setMotivo] = useState<number | ''>('');
-    const [aCancelar, setACancelar] = useState(false);
-    const [erro, setErro] = useState<string | null>(null);
+/** Decisão de cada ambulatório: operado, ou cancelado com o seu motivo (o número é o código do motivo). */
+type Decisao = 'operado' | number;
 
-    const alternar = (id: number) =>
-        setEscolhidos((atual) => {
-            const novo = new Set(atual);
-            if (!novo.delete(id)) novo.add(id);
+/** Ambulatórios já passados que não estão como operados: cada um é operado ou cancelado (com o seu motivo), de uma vez. */
+export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: AmbulatorioPorValidar[]; motivos: Opcao[]; aoFechar: () => void }) {
+    const [decisoes, setDecisoes] = useState<Map<number, Decisao>>(() => new Map());
+    const [a_gravar, setAGravar] = useState(false);
+
+    const decidir = (id: number, valor: string) =>
+        setDecisoes((atual) => {
+            const novo = new Map(atual);
+            if (valor === '') novo.delete(id);
+            else novo.set(id, valor === 'operado' ? 'operado' : Number(valor));
             return novo;
         });
-    const todos = escolhidos.size === lista.length;
 
     /** Por data (a lista já vem da mais recente para a mais antiga). */
     const porDia = [...Map.groupBy(lista, (a) => a.data)];
-    const alternarDia = (itens: AmbulatorioPorValidar[]) =>
-        setEscolhidos((atual) => {
-            const novo = new Set(atual);
-            const diaTodo = itens.every((a) => novo.has(a.id));
-            itens.forEach((a) => (diaTodo ? novo.delete(a.id) : novo.add(a.id)));
+    /** Marca todos os de um dia (ou todos) como operados; só toca nos que ainda não têm decisão. */
+    const operadosEm = (itens: AmbulatorioPorValidar[]) =>
+        setDecisoes((atual) => {
+            const novo = new Map(atual);
+            itens.forEach((a) => !novo.has(a.id) && novo.set(a.id, 'operado'));
             return novo;
         });
+    const limpar = () => setDecisoes(new Map());
 
-    const validar = () => {
+    const operados = [...decisoes.entries()].filter(([, d]) => d === 'operado').map(([id]) => id);
+    const cancelados = [...decisoes.entries()].filter(([, d]) => d !== 'operado').map(([id, d]) => ({ id, motivo: d as number }));
+
+    const gravar = () => {
         setAGravar(true);
         router.post(
-            '/agendamento/ambulatorio/operados',
-            { ids: [...escolhidos] },
+            '/agendamento/ambulatorio/decisoes',
+            { operados, cancelados },
             { preserveScroll: true, onSuccess: aoFechar, onFinish: () => setAGravar(false) },
         );
     };
 
-    /** Cancela os escolhidos (não se realizaram): pede o motivo. */
-    const cancelar = () => {
-        if (motivo === '') return setErro('Escolha o motivo do cancelamento.');
-        if (!window.confirm(`Cancelar ${escolhidos.size} ambulatório(s)? Ficam cancelados e podem voltar a ser agendados.`)) return;
-        setErro(null);
-        setAGravar(true);
-        router.post(
-            '/agendamento/ambulatorio/cancelados',
-            { ids: [...escolhidos], motivo_cancelamento: motivo },
-            { preserveScroll: true, onSuccess: aoFechar, onFinish: () => setAGravar(false) },
-        );
-    };
+    const resumo = [
+        operados.length > 0 ? `${operados.length} operado${operados.length === 1 ? '' : 's'}` : null,
+        cancelados.length > 0 ? `${cancelados.length} cancelado${cancelados.length === 1 ? '' : 's'}` : null,
+    ]
+        .filter(Boolean)
+        .join(' e ');
 
     return (
         <Dialog open onOpenChange={(aberto) => !aberto && aoFechar()}>
@@ -73,8 +71,7 @@ export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: 
                 <DialogHeader>
                     <DialogTitle>Validar ambulatórios</DialogTitle>
                     <DialogDescription>
-                        Ambulatórios já passados que não estão como operados. Marque os que foram realizados e confirme, ou cancele os que não se
-                        fizeram.
+                        Ambulatórios já passados que não estão como operados. Diga, para cada um, se foi operado ou se foi cancelado (e porquê).
                     </DialogDescription>
                 </DialogHeader>
 
@@ -83,84 +80,84 @@ export function ModalValidarAmbulatorios({ lista, motivos, aoFechar }: { lista: 
                         <p className="text-sm text-slate-600">Não há ambulatórios por validar.</p>
                     ) : (
                         <>
-                            <label className="flex items-center gap-2 text-sm font-medium">
-                                <input
-                                    type="checkbox"
-                                    className="size-4"
-                                    checked={todos}
-                                    onChange={() => setEscolhidos(todos ? new Set() : new Set(lista.map((a) => a.id)))}
-                                />
-                                Selecionar todos ({lista.length})
-                            </label>
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                                <Botao variante="secundario" onClick={() => operadosEm(lista)}>
+                                    Marcar todos como operados ({lista.length})
+                                </Botao>
+                                {decisoes.size > 0 && (
+                                    <button type="button" onClick={limpar} className="text-xs text-slate-600 underline">
+                                        Limpar escolhas
+                                    </button>
+                                )}
+                            </div>
                             <div className="space-y-4">
-                                {porDia.map(([dia, itens]) => {
-                                    const diaTodo = itens.every((a) => escolhidos.has(a.id));
-                                    return (
-                                        <section key={dia} aria-label={formatarData(dia)}>
-                                            <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                                <input type="checkbox" className="size-4" checked={diaTodo} onChange={() => alternarDia(itens)} />
-                                                {formatarData(dia)}
-                                                <span className="font-normal text-slate-600">({itens.length})</span>
-                                            </label>
-                                            <ul className="divide-y divide-slate-200 rounded-md border border-slate-200">
-                                                {itens.map((a) => (
-                                                    <li key={a.id}>
-                                                        <label className="flex cursor-pointer items-start gap-3 px-3 py-2 text-sm hover:bg-slate-50">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="mt-0.5 size-4"
-                                                                checked={escolhidos.has(a.id)}
-                                                                onChange={() => alternar(a.id)}
-                                                            />
-                                                            <span className="flex-1">
-                                                                <span className="block font-medium text-slate-900">
-                                                                    {a.utente.nome ?? 'Utente sem ficha'}
-                                                                </span>
-                                                                <span className="block text-xs text-slate-600 tabular-nums">
-                                                                    <NumeroProcesso valor={a.utente.numero_processo} />
-                                                                    {a.intervencoes.length > 0 && ` · ${a.intervencoes.join(', ')}`}
-                                                                </span>
+                                {porDia.map(([dia, itens]) => (
+                                    <section key={dia} aria-label={formatarData(dia)}>
+                                        <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                            {formatarData(dia)}
+                                            <span className="font-normal text-slate-600">({itens.length})</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => operadosEm(itens)}
+                                                className="text-xs font-normal text-teal-800 underline"
+                                            >
+                                                todos operados
+                                            </button>
+                                        </div>
+                                        <ul className="divide-y divide-slate-200 rounded-md border border-slate-200">
+                                            {itens.map((a) => {
+                                                const decisao = decisoes.get(a.id);
+                                                return (
+                                                    <li
+                                                        key={a.id}
+                                                        className={`flex flex-wrap items-center gap-3 px-3 py-2 text-sm ${
+                                                            decisao === 'operado' ? 'bg-teal-50' : decisao !== undefined ? 'bg-rose-50' : ''
+                                                        }`}
+                                                    >
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="block font-medium text-slate-900">
+                                                                {a.utente.nome ?? 'Utente sem ficha'}
                                                             </span>
-                                                            <span className="text-xs text-slate-600 tabular-nums">{a.hora ?? a.periodo ?? ''}</span>
-                                                        </label>
+                                                            <span className="block text-xs text-slate-600 tabular-nums">
+                                                                <NumeroProcesso valor={a.utente.numero_processo} />
+                                                                {a.intervencoes.length > 0 && ` · ${a.intervencoes.join(', ')}`}
+                                                                {(a.hora ?? a.periodo) && ` · ${a.hora ?? a.periodo}`}
+                                                            </span>
+                                                        </span>
+                                                        <select
+                                                            aria-label={`Resultado de ${a.utente.nome ?? 'utente sem ficha'}`}
+                                                            value={decisao === undefined ? '' : String(decisao)}
+                                                            onChange={(e) => decidir(a.id, e.target.value)}
+                                                            className={`${estiloEntrada} w-64`}
+                                                        >
+                                                            <option value="">Por validar</option>
+                                                            <option value="operado">Operado</option>
+                                                            <optgroup label="Cancelado: motivo">
+                                                                {motivos.map((m) => (
+                                                                    <option key={m.id} value={m.id}>
+                                                                        {m.nome}
+                                                                    </option>
+                                                                ))}
+                                                            </optgroup>
+                                                        </select>
                                                     </li>
-                                                ))}
-                                            </ul>
-                                        </section>
-                                    );
-                                })}
+                                                );
+                                            })}
+                                        </ul>
+                                    </section>
+                                ))}
                             </div>
                         </>
                     )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3">
-                    {lista.length > 0 && (
-                        <div className="mr-auto flex flex-wrap items-center gap-2">
-                            <Selecao
-                                id="motivo-cancelar-lote"
-                                opcoes={motivos}
-                                valor={motivo}
-                                aoMudar={(v) => {
-                                    setMotivo(v);
-                                    setErro(null);
-                                }}
-                                invalido={!!erro}
-                                vazio="Motivo do cancelamento…"
-                                className="w-72"
-                            />
-                            <Botao variante="secundario" onClick={cancelar} disabled={escolhidos.size === 0 || a_gravar}>
-                                Cancelar {escolhidos.size}
-                            </Botao>
-                            {erro && <span className="text-sm text-red-700">{erro}</span>}
-                        </div>
-                    )}
+                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
                     <Botao variante="secundario" onClick={aoFechar}>
                         Fechar
                     </Botao>
                     {lista.length > 0 && (
-                        <Botao onClick={validar} disabled={escolhidos.size === 0 || a_gravar}>
-                            Marcar {escolhidos.size} como operados
+                        <Botao onClick={gravar} disabled={decisoes.size === 0 || a_gravar}>
+                            {decisoes.size === 0 ? 'Gravar' : `Gravar: ${resumo}`}
                         </Botao>
                     )}
                 </div>

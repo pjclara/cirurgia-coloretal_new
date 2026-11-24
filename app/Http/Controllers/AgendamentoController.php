@@ -460,28 +460,49 @@ class AgendamentoController extends Controller
         return back()->with('sucesso', $agendamentos->count() === 1 ? '1 ambulatório marcado como operado.' : $agendamentos->count().' ambulatórios marcados como operados.');
     }
 
-    /** Cancela de uma vez os ambulatórios escolhidos (os que não se realizaram), com o motivo, e a inscrição fica cancelada para se poder agendar de novo. */
-    public function cancelarAmbulatorios(Request $request): RedirectResponse
+    /**
+     * Decide de uma vez os ambulatórios já passados: uns foram operados, outros cancelam-se, cada um com o seu motivo
+     * (a inscrição dos cancelados fica cancelada, para se poder agendar de novo). Os que não estão por validar ignoram-se.
+     */
+    public function decidirAmbulatorios(Request $request, SincronizarOperados $operados): RedirectResponse
     {
         $dados = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:300'],
-            'ids.*' => ['integer'],
-            'motivo_cancelamento' => ['required', 'integer', Rule::in(array_keys(Agendamento::MOTIVOS_CANCELAMENTO))],
-        ], ['required' => 'Escolha o motivo do cancelamento.']);
+            'operados' => ['sometimes', 'array', 'max:300'],
+            'operados.*' => ['integer'],
+            'cancelados' => ['sometimes', 'array', 'max:300'],
+            'cancelados.*.id' => ['required', 'integer'],
+            'cancelados.*.motivo' => ['required', 'integer', Rule::in(array_keys(Agendamento::MOTIVOS_CANCELAMENTO))],
+        ], ['required' => 'Escolha o motivo do cancelamento.', 'in' => 'Motivo inválido.']);
 
-        $agendamentos = $this->ambulatoriosPorValidar()->whereIn('id', $dados['ids'])->get();
-        DB::transaction(function () use ($agendamentos, $dados) {
-            foreach ($agendamentos as $agendamento) {
+        $idsOperados = array_map('intval', $dados['operados'] ?? []);
+        $motivos = collect($dados['cancelados'] ?? [])->mapWithKeys(fn ($c) => [(int) $c['id'] => (int) $c['motivo']]);
+        if ($idsOperados === [] && $motivos->isEmpty()) {
+            return back()->withErrors(['operados' => 'Escolha pelo menos um ambulatório.']);
+        }
+
+        // Só os que ainda estão por validar; um id nas duas listas conta como cancelado.
+        $porValidar = $this->ambulatoriosPorValidar()->whereIn('id', [...$idsOperados, ...$motivos->keys()])->get()->keyBy('id');
+        $paraOperar = $porValidar->only(array_diff($idsOperados, $motivos->keys()->all()))->values();
+        $paraCancelar = $porValidar->only($motivos->keys()->all());
+
+        DB::transaction(function () use ($operados, $paraOperar, $paraCancelar, $motivos) {
+            $operados->marcarOperados($paraOperar);
+            foreach ($paraCancelar as $agendamento) {
                 $agendamento->update([
                     'estado_de_agendamento_id' => ListaDeEspera::ESTADO_CANCELADO,
                     'estado_de_agendamento' => (string) ListaDeEspera::ESTADO_CANCELADO,
-                    'motivo_cancelar_agendamento' => (string) $dados['motivo_cancelamento'],
+                    'motivo_cancelar_agendamento' => (string) $motivos[$agendamento->id],
                 ]);
                 $this->espelharEstado($agendamento->espera, ListaDeEspera::ESTADO_CANCELADO);
             }
         });
 
-        return back()->with('sucesso', $agendamentos->count() === 1 ? '1 ambulatório cancelado.' : $agendamentos->count().' ambulatórios cancelados.');
+        $partes = array_filter([
+            $paraOperar->count() ? $paraOperar->count().($paraOperar->count() === 1 ? ' operado' : ' operados') : null,
+            $paraCancelar->count() ? $paraCancelar->count().($paraCancelar->count() === 1 ? ' cancelado' : ' cancelados') : null,
+        ]);
+
+        return back()->with('sucesso', $partes === [] ? 'Nenhum ambulatório por validar.' : 'Ambulatórios validados: '.implode(' e ', $partes).'.');
     }
 
     /** Move um agendamento para outra data (arrastar no calendário). */

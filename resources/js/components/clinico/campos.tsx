@@ -65,7 +65,7 @@ export function Selecao({ opcoes, valor, aoMudar, vazio = 'Escolher…', invalid
 const variantes = {
     primario: 'bg-teal-800 text-white hover:bg-teal-900 disabled:bg-teal-800/50',
     secundario: 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:text-slate-400',
-    perigo: 'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50',
+    perigo: 'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white',
 };
 
 const estiloBotao =
