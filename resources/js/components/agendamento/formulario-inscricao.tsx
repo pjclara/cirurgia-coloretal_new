@@ -81,6 +81,9 @@ export function FormularioInscricao({
         else form.post(`/agendamento/utentes/${utente.id}/inscrever`, { preserveScroll: true });
     };
 
+    /** Com um agendamento por cancelar a inscrição não se cancela: cancela-se primeiro o agendamento. */
+    const temAgendamento = !!espera?.agendamentos.some((a) => a.estado !== 4);
+
     const cancelar = () => {
         if (espera && window.confirm('Cancelar esta inscrição em lista de espera?'))
             router.post(
@@ -255,7 +258,13 @@ export function FormularioInscricao({
                         Cancelar
                     </Botao>
                     {espera && espera.estado !== 4 && !espera.somente_consulta && (
-                        <Botao variante="perigo" className="ml-auto" onClick={cancelar}>
+                        <Botao
+                            variante="perigo"
+                            className="ml-auto"
+                            onClick={cancelar}
+                            disabled={temAgendamento}
+                            title={temAgendamento ? 'Tem um agendamento: cancele primeiro o agendamento' : undefined}
+                        >
                             Cancelar inscrição
                         </Botao>
                     )}

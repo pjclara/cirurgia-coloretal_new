@@ -15,13 +15,13 @@ use ZipArchive;
 class LeitorDeFolha
 {
     /** @return Generator<int, array<string, string|null>> */
-    public static function linhas(string $ficheiro): Generator
+    public static function linhas(string $ficheiro, int $folha = 0): Generator
     {
         if (! is_file($ficheiro)) {
             throw new RuntimeException("Ficheiro não encontrado: $ficheiro");
         }
 
-        $linhas = strtolower(pathinfo($ficheiro, PATHINFO_EXTENSION)) === 'csv' ? self::csv($ficheiro) : self::xlsx($ficheiro);
+        $linhas = strtolower(pathinfo($ficheiro, PATHINFO_EXTENSION)) === 'csv' ? self::csv($ficheiro) : self::xlsx($ficheiro, $folha);
 
         $cabecalhos = null;
         foreach ($linhas as $celulas) {
@@ -72,7 +72,7 @@ class LeitorDeFolha
         fclose($f);
     }
 
-    private static function xlsx(string $ficheiro): Generator
+    private static function xlsx(string $ficheiro, int $indiceDaFolha = 0): Generator
     {
         $zip = new ZipArchive;
         if ($zip->open($ficheiro) !== true) {
@@ -81,15 +81,18 @@ class LeitorDeFolha
 
         $textos = self::textosPartilhados($zip);
 
-        $folha = null;
+        // As folhas por ordem do nome do ficheiro (sheet1, sheet2…): a 0 é a primeira.
+        $folhas = [];
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $nome = $zip->getNameIndex($i);
-            if (preg_match('#^xl/worksheets/sheet\d+\.xml$#', $nome) && ($folha === null || strnatcmp($nome, $folha) < 0)) {
-                $folha = $nome;
+            if (preg_match('#^xl/worksheets/sheet\d+\.xml$#', $nome)) {
+                $folhas[] = $nome;
             }
         }
+        usort($folhas, 'strnatcmp');
+        $folha = $folhas[$indiceDaFolha] ?? null;
         if ($folha === null) {
-            throw new RuntimeException('O ficheiro não tem folhas.');
+            throw new RuntimeException($folhas === [] ? 'O ficheiro não tem folhas.' : 'O ficheiro não tem a folha '.($indiceDaFolha + 1).'.');
         }
 
         $leitor = new XMLReader;

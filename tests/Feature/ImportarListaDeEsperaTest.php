@@ -126,11 +126,11 @@ test('o administrador importa a lista de espera por Excel: carrega, vê a simula
     // Carregar mostra a simulação e não grava nada.
     $this->actingAs($admin)->post('/admin/importar/lista-de-espera', ['ficheiro' => $csv])->assertRedirect('/admin/importar/lista-de-espera');
     $previa = session('previa');
-    expect($previa['a_criar'])->toBe(1)->and($previa['novos_utentes'])->toBe(1)->and($previa['saltados']['sem_medico'])->toBe(1)
+    expect($previa['a_criar'])->toBe(1)->and($previa['novos_utentes'])->toBe(1)->and($previa['saltados'])->toBe([['rotulo' => 'sem médico reconhecido', 'n' => 1]])
         ->and($previa['amostra'][0]['nome'])->toBe('Ana Nova')
         ->and(Utente::where('numero_processo', 99100001)->exists())->toBeFalse();
     $this->actingAs($admin)->withSession(['previa' => $previa])->get('/admin/importar/lista-de-espera')->assertInertia(fn ($p) => $p
-        ->component('admin/importar-lista-de-espera')->where('previa.a_criar', 1));
+        ->component('admin/importar')->where('previa.a_criar', 1));
 
     // Confirmar grava; repetir o mesmo token já não encontra a folha.
     $this->actingAs($admin)->post('/admin/importar/lista-de-espera/confirmar', ['token' => $previa['token']])->assertSessionHas('sucesso');

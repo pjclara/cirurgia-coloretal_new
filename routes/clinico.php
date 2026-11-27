@@ -117,11 +117,13 @@ Route::middleware('clinico.admin')->prefix('admin')->name('admin.')->group(funct
         Route::delete('{id}', [CatalogoController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Importação da lista de espera por Excel (simulação e confirmação).
-    Route::get('importar/lista-de-espera', [ImportacaoController::class, 'listaDeEspera'])->name('importar.lista-de-espera');
-    Route::post('importar/lista-de-espera', [ImportacaoController::class, 'previsualizar'])->name('importar.previsualizar');
-    Route::post('importar/lista-de-espera/confirmar', [ImportacaoController::class, 'aplicar'])->name('importar.aplicar');
-    Route::post('importar/lista-de-espera/cancelar', [ImportacaoController::class, 'cancelar'])->name('importar.cancelar');
+    // Importações por Excel (lista de espera e referenciações): simulação e confirmação.
+    Route::prefix('importar/{tipo}')->where(['tipo' => 'lista-de-espera|referenciacoes'])->name('importar.')->group(function () {
+        Route::get('/', [ImportacaoController::class, 'mostrar'])->name('mostrar');
+        Route::post('/', [ImportacaoController::class, 'previsualizar'])->name('previsualizar');
+        Route::post('confirmar', [ImportacaoController::class, 'aplicar'])->name('aplicar');
+        Route::post('cancelar', [ImportacaoController::class, 'cancelar'])->name('cancelar');
+    });
 
     // Perfis e permissões: só o superAdmin.
     Route::middleware('clinico.superadmin')->group(function () {

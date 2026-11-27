@@ -326,6 +326,11 @@ class AgendamentoController extends Controller
     {
         $this->impedirSeOperado($espera);
 
+        // Com um agendamento (que não esteja cancelado) a inscrição não se cancela: cancela-se primeiro o agendamento.
+        if ($espera->agendamentoAtivo()) {
+            return back()->with('erro', 'Esta inscrição tem um agendamento: cancele primeiro o agendamento (e, nesse passo, escolha se a inscrição também se cancela).');
+        }
+
         $espera->update(['estado_lista_espera' => ListaDeEspera::ESTADO_CANCELADO, 'cancelar_lista_espera' => ListaDeEspera::CANCELADA_DE_PROPOSITO]);
 
         return ($retorno = $this->retornoDaAgenda($request)) !== null

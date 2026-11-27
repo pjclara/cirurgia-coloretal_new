@@ -1,9 +1,11 @@
-import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
 import { formatarData } from '../../clinico/formato';
 import { useResponsavelPorOmissao } from '../../clinico/responsavel';
+import { rotas } from '../../clinico/rotas';
 import type { Opcao, OpcaoAgrupada, PropsPartilhadas, Responsavel } from '../../clinico/tipos';
+import { CorpoFormularioUtente, type PropsUtente } from '../../pages/utentes/formulario';
 import { Botao, Campo, Seccao, Selecao, SelecaoResponsavel, estiloEntrada } from '../clinico/campos';
 import { NumeroProcesso } from '../clinico/numero-processo';
 import { EditorDecisao, type DecisaoTerapeutica } from './editor-decisao';
@@ -33,7 +35,7 @@ export type PropsReferenciacao = {
         comentarios: string;
         diagnosticos: { diagnostico_id: number; modo_id: number | null; histologia_id: number | null; data_diagnostico: string }[];
     } | null;
-    utente: { id: number; nome: string; numero_processo: number };
+    utente: { id: number; nome: string; numero_processo: number | null };
     /** Internamentos do utente (null sem permissão para os ver). */
     internamentos?: InternamentoDoUtente[] | null;
     /** Decisões terapêuticas (reunião DT) do utente; só ao editar uma referenciação existente. */
@@ -118,6 +120,16 @@ export function FormularioReferenciacao({
     const [decisaoAberta, setDecisaoAberta] = useState<DecisaoTerapeutica | null | undefined>(undefined);
     const { permissoes, administrador } = usePage<PropsPartilhadas>().props.clinico;
     const podeApagar = administrador || permissoes.includes('delete referenciacao');
+    const podeEditarUtente = administrador || permissoes.includes('update internamento');
+    /** Ficha do utente aberta por cima desta janela (para completar, por exemplo, o n.º de processo). */
+    const [editarUtente, setEditarUtente] = useState<PropsUtente | 'a-carregar' | 'erro' | null>(null);
+    const abrirEdicaoDoUtente = () => {
+        setEditarUtente('a-carregar');
+        fetch(rotas.utentes.dados(utente.id), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then((r) => (r.ok ? (r.json() as Promise<PropsUtente>) : Promise.reject(new Error())))
+            .then(setEditarUtente)
+            .catch(() => setEditarUtente('erro'));
+    };
 
     const euResponsavel = useResponsavelPorOmissao(dominios.responsaveis);
     const form = useForm({
@@ -173,8 +185,39 @@ export function FormularioReferenciacao({
                 <DialogTitle>{referenciacao ? 'Referenciação ao centro de referência' : 'Referenciar ao centro de referência'}</DialogTitle>
                 <DialogDescription className="tabular-nums">
                     {utente.nome} · <NumeroProcesso valor={utente.numero_processo} />
+                    {podeEditarUtente && (
+                        <button
+                            type="button"
+                            onClick={abrirEdicaoDoUtente}
+                            className="ml-3 text-xs text-slate-700 underline underline-offset-2 hover:text-slate-900"
+                        >
+                            Editar utente
+                        </button>
+                    )}
                 </DialogDescription>
             </DialogHeader>
+            {editarUtente && (
+                <Dialog open onOpenChange={(aberto) => !aberto && setEditarUtente(null)}>
+                    <DialogContent
+                        className="max-h-[90vh] max-w-3xl overflow-y-auto bg-white text-slate-900"
+                        onInteractOutside={(e) => e.preventDefault()}
+                        aria-describedby={undefined}
+                    >
+                        <DialogHeader>
+                            <DialogTitle>Editar utente</DialogTitle>
+                        </DialogHeader>
+                        {editarUtente === 'a-carregar' && <p className="text-sm text-slate-600">A carregar…</p>}
+                        {editarUtente === 'erro' && <p className="text-sm text-rose-700">Não foi possível carregar os dados do utente.</p>}
+                        {typeof editarUtente === 'object' && (
+                            <CorpoFormularioUtente
+                                {...editarUtente}
+                                aoCancelar={() => setEditarUtente(null)}
+                                aoGuardar={() => setEditarUtente(null)}
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+            )}
 
             <div role="tablist" aria-label="Secções da referenciação" className="flex gap-1 border-b border-slate-200">
                 {(
